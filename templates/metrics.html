@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project Metrics</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        div { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Healthcare Directory Metrics</h2>
+    <div><strong>Total Providers:</strong> {{ metrics.total_providers }} / 5000 ({{ metrics.remaining_providers }} remaining)</div>
+    <div><strong>API Calls:</strong> {{ metrics.total_api_calls }} (Est. Cost: ${{ "%.2f" % metrics.estimated_cost }})</div>
+    <div><strong>Daily Progress:</strong> {{ metrics.daily_progress }} providers</div>
+    <a href="/review">Back to Review</a>
+</body>
+</html>

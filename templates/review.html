@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Provider Review</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        button { margin-right: 5px; }
+        textarea { width: 100%; height: 100px; }
+        select { width: 100%; }
+    </style>
+</head>
+<body>
+    <h2>Review Providers</h2>
+    <select onchange="window.location='?filter='+this.value">
+        <option value="pending" {% if filter_type == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="unknown_proficiency" {% if filter_type == 'unknown_proficiency' %}selected{% endif %}>Unknown Proficiency</option>
+    </select>
+    <table>
+        <tr>
+            <th>Name</th>
+            <th>Address</th>
+            <th>Proficiency</th>
+            <th>Highlights</th>
+            <th>Description</th>
+            <th>Action</th>
+        </tr>
+        {% for provider in providers %}
+        <tr>
+            <td>{{ provider.provider_name }}</td>
+            <td>{{ provider.address }}</td>
+            <td>
+                <form method="POST">
+                    <input type="hidden" name="id" value="{{ provider.id }}">
+                    <select name="english_proficiency">
+                        <option value="Fluent" {% if provider.english_proficiency == 'Fluent' %}selected{% endif %}>Fluent</option>
+                        <option value="Conversational" {% if provider.english_proficiency == 'Conversational' %}selected{% endif %}>Conversational</option>
+                        <option value="Basic" {% if provider.english_proficiency == 'Basic' %}selected{% endif %}>Basic</option>
+                        <option value="Unknown" {% if provider.english_proficiency == 'Unknown' %}selected{% endif %}>Unknown</option>
+                    </select>
+                    <button name="action" value="edit">Save Edit</button>
+                </form>
+            </td>
+            <td>{{ provider.review_highlights | tojson }}</td>
+            <td>
+                <form method="POST">
+                    <input type="hidden" name="id" value="{{ provider.id }}">
+                    <textarea name="ai_description">{{ provider.ai_description }}</textarea>
+                    <button name="action" value="edit">Save Edit</button>
+                </form>
+            </td>
+            <td>
+                <form method="POST">
+                    <input type="hidden" name="id" value="{{ provider.id }}">
+                    <button name="action" value="approve">Approve</button>
+                    <button name="action" value="reject">Reject</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/metrics">View Metrics</a>
+</body>
+</html>

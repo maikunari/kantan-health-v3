@@ -1,0 +1,14 @@
+{
+    "specialties": [
+        {"name": "doctor", "category": "General Medicine"},
+        {"name": "dentist", "category": "Dental Care"},
+        {"name": "gynecologist", "category": "Women’s Health"},
+        {"name": "pediatrician", "category": "Pediatrics"},
+        {"name": "cardiologist", "category": "Cardiology"},
+        {"name": "dermatologist", "category": "Dermatology"},
+        {"name": "orthopedist", "category": "Orthopedics"},
+        {"name": "ophthalmologist", "category": "Ophthalmology"},
+        {"name": "psychiatrist", "category": "Mental Health"}
+        // Add your specialties here
+    ]
+}

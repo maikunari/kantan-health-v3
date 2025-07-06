@@ -1,0 +1,694 @@
+{
+    "prefectures": [
+        {
+            "name": "Hokkaido",
+            "cities": [
+                {"name": "Sapporo", "population": 1970000},
+                {"name": "Asahikawa", "population": 325000},
+                {"name": "Hakodate", "population": 240000},
+                {"name": "Kushiro", "population": 165000},
+                {"name": "Tomakomai", "population": 165000},
+                {"name": "Obihiro", "population": 165000},
+                {"name": "Otaru", "population": 110000},
+                {"name": "Kitami", "population": 105000},
+                {"name": "Ebetsu", "population": 105000},
+                {"name": "Muroran", "population": 80000}
+            ]
+        },
+        {
+            "name": "Aomori",
+            "cities": [
+                {"name": "Aomori", "population": 275000},
+                {"name": "Hachinohe", "population": 225000},
+                {"name": "Hirosaki", "population": 170000},
+                {"name": "Towada", "population": 60000},
+                {"name": "Goshogawara", "population": 50000},
+                {"name": "Misawa", "population": 40000},
+                {"name": "Kuroishi", "population": 30000},
+                {"name": "Tsugaru", "population": 30000},
+                {"name": "Mutsu", "population": 25000},
+                {"name": "Hirakawa", "population": 25000}
+            ]
+        },
+        {
+            "name": "Iwate",
+            "cities": [
+                {"name": "Morioka", "population": 290000},
+                {"name": "Ichinoseki", "population": 110000},
+                {"name": "Oshu", "population": 110000},
+                {"name": "Hanamaki", "population": 90000},
+                {"name": "Kitakami", "population": 90000},
+                {"name": "Kuji", "population": 35000},
+                {"name": "Tono", "population": 25000},
+                {"name": "Miyako", "population": 25000},
+                {"name": "Ofunato", "population": 20000},
+                {"name": "Rikuzentakata", "population": 20000}
+            ]
+        },
+        {
+            "name": "Miyagi",
+            "cities": [
+                {"name": "Sendai", "population": 1100000},
+                {"name": "Ishinomaki", "population": 140000},
+                {"name": "Shiogama", "population": 50000},
+                {"name": "Kesennuma", "population": 50000},
+                {"name": "Natori", "population": 80000},
+                {"name": "Tagajo", "population": 60000},
+                {"name": "Iwanuma", "population": 45000},
+                {"name": "Tome", "population": 40000},
+                {"name": "Higashimatsushima", "population": 40000},
+                {"name": "Osaki", "population": 35000}
+            ]
+        },
+        {
+            "name": "Akita",
+            "cities": [
+                {"name": "Akita", "population": 300000},
+                {"name": "Yokote", "population": 85000},
+                {"name": "Odate", "population": 70000},
+                {"name": "Daisen", "population": 50000},
+                {"name": "Yuzawa", "population": 40000},
+                {"name": "Yurihonjo", "population": 40000},
+                {"name": "Noshiro", "population": 35000},
+                {"name": "Kazuno", "population": 30000},
+                {"name": "Semboku", "population": 25000},
+                {"name": "Katagami", "population": 25000}
+            ]
+        },
+        {
+            "name": "Yamagata",
+            "cities": [
+                {"name": "Yamagata", "population": 245000},
+                {"name": "Tsuruoka", "population": 120000},
+                {"name": "Sakata", "population": 100000},
+                {"name": "Yonezawa", "population": 80000},
+                {"name": "Tendo", "population": 60000},
+                {"name": "Higashine", "population": 50000},
+                {"name": "Shinjo", "population": 35000},
+                {"name": "Nanyo", "population": 30000},
+                {"name": "Kaminoyama", "population": 25000},
+                {"name": "Sagae", "population": 25000}
+            ]
+        },
+        {
+            "name": "Fukushima",
+            "cities": [
+                {"name": "Iwaki", "population": 335000},
+                {"name": "Koriyama", "population": 325000},
+                {"name": "Fukushima", "population": 280000},
+                {"name": "Aizuwakamatsu", "population": 115000},
+                {"name": "Sukagawa", "population": 75000},
+                {"name": "Soma", "population": 35000},
+                {"name": "Kitakata", "population": 35000},
+                {"name": "Nihonmatsu", "population": 30000},
+                {"name": "Tamura", "population": 30000},
+                {"name": "Minamisoma", "population": 25000}
+            ]
+        },
+        {
+            "name": "Ibaraki",
+            "cities": [
+                {"name": "Mito", "population": 270000},
+                {"name": "Tsukuba", "population": 250000},
+                {"name": "Hitachi", "population": 175000},
+                {"name": "Tsuchiura", "population": 140000},
+                {"name": "Koga", "population": 135000},
+                {"name": "Kashima", "population": 65000},
+                {"name": "Ryugasaki", "population": 75000},
+                {"name": "Toride", "population": 105000},
+                {"name": "Ushiku", "population": 85000},
+                {"name": "Kasama", "population": 65000}
+            ]
+        },
+        {
+            "name": "Tochigi",
+            "cities": [
+                {"name": "Utsunomiya", "population": 515000},
+                {"name": "Oyama", "population": 165000},
+                {"name": "Tochigi", "population": 155000},
+                {"name": "Ashikaga", "population": 145000},
+                {"name": "Sano", "population": 115000},
+                {"name": "Kanuma", "population": 95000},
+                {"name": "Nikko", "population": 80000},
+                {"name": "Mooka", "population": 75000},
+                {"name": "Shimotsuke", "population": 60000},
+                {"name": "Nasushiobara", "population": 55000}
+            ]
+        },
+        {
+            "name": "Gunma",
+            "cities": [
+                {"name": "Takasaki", "population": 365000},
+                {"name": "Maebashi", "population": 335000},
+                {"name": "Ota", "population": 220000},
+                {"name": "Isesaki", "population": 210000},
+                {"name": "Kiryu", "population": 110000},
+                {"name": "Tatebayashi", "population": 75000},
+                {"name": "Fujioka", "population": 65000},
+                {"name": "Annaka", "population": 55000},
+                {"name": "Shibukawa", "population": 50000},
+                {"name": "Numata", "population": 45000}
+            ]
+        },
+        {
+            "name": "Saitama",
+            "cities": [
+                {"name": "Saitama", "population": 1350000},
+                {"name": "Kawaguchi", "population": 595000},
+                {"name": "Kawagoe", "population": 355000},
+                {"name": "Tokorozawa", "population": 345000},
+                {"name": "Koshigaya", "population": 345000},
+                {"name": "Soka", "population": 255000},
+                {"name": "Ageo", "population": 225000},
+                {"name": "Warabi", "population": 75000},
+                {"name": "Toda", "population": 140000},
+                {"name": "Kasukabe", "population": 230000}
+            ]
+        },
+        {
+            "name": "Chiba",
+            "cities": [
+                {"name": "Chiba", "population": 980000},
+                {"name": "Funabashi", "population": 645000},
+                {"name": "Matsudo", "population": 490000},
+                {"name": "Kashiwa", "population": 435000},
+                {"name": "Ichikawa", "population": 495000},
+                {"name": "Urayasu", "population": 170000},
+                {"name": "Narashino", "population": 175000},
+                {"name": "Yachiyo", "population": 200000},
+                {"name": "Nagareyama", "population": 200000},
+                {"name": "Abiko", "population": 130000}
+            ]
+        },
+        {
+            "name": "Tokyo",
+            "cities": [
+                {"name": "Setagaya", "population": 940000},
+                {"name": "Nerima", "population": 765000},
+                {"name": "Ota", "population": 745000},
+                {"name": "Edogawa", "population": 700000},
+                {"name": "Adachi", "population": 675000},
+                {"name": "Suginami", "population": 600000},
+                {"name": "Itabashi", "population": 580000},
+                {"name": "Koto", "population": 540000},
+                {"name": "Katsushika", "population": 455000},
+                {"name": "Shinagawa", "population": 425000}
+            ]
+        },
+        {
+            "name": "Kanagawa",
+            "cities": [
+                {"name": "Yokohama", "population": 3800000},
+                {"name": "Kawasaki", "population": 1600000},
+                {"name": "Sagamihara", "population": 720000},
+                {"name": "Fujisawa", "population": 435000},
+                {"name": "Yokosuka", "population": 390000},
+                {"name": "Chigasaki", "population": 240000},
+                {"name": "Atsugi", "population": 225000},
+                {"name": "Odawara", "population": 185000},
+                {"name": "Yamato", "population": 185000},
+                {"name": "Ebina", "population": 135000}
+            ]
+        },
+        {
+            "name": "Niigata",
+            "cities": [
+                {"name": "Niigata", "population": 795000},
+                {"name": "Nagaoka", "population": 265000},
+                {"name": "Joetsu", "population": 190000},
+                {"name": "Shibata", "population": 95000},
+                {"name": "Sanjo", "population": 95000},
+                {"name": "Kashiwazaki", "population": 80000},
+                {"name": "Tsubame", "population": 75000},
+                {"name": "Murakami", "population": 60000},
+                {"name": "Mitsuke", "population": 40000},
+                {"name": "Gosen", "population": 40000}
+            ]
+        },
+        {
+            "name": "Toyama",
+            "cities": [
+                {"name": "Toyama", "population": 415000},
+                {"name": "Takaoka", "population": 170000},
+                {"name": "Imizu", "population": 90000},
+                {"name": "Namerikawa", "population": 35000},
+                {"name": "Uozu", "population": 40000},
+                {"name": "Himi", "population": 45000},
+                {"name": "Tonami", "population": 45000},
+                {"name": "Oyabe", "population": 30000},
+                {"name": "Nanto", "population": 30000},
+                {"name": "Kurobe", "population": 25000}
+            ]
+        },
+        {
+            "name": "Ishikawa",
+            "cities": [
+                {"name": "Kanazawa", "population": 465000},
+                {"name": "Komatsu", "population": 105000},
+                {"name": "Hakusan", "population": 110000},
+                {"name": "Nonoichi", "population": 55000},
+                {"name": "Kaga", "population": 65000},
+                {"name": "Kahoku", "population": 35000},
+                {"name": "Suzu", "population": 15000},
+                {"name": "Nomi", "population": 50000},
+                {"name": "Wajima", "population": 15000},
+                {"name": "Hakui", "population": 20000}
+            ]
+        },
+        {
+            "name": "Fukui",
+            "cities": [
+                {"name": "Fukui", "population": 260000},
+                {"name": "Sakai", "population": 90000},
+                {"name": "Tsuruga", "population": 65000},
+                {"name": "Obama", "population": 30000},
+                {"name": "Ono", "population": 35000},
+                {"name": "Sabae", "population": 65000},
+                {"name": "Awara", "population": 30000},
+                {"name": "Echizen", "population": 25000},
+                {"name": "Katsuyama", "population": 20000}
+            ]
+        },
+        {
+            "name": "Yamanashi",
+            "cities": [
+                {"name": "Kofu", "population": 190000},
+                {"name": "Kai", "population": 75000},
+                {"name": "Minami-Alps", "population": 70000},
+                {"name": "Fuefuki", "population": 65000},
+                {"name": "Nirasaki", "population": 30000},
+                {"name": "Yamanashi", "population": 25000},
+                {"name": "Tsuru", "population": 25000},
+                {"name": "Otsuki", "population": 20000},
+                {"name": "Uenohara", "population": 20000},
+                {"name": "Chuo", "population": 15000}
+            ]
+        },
+        {
+            "name": "Nagano",
+            "cities": [
+                {"name": "Nagano", "population": 370000},
+                {"name": "Matsumoto", "population": 240000},
+                {"name": "Ueda", "population": 155000},
+                {"name": "Saku", "population": 95000},
+                {"name": "Azumino", "population": 95000},
+                {"name": "Iida", "population": 95000},
+                {"name": "Suwa", "population": 50000},
+                {"name": "Okaya", "population": 45000},
+                {"name": "Komoro", "population": 40000},
+                {"name": "Chino", "population": 55000}
+            ]
+        },
+        {
+            "name": "Gifu",
+            "cities": [
+                {"name": "Gifu", "population": 400000},
+                {"name": "Ogaki", "population": 160000},
+                {"name": "Tajimi", "population": 105000},
+                {"name": "Kakamigahara", "population": 145000},
+                {"name": "Mino", "population": 20000},
+                {"name": "Mizunami", "population": 35000},
+                {"name": "Hashima", "population": 65000},
+                {"name": "Nakatsugawa", "population": 75000},
+                {"name": "Seki", "population": 85000},
+                {"name": "Takayama", "population": 85000}
+            ]
+        },
+        {
+            "name": "Shizuoka",
+            "cities": [
+                {"name": "Shizuoka", "population": 685000},
+                {"name": "Hamamatsu", "population": 790000},
+                {"name": "Fuji", "population": 245000},
+                {"name": "Numazu", "population": 185000},
+                {"name": "Fujieda", "population": 145000},
+                {"name": "Yaizu", "population": 135000},
+                {"name": "Fujinomiya", "population": 130000},
+                {"name": "Shimada", "population": 95000},
+                {"name": "Iwata", "population": 165000},
+                {"name": "Kakegawa", "population": 115000}
+            ]
+        },
+        {
+            "name": "Aichi",
+            "cities": [
+                {"name": "Nagoya", "population": 2300000},
+                {"name": "Toyohashi", "population": 370000},
+                {"name": "Okazaki", "population": 385000},
+                {"name": "Ichinomiya", "population": 380000},
+                {"name": "Seto", "population": 125000},
+                {"name": "Handa", "population": 115000},
+                {"name": "Kasugai", "population": 305000},
+                {"name": "Toyokawa", "population": 185000},
+                {"name": "Tsushima", "population": 60000},
+                {"name": "Hekinan", "population": 70000}
+            ]
+        },
+        {
+            "name": "Mie",
+            "cities": [
+                {"name": "Yokkaichi", "population": 305000},
+                {"name": "Tsu", "population": 275000},
+                {"name": "Suzuka", "population": 195000},
+                {"name": "Matsusaka", "population": 155000},
+                {"name": "Kuwana", "population": 135000},
+                {"name": "Ise", "population": 125000},
+                {"name": "Kameyama", "population": 50000},
+                {"name": "Toba", "population": 20000},
+                {"name": "Nabari", "population": 75000},
+                {"name": "Owase", "population": 15000}
+            ]
+        },
+        {
+            "name": "Shiga",
+            "cities": [
+                {"name": "Otsu", "population": 345000},
+                {"name": "Kusatsu", "population": 140000},
+                {"name": "Hikone", "population": 110000},
+                {"name": "Nagahama", "population": 115000},
+                {"name": "Moriyama", "population": 80000},
+                {"name": "Omihachiman", "population": 80000},
+                {"name": "Ritto", "population": 70000},
+                {"name": "Koka", "population": 90000},
+                {"name": "Yasu", "population": 50000},
+                {"name": "Konan", "population": 55000}
+            ]
+        },
+        {
+            "name": "Kyoto",
+            "cities": [
+                {"name": "Kyoto", "population": 1450000},
+                {"name": "Uji", "population": 185000},
+                {"name": "Kameoka", "population": 85000},
+                {"name": "Maizuru", "population": 80000},
+                {"name": "Fukuchiyama", "population": 75000},
+                {"name": "Ayabe", "population": 35000},
+                {"name": "Yawata", "population": 70000},
+                {"name": "Kyotanabe", "population": 70000},
+                {"name": "Nagaokakyo", "population": 80000},
+                {"name": "Miyazu", "population": 15000}
+            ]
+        },
+        {
+            "name": "Osaka",
+            "cities": [
+                {"name": "Osaka", "population": 2800000},
+                {"name": "Sakai", "population": 810000},
+                {"name": "Higashiosaka", "population": 490000},
+                {"name": "Toyonaka", "population": 395000},
+                {"name": "Suita", "population": 380000},
+                {"name": "Takatsuki", "population": 350000},
+                {"name": "Hirakata", "population": 350000},
+                {"name": "Ibaraki", "population": 280000},
+                {"name": "Yao", "population": 260000},
+                {"name": "Neyagawa", "population": 230000}
+            ]
+        },
+        {
+            "name": "Hyogo",
+            "cities": [
+                {"name": "Kobe", "population": 1500000},
+                {"name": "Himeji", "population": 525000},
+                {"name": "Amagasaki", "population": 450000},
+                {"name": "Nishinomiya", "population": 485000},
+                {"name": "Akashi", "population": 295000},
+                {"name": "Kakogawa", "population": 260000},
+                {"name": "Takarazuka", "population": 225000},
+                {"name": "Kawanishi", "population": 155000},
+                {"name": "Sanda", "population": 110000},
+                {"name": "Ashiya", "population": 95000}
+            ]
+        },
+        {
+            "name": "Nara",
+            "cities": [
+                {"name": "Nara", "population": 355000},
+                {"name": "Kashihara", "population": 120000},
+                {"name": "Ikoma", "population": 115000},
+                {"name": "Yamatokoriyama", "population": 85000},
+                {"name": "Kashiba", "population": 75000},
+                {"name": "Tenri", "population": 65000},
+                {"name": "Yamatotakada", "population": 60000},
+                {"name": "Sakurai", "population": 55000},
+                {"name": "Gose", "population": 25000},
+                {"name": "Gojo", "population": 25000}
+            ]
+        },
+        {
+            "name": "Wakayama",
+            "cities": [
+                {"name": "Wakayama", "population": 355000},
+                {"name": "Tanabe", "population": 70000},
+                {"name": "Hashimoto", "population": 60000},
+                {"name": "Kainan", "population": 50000},
+                {"name": "Gobō", "population": 25000},
+                {"name": "Kinokawa", "population": 60000},
+                {"name": "Arida", "population": 25000},
+                {"name": "Shingu", "population": 25000},
+                {"name": "Iwade", "population": 55000}
+            ]
+        },
+        {
+            "name": "Tottori",
+            "cities": [
+                {"name": "Tottori", "population": 185000},
+                {"name": "Yonago", "population": 145000},
+                {"name": "Kurayoshi", "population": 45000},
+                {"name": "Sakaiminato", "population": 30000}
+            ]
+        },
+        {
+            "name": "Shimane",
+            "cities": [
+                {"name": "Matsue", "population": 200000},
+                {"name": "Izumo", "population": 170000},
+                {"name": "Hamada", "population": 55000},
+                {"name": "Masuda", "population": 45000},
+                {"name": "Yasugi", "population": 35000},
+                {"name": "Gotsu", "population": 20000},
+                {"name": "Unnan", "population": 35000},
+                {"name": "Ota", "population": 15000}
+            ]
+        },
+        {
+            "name": "Okayama",
+            "cities": [
+                {"name": "Okayama", "population": 725000},
+                {"name": "Kurashiki", "population": 475000},
+                {"name": "Tsuyama", "population": 100000},
+                {"name": "Tamano", "population": 55000},
+                {"name": "Kasaoka", "population": 45000},
+                {"name": "Soja", "population": 65000},
+                {"name": "Bizen", "population": 35000},
+                {"name": "Setouchi", "population": 35000},
+                {"name": "Akaiwa", "population": 45000},
+                {"name": "Niimi", "population": 30000}
+            ]
+        },
+        {
+            "name": "Hiroshima",
+            "cities": [
+                {"name": "Hiroshima", "population": 1200000},
+                {"name": "Fukuyama", "population": 465000},
+                {"name": "Kure", "population": 215000},
+                {"name": "Higashihiroshima", "population": 185000},
+                {"name": "Onomichi", "population": 135000},
+                {"name": "Mihara", "population": 90000},
+                {"name": "Hatsukaichi", "population": 115000},
+                {"name": "Akitakata", "population": 25000},
+                {"name": "Takehara", "population": 25000},
+                {"name": "Fuchu", "population": 35000}
+            ]
+        },
+        {
+            "name": "Yamaguchi",
+            "cities": [
+                {"name": "Shimonoseki", "population": 255000},
+                {"name": "Yamaguchi", "population": 190000},
+                {"name": "Ube", "population": 165000},
+                {"name": "Hofu", "population": 115000},
+                {"name": "Iwakuni", "population": 130000},
+                {"name": "Hikari", "population": 50000},
+                {"name": "Nagato", "population": 35000},
+                {"name": "Yanai", "population": 30000},
+                {"name": "Mine", "population": 25000},
+                {"name": "Hagi", "population": 25000}
+            ]
+        },
+        {
+            "name": "Tokushima",
+            "cities": [
+                {"name": "Tokushima", "population": 255000},
+                {"name": "Naruto", "population": 55000},
+                {"name": "Anan", "population": 70000},
+                {"name": "Komatsushima", "population": 35000},
+                {"name": "Yoshinogawa", "population": 40000},
+                {"name": "Awa", "population": 35000},
+                {"name": "Mima", "population": 25000},
+                {"name": "Miyoshi", "population": 25000}
+            ]
+        },
+        {
+            "name": "Kagawa",
+            "cities": [
+                {"name": "Takamatsu", "population": 415000},
+                {"name": "Marugame", "population": 110000},
+                {"name": "Sakaide", "population": 50000},
+                {"name": "Zentsuji", "population": 30000},
+                {"name": "Sanuki", "population": 50000},
+                {"name": "Higashikagawa", "population": 30000},
+                {"name": "Mitoyo", "population": 60000},
+                {"name": "Kanonji", "population": 55000}
+            ]
+        },
+        {
+            "name": "Ehime",
+            "cities": [
+                {"name": "Matsuyama", "population": 510000},
+                {"name": "Imabari", "population": 150000},
+                {"name": "Niihama", "population": 115000},
+                {"name": "Saijo", "population": 105000},
+                {"name": "Shikokuchuo", "population": 85000},
+                {"name": "Uwajima", "population": 70000},
+                {"name": "Ozu", "population": 40000},
+                {"name": "Yawatahama", "population": 35000},
+                {"name": "Seiyo", "population": 35000},
+                {"name": "Toon", "population": 35000}
+            ]
+        },
+        {
+            "name": "Kochi",
+            "cities": [
+                {"name": "Kochi", "population": 325000},
+                {"name": "Nankoku", "population": 45000},
+                {"name": "Shimanto", "population": 35000},
+                {"name": "Konan", "population": 30000},
+                {"name": "Susaki", "population": 20000},
+                {"name": "Sukumo", "population": 20000},
+                {"name": "Aki", "population": 15000},
+                {"name": "Tosa", "population": 25000},
+                {"name": "Tosashimizu", "population": 15000},
+                {"name": "Muroto", "population": 15000}
+            ]
+        },
+        {
+            "name": "Fukuoka",
+            "cities": [
+                {"name": "Fukuoka", "population": 1650000},
+                {"name": "Kitakyushu", "population": 925000},
+                {"name": "Kurume", "population": 300000},
+                {"name": "Omuta", "population": 110000},
+                {"name": "Iizuka", "population": 125000},
+                {"name": "Kasuga", "population": 110000},
+                {"name": "Chikushino", "population": 105000},
+                {"name": "Onojo", "population": 100000},
+                {"name": "Dazaifu", "population": 75000},
+                {"name": "Munakata", "population": 95000}
+            ]
+        },
+        {
+            "name": "Saga",
+            "cities": [
+                {"name": "Saga", "population": 230000},
+                {"name": "Karatsu", "population": 115000},
+                {"name": "Tosu", "population": 75000},
+                {"name": "Imari", "population": 50000},
+                {"name": "Taku", "population": 20000},
+                {"name": "Kashima", "population": 25000},
+                {"name": "Ogi", "population": 40000},
+                {"name": "Ureshino", "population": 25000},
+                {"name": "Kanzaki", "population": 30000},
+                {"name": "Takeo", "population": 25000}
+            ]
+        },
+        {
+            "name": "Nagasaki",
+            "cities": [
+                {"name": "Nagasaki", "population": 405000},
+                {"name": "Sasebo", "population": 245000},
+                {"name": "Isahaya", "population": 135000},
+                {"name": "Omura", "population": 95000},
+                {"name": "Tsushima", "population": 30000},
+                {"name": "Goto", "population": 35000},
+                {"name": "Hirado", "population": 30000},
+                {"name": "Matsuura", "population": 20000},
+                {"name": "Iki", "population": 25000},
+                {"name": "Saikai", "population": 25000}
+            ]
+        },
+        {
+            "name": "Kumamoto",
+            "cities": [
+                {"name": "Kumamoto", "population": 740000},
+                {"name": "Yatsushiro", "population": 125000},
+                {"name": "Amakusa", "population": 80000},
+                {"name": "Tamana", "population": 65000},
+                {"name": "Arao", "population": 50000},
+                {"name": "Uto", "population": 35000},
+                {"name": "Kami-Amakusa", "population": 25000},
+                {"name": "Uki", "population": 55000},
+                {"name": "Aso", "population": 25000},
+                {"name": "Hitoyoshi", "population": 30000}
+            ]
+        },
+        {
+            "name": "Oita",
+            "cities": [
+                {"name": "Oita", "population": 475000},
+                {"name": "Beppu", "population": 115000},
+                {"name": "Nakatsu", "population": 85000},
+                {"name": "Hita", "population": 65000},
+                {"name": "Saiki", "population": 45000},
+                {"name": "Usuki", "population": 35000},
+                {"name": "Tsukumi", "population": 15000},
+                {"name": "Taketa", "population": 20000},
+                {"name": "Bungotakada", "population": 20000},
+                {"name": "Usa", "population": 50000}
+            ]
+        },
+        {
+            "name": "Miyazaki",
+            "cities": [
+                {"name": "Miyazaki", "population": 400000},
+                {"name": "Miyakonojo", "population": 160000},
+                {"name": "Nobeoka", "population": 120000},
+                {"name": "Hyuga", "population": 60000},
+                {"name": "Nichinan", "population": 50000},
+                {"name": "Kobayashi", "population": 45000},
+                {"name": "Kushima", "population": 15000},
+                {"name": "Ebino", "population": 15000},
+                {"name": "Saito", "population": 30000}
+            ]
+        },
+        {
+            "name": "Kagoshima",
+            "cities": [
+                {"name": "Kagoshima", "population": 595000},
+                {"name": "Kirishima", "population": 125000},
+                {"name": "Aira", "population": 75000},
+                {"name": "Kanoya", "population": 100000},
+                {"name": "Satsumasendai", "population": 95000},
+                {"name": "Minamisatsuma", "population": 35000},
+                {"name": "Izumi", "population": 50000},
+                {"name": "Ibusuki", "population": 40000},
+                {"name": "Makurazaki", "population": 20000},
+                {"name": "Akune", "population": 20000}
+            ]
+        },
+        {
+            "name": "Okinawa",
+            "cities": [
+                {"name": "Naha", "population": 315000},
+                {"name": "Okinawa", "population": 140000},
+                {"name": "Uruma", "population": 125000},
+                {"name": "Ginowan", "population": 100000},
+                {"name": "Nago", "population": 65000},
+                {"name": "Itoman", "population": 60000},
+                {"name": "Tomigusuku", "population": 65000},
+                {"name": "Nanjo", "population": 45000},
+                {"name": "Ishigaki", "population": 50000},
+                {"name": "Miyakojima", "population": 55000}
+            ]
+        }
+    ]
+}
