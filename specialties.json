@@ -9,6 +9,5 @@
         {"name": "orthopedist", "category": "Orthopedics"},
         {"name": "ophthalmologist", "category": "Ophthalmology"},
         {"name": "psychiatrist", "category": "Mental Health"}
-        // Add your specialties here
     ]
 }

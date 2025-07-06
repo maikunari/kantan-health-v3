@@ -9,9 +9,8 @@ import os
 import time
 from typing import List, Dict, Tuple, Set, Any
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, text
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 Base = declarative_base()
 
@@ -202,7 +201,7 @@ class PostgresIntegration:
         """Test PostgreSQL connection"""
         try:
             session = self.Session()
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
             session.close()
             return True, "✅ PostgreSQL connection verified"
         except Exception as e:
