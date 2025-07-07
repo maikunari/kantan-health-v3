@@ -26,11 +26,10 @@ class GooglePlacesHealthcareCollector:
         print(f"Config Path: {config_path}")  # Debug: Resolved path
         try:
             with open(config_path, 'r') as f:
-                content = f.read()
-                print(f"File Content: [Sensitive data masked]")  # Mask content
+                print(f"File Content: {f.read()}")  # Debug: Raw file content
             load_dotenv(config_path)
             self.google_api_key = os.getenv('GOOGLE_PLACES_API_KEY')
-            print(f"Loaded API Key: [Masked for security]")  # Mask key
+            print(f"Loaded API Key: {self.google_api_key}")  # Debug: Loaded key
         except FileNotFoundError:
             print(f"Error: .env file not found at {config_path}")
         except Exception as e:
@@ -122,15 +121,15 @@ class GooglePlacesHealthcareCollector:
             'radius': radius
         }
         response = requests.get(self.search_url, params=params)
-        print(f"API Response for {query}: Status {response.status_code}")  # Debug: Status only
+        print(f"API Response for {query}: {response.text}")  # Debug: Raw response
         self.log_api_usage("text_search", 1)
         if response.status_code == 200:
             results = response.json().get('results', [])
-            print(f"Parsed Results for {query}: {len(results)} results")  # Debug: Count only
+            print(f"Parsed Results for {query}: {len(results)} results - {results[:2] if results else 'None'}")  # Debug: Parsed results
             self.cache_results(query, results)
             return results
         else:
-            print(f"❌ Search error: {response.status_code} - {response.text}")
+            print(f"❌ Search error: {response.status_code}")
             return []
 
     def get_place_details(self, place_id):
@@ -205,71 +204,9 @@ class GooglePlacesHealthcareCollector:
                     min_duration = duration
                     nearest_station = {
                         'name': stations[i]['name'],
-                        'time': element['duration']['text'],
-                        'distance': element['distance']['text']
+                        'time': f"{int(round(min_duration / 60))} min. walk"
                     }
         return nearest_station
-
-    def search_and_collect_providers(self, search_queries, max_per_query=10):
-        """Search for providers and collect comprehensive data"""
-        print(f"🔍 Searching {len(search_queries)} queries with max {max_per_query} results per query")
-        all_providers = []
-        processed_place_ids = set()
-        
-        for i, query in enumerate(search_queries):
-            print(f"🔍 Processing query {i+1}/{len(search_queries)}: {query}")
-            
-            # Search for providers
-            search_results = self.search_healthcare_providers(query)
-            
-            if not search_results:
-                print(f"⚠️ No results for query: {query}")
-                continue
-            
-            # Limit results per query
-            limited_results = search_results[:max_per_query]
-            print(f"📋 Found {len(search_results)} total, processing {len(limited_results)} providers")
-            
-            if not limited_results:
-                print(f"⚠️ No results to process for {query} due to max_per_query limit")
-                continue
-            
-            for j, provider in enumerate(limited_results, 1):
-                print(f"📊 Processing provider {j}/{len(limited_results)} for {query}: {provider.get('name', 'Unknown')}")
-                place_id = provider.get('place_id')
-                if not place_id:
-                    print(f"⚠️ Provider {j} missing place_id, skipping: {provider.get('name', 'Unknown')}")
-                    continue
-                
-                # Skip if already processed
-                if place_id in processed_place_ids:
-                    print(f"⏭️ Provider {j} already processed, skipping")
-                    continue
-                
-                # Get detailed information
-                detailed_data = self.get_place_details(place_id)
-                if not detailed_data:
-                    print(f"⚠️ Could not get details for {provider.get('name', 'Unknown')}")
-                    continue
-                
-                # Create comprehensive record
-                try:
-                    comprehensive_record = self.create_comprehensive_provider_record(detailed_data)
-                    all_providers.append(comprehensive_record)
-                    processed_place_ids.add(place_id)
-                    print(f"✅ Successfully processed: {comprehensive_record['provider_name']}")
-                except Exception as e:
-                    print(f"❌ Error processing {provider.get('name', 'Unknown')}: {str(e)}")
-                    continue
-                
-                # Add small delay to respect API rate limits
-                time.sleep(0.1)
-        
-        print(f"\n📈 Collection Summary:")
-        print(f"   Total unique providers collected: {len(all_providers)}")
-        print(f"   Processed place IDs: {len(processed_place_ids)}")
-        
-        return all_providers
 
     def analyze_english_proficiency(self, place_data):
         """Analyze English proficiency with NLP and review volume"""
