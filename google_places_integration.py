@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from postgres_integration import PostgresIntegration, Provider, Metric
 from textblob import TextBlob
 from langdetect import detect
-from googletrans import Translator
+from anthropic import Anthropic  # Reverted to latest version
 
 class GooglePlacesHealthcareCollector:
     def __init__(self):
@@ -29,7 +29,7 @@ class GooglePlacesHealthcareCollector:
                 print(f"File Content: [Sensitive data masked]")
             load_dotenv(config_path)
             self.google_api_key = os.getenv('GOOGLE_PLACES_API_KEY')
-            self.google_translate_api_key = os.getenv('GOOGLE_TRANSLATE_API_KEY')  # Re-added
+            self.claude_api_key = os.getenv('CLAUDE_API_KEY')  # Re-added
             print(f"Loaded API Key: [Masked for security]")
         except FileNotFoundError:
             print(f"Error: .env file not found at {config_path}")
@@ -44,7 +44,10 @@ class GooglePlacesHealthcareCollector:
         self.cache_dir = "cache"
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
-        self.translator = Translator()  # Re-added
+        self.claude = Anthropic(api_key=self.claude_api_key) if self.claude_api_key else None
+        # Load cities for translation
+        with open("cities.json", "r") as f:
+            self.city_translations = {city["translations"]["ja"]: city["translations"]["en"] for prefecture in json.load(f)["prefectures"] for city in prefecture["cities"]}
 
     def log_api_usage(self, call_type, count, cost_per_call=0.017):
         """Log API usage to metrics table"""
@@ -444,19 +447,22 @@ class GooglePlacesHealthcareCollector:
         # Use original provider name
         name = place_data.get('name', 'Unknown Provider')
 
-        # Translate city name if Japanese
+        # Translate city name using predefined list with fallback
         address_components = place_data.get('address_components', [])
         city = next((comp['long_name'] for comp in address_components if 'locality' in comp['types']), '')
         if city:
             try:
                 lang = detect(city)
-                if lang == 'ja':
-                    translated = self.translator.translate(city, dest='en').text
-                    print(f"ℹ️ Translated city '{city}' to '{translated}'")
-                    city = translated if translated else city
+                if lang == 'ja' and city in self.city_translations:
+                    translated_city = self.city_translations[city]
+                    print(f"ℹ️ Translated city '{city}' to '{translated_city}'")
+                    city = translated_city
+                elif lang == 'ja' and city not in self.city_translations:
+                    print(f"⚠️ Unrecognized Japanese city '{city}', using original")
+                    # Fallback to original as per your preference
             except Exception as e:
-                print(f"⚠️ City translation error for {city}: {str(e)}")
-                city = city  # Keep original if translation fails
+                print(f"⚠️ City detection error for {city}: {str(e)}")
+                city = city  # Fallback to original
 
         english_proficiency, english_indicators, proficiency_score = self.analyze_english_proficiency(place_data) if isinstance(place_data, dict) else ("Unknown", [], 0)
         amenities = self.extract_amenities(place_data) if isinstance(place_data, dict) else []
@@ -464,6 +470,20 @@ class GooglePlacesHealthcareCollector:
         photos = self.get_photo_urls(place_data.get('photos', [])) if isinstance(place_data, dict) else []
 
         prefecture = next((comp['long_name'] for comp in address_components if 'administrative_area_level_1' in comp['types']), '') if isinstance(address_components, list) else ''
+        if prefecture:
+            try:
+                lang = detect(prefecture)
+                if lang == 'ja' and prefecture in self.city_translations:
+                    translated_prefecture = self.city_translations[prefecture]
+                    print(f"ℹ️ Translated prefecture '{prefecture}' to '{translated_prefecture}'")
+                    prefecture = translated_prefecture
+                elif lang == 'ja' and prefecture not in self.city_translations:
+                    print(f"⚠️ Unrecognized Japanese prefecture '{prefecture}', using original")
+                    # Fallback to original
+            except Exception as e:
+                print(f"⚠️ Prefecture detection error for {prefecture}: {str(e)}")
+                prefecture = prefecture  # Fallback to original
+
         postal_code = next((comp['long_name'] for comp in address_components if 'postal_code' in comp['types']), '') if isinstance(address_components, list) else ''
 
         record = {

@@ -6,6 +6,7 @@ Integrates healthcare provider data from PostgreSQL to WordPress as custom post 
 
 import os
 import requests
+import time
 from dotenv import load_dotenv
 import json
 from sqlalchemy import create_engine
@@ -49,8 +50,52 @@ class WordPressIntegration:
         """
         return content
 
+    def check_duplicate_post(self, provider_name, provider_city, google_place_id=None):
+        """Check for existing WordPress post by name and city"""
+        url = f"{self.wordpress_url}/wp-json/wp/v2/healthcare_provider"
+        response = requests.get(url, auth=(self.username, self.application_password), params={'per_page': 100})
+        if response.status_code != 200:
+            print(f"⚠️ Error checking duplicates: {response.status_code} - {response.text}")
+            return None
+        posts = response.json()
+        for post in posts:
+            if (post.get('title', {}).get('rendered') == provider_name and 
+                post.get('meta', {}).get('provider_city') == provider_city):
+                print(f"⚠️ Duplicate detected: {provider_name} in {provider_city} (ID: {post['id']})")
+                return post['id']  # Return existing post ID for update
+        return None
+
     def create_wordpress_post(self, provider):
-        """Create a new WordPress post for the provider"""
+        """Create a new WordPress post for the provider or update if duplicate"""
+        # Check for duplicate
+        duplicate_id = self.check_duplicate_post(provider.provider_name, provider.city, provider.google_place_id)
+        if duplicate_id:
+            print(f"ℹ️ Updating existing post for {provider.provider_name} (ID: {duplicate_id})")
+            # Update logic (simplified, add fields as needed)
+            post_data = {
+                'title': provider.provider_name,
+                'content': self.generate_provider_content(provider.__dict__),
+                'status': 'publish',
+                'meta': {
+                    'provider_address': provider.address,
+                    'provider_city': provider.city,
+                    'provider_phone': provider.phone,
+                    'provider_website': provider.website,
+                    'english_proficiency': provider.english_proficiency,
+                }
+            }
+            response = requests.post(
+                f"{self.wordpress_url}/wp-json/wp/v2/healthcare_provider/{duplicate_id}",
+                auth=(self.username, self.application_password),
+                json=post_data
+            )
+            if response.status_code in [200, 201]:
+                print(f"✅ Updated WordPress post for {provider.provider_name} (ID: {duplicate_id})")
+                return True
+            else:
+                print(f"❌ Failed to update post for {provider.provider_name}: {response.status_code} - {response.text}")
+                return False
+
         post_data = {
             'title': provider.provider_name,
             'content': self.generate_provider_content(provider.__dict__),
@@ -104,15 +149,15 @@ class WordPressIntegration:
         if specialty_ids:
             post_data['specialties'] = specialty_ids  # Ensure IDs are integers
 
-        # Assign Locations taxonomy with detailed logging and retry
+        # Assign Locations taxonomy with detailed logging, retry, and delay
         response = requests.get(f"{self.wordpress_url}/wp-json/wp/v2/location", auth=(self.username, self.application_password))
         if response.status_code != 200:
-            print(f"⚠️ Error fetching locations: {response.status_code} - {response.text}")
+            print(f"⚠️ Error fetching locations: {response.status_code} - {response.text} - Full response: {response.json()}")
             return False
         try:
             locations = response.json()
             if not locations:
-                print(f"⚠️ No locations returned for API call, city: {provider.city}")
+                print(f"⚠️ No locations returned for API call, city: {provider.city} - Full response: {locations}")
             location_id = next((term["id"] for term in locations if term["name"].lower() == provider.city.lower()), None)
             if not location_id:
                 print(f"⚠️ No matching location found for city: {provider.city}, attempting creation")
@@ -125,25 +170,27 @@ class WordPressIntegration:
                     location_id = new_location_response.json()["id"]
                     print(f"✅ Created new location: {provider.city} (ID: {location_id})")
                 elif new_location_response.status_code == 400 and "term_exists" in new_location_response.text:
-                    # Retry fetch to ensure ID is captured
+                    print(f"ℹ️ Term exists for {provider.city}, waiting 1 second for indexing")
+                    time.sleep(1)  # Delay to allow WordPress to index
                     locations = requests.get(f"{self.wordpress_url}/wp-json/wp/v2/location", auth=(self.username, self.application_password)).json()
+                    print(f"ℹ️ Re-fetch locations response: {locations[:2]}...")  # Log first two items
                     location_id = next((term["id"] for term in locations if term["name"].lower() == provider.city.lower()), None)
                     if location_id:
                         print(f"✅ Reused existing location: {provider.city} (ID: {location_id})")
                     else:
-                        print(f"❌ Critical: Failed to retrieve ID for existing location {provider.city}")
+                        print(f"❌ Critical: Failed to retrieve ID for existing location {provider.city} after delay")
                 else:
-                    print(f"⚠️ Failed to create location {provider.city}: {new_location_response.text}")
+                    print(f"⚠️ Failed to create location {provider.city}: {new_location_response.status_code} - {new_location_response.text}")
             if location_id:
                 post_data['locations'] = [location_id]
             else:
                 print(f"❌ Critical: No location_id assigned for city {provider.city} after all attempts")
                 return False
         except TypeError as e:
-            print(f"⚠️ Invalid response from locations endpoint for city {provider.city}: {str(e)} - {response.text}")
+            print(f"⚠️ Invalid response from locations endpoint for city {provider.city}: {str(e)} - Full response: {response.json()}")
             return False
         except Exception as e:
-            print(f"⚠️ Unexpected error in location assignment for {provider.city}: {str(e)}")
+            print(f"⚠️ Unexpected error in location assignment for {provider.city}: {str(e)} - Response: {response.json()}")
             return False
 
         # Create post
