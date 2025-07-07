@@ -45,6 +45,11 @@ class ClaudeDescriptionGenerator:
         providers = session.query(Provider).filter_by(status="pending").all()
         results = {"processed": 0, "errors": 0}
         
+        if not providers:
+            print("⚠️ No providers with status 'pending' found")
+        else:
+            print(f"🔍 Found {len(providers)} providers with status 'pending'")
+        
         for provider in providers:
             try:
                 description = self.generate_description({
@@ -62,6 +67,7 @@ class ClaudeDescriptionGenerator:
                 provider.status = "description_generated"
                 session.commit()
                 results["processed"] += 1
+                print(f"✅ Generated description for {provider.provider_name}")
             except Exception as e:
                 print(f"❌ Error generating description for {provider.provider_name}: {str(e)}")
                 results["errors"] += 1

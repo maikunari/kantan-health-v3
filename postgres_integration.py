@@ -148,6 +148,7 @@ class PostgresIntegration:
                     print(f"⚠️ Skipping {provider['provider_name']} - already exists")
                     continue
                 valid_providers.append(provider)
+                print(f"✅ Validated: {provider['provider_name']} with status {provider.get('status', 'Not set')}")
             except Exception as e:
                 print(f"❌ Error validating {provider.get('provider_name', 'Unknown')}: {str(e)}")
                 error_count += 1
@@ -163,7 +164,7 @@ class PostgresIntegration:
             if success:
                 saved_count += len(batch)
                 for provider in batch:
-                    print(f"✅ Saved: {provider['provider_name']}")
+                    print(f"✅ Saved: {provider['provider_name']} with status {provider.get('status', 'pending')}")
             else:
                 error_count += len(batch)
             if i + batch_size < len(valid_providers):

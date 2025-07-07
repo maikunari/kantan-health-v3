@@ -13,24 +13,21 @@ from datetime import datetime
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from postgres_integration import PostgresIntegration, Metric
+from postgres_integration import PostgresIntegration, Provider
 from textblob import TextBlob
-
-import os
-print(f"Current Working Directory: {os.getcwd()}")  # Debug: Working directory
 
 class GooglePlacesHealthcareCollector:
     def __init__(self):
         config_path = os.path.join(os.path.dirname(__file__), 'config', '.env')
-        print(f"Script Location: {__file__}")  # Debug: Script path
-        print(f"Config Path: {config_path}")  # Debug: Resolved path
+        print(f"Script Location: {__file__}")
+        print(f"Config Path: {config_path}")
         try:
             with open(config_path, 'r') as f:
                 content = f.read()
-                print(f"File Content: [Sensitive data masked]")  # Mask content
+                print(f"File Content: [Sensitive data masked]")
             load_dotenv(config_path)
             self.google_api_key = os.getenv('GOOGLE_PLACES_API_KEY')
-            print(f"Loaded API Key: [Masked for security]")  # Mask key
+            print(f"Loaded API Key: [Masked for security]")
         except FileNotFoundError:
             print(f"Error: .env file not found at {config_path}")
         except Exception as e:
@@ -72,16 +69,13 @@ class GooglePlacesHealthcareCollector:
 
     def generate_search_queries(self, limit=50, initial_cities=["Tokyo", "Yokohama", "Osaka City", "Nagoya"]):
         """Generate dynamic search queries for specified cities and specialties from JSON"""
-        # Load cities from JSON
         with open("cities.json", "r") as f:
             prefectures = json.load(f)["prefectures"]
         
-        # Load specialties from JSON
         with open("specialties.json", "r") as f:
             specialties_data = json.load(f)["specialties"]
             specialties = [s["name"] for s in specialties_data]
         
-        # Filter to initial cities or all cities
         cities = []
         if initial_cities:
             for prefecture in prefectures:
@@ -96,8 +90,8 @@ class GooglePlacesHealthcareCollector:
             "International clinic {city}",
             "Foreign friendly hospital {city}",
             "Expat clinic {city}",
-            "doctor {city}",  # Broader term
-            "clinic {city}"   # Broader term
+            "doctor {city}",
+            "clinic {city}"
         ]
         queries = []
         for city in cities:
@@ -122,11 +116,11 @@ class GooglePlacesHealthcareCollector:
             'radius': radius
         }
         response = requests.get(self.search_url, params=params)
-        print(f"API Response for {query}: Status {response.status_code}")  # Debug: Status only
+        print(f"API Response for {query}: Status {response.status_code}")
         self.log_api_usage("text_search", 1)
         if response.status_code == 200:
             results = response.json().get('results', [])
-            print(f"Parsed Results for {query}: {len(results)} results")  # Debug: Count only
+            print(f"Parsed Results for {query}: {len(results)} results")
             self.cache_results(query, results)
             return results
         else:
@@ -359,7 +353,6 @@ class GooglePlacesHealthcareCollector:
         """Intelligently determine medical specialties from provider data"""
         name = place_data.get('name', '').lower()
         specialties = []
-        # Load specialties from JSON
         with open("specialties.json", "r") as f:
             specialties_data = json.load(f)["specialties"]
             specialty_keywords = {s["name"]: s["category"] for s in specialties_data}
@@ -471,7 +464,39 @@ class GooglePlacesHealthcareCollector:
             if not is_connected:
                 print(f"❌ PostgreSQL connection failed: {message}")
                 return 0
-            saved_count, error_count = postgres.save_providers(providers)
+            saved_count, error_count = 0, 0
+            session = postgres.Session()
+            for provider in providers:
+                try:
+                    print(f"🔍 Saving provider: {provider['provider_name']} with status {provider.get('status', 'Not set')}")
+                    provider_obj = Provider(
+                        provider_name=provider.get('provider_name', ''),
+                        address=provider.get('address', ''),
+                        city=provider.get('city', ''),
+                        prefecture=provider.get('prefecture', ''),
+                        phone=provider.get('phone', ''),
+                        website=provider.get('website', ''),
+                        specialties=provider.get('specialties', []),
+                        english_proficiency=provider.get('english_proficiency', 'Unknown'),
+                        rating=provider.get('rating', 0),
+                        total_reviews=provider.get('total_reviews', 0),
+                        review_content=provider.get('review_content', ''),
+                        review_keywords=provider.get('review_keywords', []),
+                        review_highlights=provider.get('review_highlights', []),
+                        photo_urls=provider.get('photo_urls', ''),
+                        nearest_station=provider.get('nearest_station', ''),
+                        status=provider.get('status', 'pending'),
+                        created_at=provider.get('created_at', datetime.now().strftime('%Y-%m-%d'))
+                    )
+                    session.add(provider_obj)
+                    session.commit()
+                    saved_count += 1
+                    print(f"✅ Saved {provider['provider_name']} with status {provider_obj.status}")
+                except Exception as e:
+                    session.rollback()
+                    print(f"⚠️ Error saving {provider['provider_name']}: {str(e)}")
+                    error_count += 1
+            session.close()
             if error_count > 0:
                 print(f"⚠️ {error_count} providers had errors during save")
             return saved_count
