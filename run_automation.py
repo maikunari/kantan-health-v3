@@ -6,9 +6,9 @@ Orchestrates data collection, AI description generation, and WordPress publishin
 
 import argparse
 from google_places_integration import GooglePlacesHealthcareCollector
-from claude_description_generator import ClaudeDescriptionGenerator
 from wordpress_integration import WordPressIntegration
 from flask import Flask, render_template
+from claude_description_generator import run_ai_description_generation  # Corrected import
 
 app = Flask(__name__)
 duplicates_detected = []
@@ -22,16 +22,6 @@ def run_data_collection(daily_limit):
     providers = collector.search_and_collect_providers(search_queries, max_per_query=max_per_query, daily_limit=daily_limit)
     return providers
 
-def run_ai_description_generation(providers):
-    """Run AI description generation phase."""
-    generator = ClaudeDescriptionGenerator()
-    for provider in providers:
-        if provider.get('status') == 'pending':
-            description = generator.generate_description(provider)
-            provider['ai_description'] = description
-            provider['status'] = 'description_generated'
-    return providers
-
 def run_wordpress_publishing():
     """Run WordPress publishing phase."""
     wp = WordPressIntegration()
@@ -41,7 +31,8 @@ def run_wordpress_publishing():
     return results
 
 def main():
-    parser = argparse.ArgumentParser(description="Run healthcare directory automation")
+    """Main function to parse arguments and run phases."""
+    parser = argparse.ArgumentParser(description="Automate healthcare directory data collection and description generation.")
     parser.add_argument("--daily-limit", type=int, default=25, help="Daily limit for provider collection")
     args = parser.parse_args()
 
@@ -56,12 +47,12 @@ def main():
     # Phase 2: AI Description Generation
     print("🤖 PHASE 2: AI Description Generation")
     print("=" * 50)
-    providers = run_ai_description_generation(providers)
+    run_ai_description_generation(providers)
 
     # Phase 3: WordPress Publishing
     print("🌐 PHASE 3: WordPress Publishing")
     print("=" * 50)
-    results = run_wordpress_publishing()
+    run_wordpress_publishing()
 
     # Flask alert for duplicates (simplified)
     if duplicates_detected:
@@ -79,5 +70,3 @@ def show_alerts():
 
 if __name__ == "__main__":
     main()
-    # Uncomment to run Flask server (separate process recommended)
-    # app.run(debug=True)

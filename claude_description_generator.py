@@ -1,82 +1,80 @@
 #!/usr/bin/env python3
 """
-Claude Description Generator
-Generates AI-powered descriptions for healthcare providers using Anthropic's API.
+AI Description Generator Module
+Generates AI-powered descriptions for healthcare providers using Anthropic.
 """
 
 import os
-import json
+import logging
 from dotenv import load_dotenv
-import anthropic
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from postgres_integration import Provider
+from anthropic import Anthropic
+from google_places_integration import GooglePlacesHealthcareCollector  # For session access
+from postgres_integration import Provider  # Added import
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ClaudeDescriptionGenerator:
     def __init__(self):
-        # Load environment variables
-        load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', '.env'))
-        self.anthropic_client = anthropic.Anthropic(
-            api_key=os.getenv('ANTHROPIC_API_KEY')
-        )
-        self.engine = create_engine(f"postgresql://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'password')}@{os.getenv('POSTGRES_HOST', 'localhost')}:5432/directory")
-        self.Session = sessionmaker(bind=self.engine)
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', '.env')
+        load_dotenv(config_path)
+        self.anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
+        if not self.anthropic_api_key:
+            logger.error("ANTHROPIC_API_KEY not found in .env")
+            raise ValueError("ANTHROPIC_API_KEY not found in .env")
+        self.claude = Anthropic(api_key=self.anthropic_api_key)
+        logger.info("ClaudeDescriptionGenerator initialized successfully")
 
     def generate_description(self, provider_data):
-        """Generate a 150-200 word description with 3 user insights"""
+        """Generate a description for a provider using Claude."""
+        provider_name = provider_data.get('provider_name', 'Unknown Provider')
+        city = provider_data.get('city', 'Unknown City')
+        specialties = ', '.join(provider_data.get('specialties', ['General Practitioner']))
+        english_proficiency = provider_data.get('english_proficiency', 'Unknown')
+
         prompt = f"""
-        You are an AI assistant creating a professional description for a healthcare provider. 
-        Based on the following data, write a 150-200 word description in HTML format, including 3 balanced user insights (positive, neutral, mixed). 
-        Data: {json.dumps(provider_data, ensure_ascii=False)}
-        Ensure the tone is informative and welcoming for English-speaking expats and tourists in Japan.
+        Generate a concise and professional description for a healthcare provider.
+        Provider Name: {provider_name}
+        Location: {city}
+        Specialties: {specialties}
+        English Proficiency: {english_proficiency}
+        The description should be suitable for a directory listing, highlighting the provider's services and language capabilities.
         """
-        response = self.anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=300,
-            temperature=0.7,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        description = response.content[0].text
-        return description
 
-    def process_all_providers(self):
-        """Process all pending providers and generate descriptions"""
-        session = self.Session()
-        providers = session.query(Provider).filter_by(status="pending").all()
-        results = {"processed": 0, "errors": 0}
-        
-        if not providers:
-            print("⚠️ No providers with status 'pending' found")
-        else:
-            print(f"🔍 Found {len(providers)} providers with status 'pending'")
-        
-        for provider in providers:
-            try:
-                description = self.generate_description({
-                    "name": provider.provider_name,
-                    "address": provider.address,
-                    "city": provider.city,
-                    "phone": provider.phone,
-                    "website": provider.website,
-                    "specialties": provider.specialties,
-                    "rating": provider.rating,
-                    "total_reviews": provider.total_reviews,
-                    "english_proficiency": provider.english_proficiency
-                })
-                provider.ai_description = description
-                provider.status = "description_generated"
-                session.commit()
-                results["processed"] += 1
-                print(f"✅ Generated description for {provider.provider_name}")
-            except Exception as e:
-                print(f"❌ Error generating description for {provider.provider_name}: {str(e)}")
-                results["errors"] += 1
-                session.rollback()
-        
-        session.close()
-        return results
+        try:
+            logger.info(f"Generating description for {provider_name}")
+            response = self.claude.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=200,
+                temperature=0.7,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            description = response.content[0].text.strip()
+            logger.info(f"✅ Generated description for {provider_name}: {description[:50]}...")
+            return description
+        except Exception as e:
+            logger.error(f"⚠️ Error generating description for {provider_name}: {str(e)}")
+            return "Description generation failed. Please contact support."
 
-if __name__ == "__main__":
+def run_ai_description_generation(providers):
+    """Generate descriptions for a list of provider dictionaries."""
     generator = ClaudeDescriptionGenerator()
-    results = generator.process_all_providers()
-    print(f"Processed: {results['processed']}, Errors: {results['errors']}")
+    collector = GooglePlacesHealthcareCollector()
+    session = collector.Session()
+    for provider in providers:
+        provider_data = {
+            'provider_name': provider.get('provider_name', 'Unknown Provider'),
+            'city': provider.get('city', 'Unknown City'),
+            'specialties': provider.get('specialties', ['General Practitioner']),
+            'english_proficiency': provider.get('english_proficiency', 'Unknown')
+        }
+        description = generator.generate_description(provider_data)
+        # Update the corresponding database record
+        db_provider = session.query(Provider).filter_by(provider_name=provider_data['provider_name'], city=provider_data['city']).first()
+        if db_provider:
+            db_provider.ai_description = description
+            db_provider.status = 'description_generated'
+            session.commit()
+            logger.info(f"✅ Updated {provider_data['provider_name']} with description and status")
+    session.close()
