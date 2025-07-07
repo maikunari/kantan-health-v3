@@ -15,6 +15,11 @@
         "urologist",
         "otolaryngologist",
         "allergist",
-        "endocrinologist"
+        "endocrinologist",
+        "Point_of_interest",
+        "Health",
+        "Establishment",
+        "Clinic",
+        "Yokohama"
     ]
 }

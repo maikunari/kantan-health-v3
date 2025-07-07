@@ -15,6 +15,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from postgres_integration import PostgresIntegration, Provider, Metric
 from textblob import TextBlob
+from langdetect import detect
+from googletrans import Translator
 
 class GooglePlacesHealthcareCollector:
     def __init__(self):
@@ -27,6 +29,7 @@ class GooglePlacesHealthcareCollector:
                 print(f"File Content: [Sensitive data masked]")
             load_dotenv(config_path)
             self.google_api_key = os.getenv('GOOGLE_PLACES_API_KEY')
+            self.google_translate_api_key = os.getenv('GOOGLE_TRANSLATE_API_KEY')  # Re-added
             print(f"Loaded API Key: [Masked for security]")
         except FileNotFoundError:
             print(f"Error: .env file not found at {config_path}")
@@ -41,6 +44,7 @@ class GooglePlacesHealthcareCollector:
         self.cache_dir = "cache"
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
+        self.translator = Translator()  # Re-added
 
     def log_api_usage(self, call_type, count, cost_per_call=0.017):
         """Log API usage to metrics table"""
@@ -386,30 +390,25 @@ class GooglePlacesHealthcareCollector:
         specialties = []
         with open("specialties.json", "r") as f:
             specialties_data = json.load(f)["specialties"]
-            specialty_keywords = {s.lower(): s for s in specialties_data}  # Map lowercase to original case
-        for specialty, original in specialty_keywords.items():
-            keywords = specialty.split() + [specialty]
-            if any(keyword in name for keyword in keywords):
-                specialties.append(original)
-        try:
-            reviews = place_data.get('reviews', [])
-            review_text = ' '.join([review.get('text', '').lower() for review in reviews[:5]])
-            for specialty, original in specialty_keywords.items():
-                if specialty not in [s.lower() for s in specialties]:
-                    if any(keyword in review_text for keyword in specialty.split()):
-                        specialties.append(original)
-                        break
-        except:
-            pass
-        if not specialties:
-            if 'clinic' in name and 'international' in name:
-                specialties.append('general_practitioner')
-            elif 'hospital' in name or 'medical_center' in name:
-                specialties.append('general_practitioner')
+        with open("specialty_frequency.json", "r") as f:
+            frequency = json.load(f)
+        
+        for term in place_data.get('types', []) + name.split():
+            term = term.lower().strip()
+            if term in [s.lower() for s in specialties_data]:
+                specialties.append(next(s for s in specialties_data if s.lower() == term))
             else:
-                specialties.append('general_practitioner')
-        specialties = list(dict.fromkeys(specialties))[:2]
-        return specialties
+                frequency[term] = frequency.get(term, 0) + 1
+                if frequency[term] >= 5 and term not in ["doctor", "specialist"]:  # Threshold
+                    specialties_data.append(term.capitalize())
+                    with open("specialties.json", "w") as f:
+                        json.dump({"specialties": specialties_data}, f, indent=4)
+                    frequency[term] = 0  # Reset after addition
+                with open("specialty_frequency.json", "w") as f:
+                    json.dump(frequency, f, indent=4)
+        if not specialties:
+            specialties.append("general_practitioner")
+        return list(dict.fromkeys(specialties))[:2]
 
     def process_reviews(self, reviews):
         """Process and structure review data"""
@@ -442,18 +441,33 @@ class GooglePlacesHealthcareCollector:
             print(f"⚠️ Invalid place_data type for {place_data}: {type(place_data)}")
             return {}
 
+        # Use original provider name
+        name = place_data.get('name', 'Unknown Provider')
+
+        # Translate city name if Japanese
+        address_components = place_data.get('address_components', [])
+        city = next((comp['long_name'] for comp in address_components if 'locality' in comp['types']), '')
+        if city:
+            try:
+                lang = detect(city)
+                if lang == 'ja':
+                    translated = self.translator.translate(city, dest='en').text
+                    print(f"ℹ️ Translated city '{city}' to '{translated}'")
+                    city = translated if translated else city
+            except Exception as e:
+                print(f"⚠️ City translation error for {city}: {str(e)}")
+                city = city  # Keep original if translation fails
+
         english_proficiency, english_indicators, proficiency_score = self.analyze_english_proficiency(place_data) if isinstance(place_data, dict) else ("Unknown", [], 0)
         amenities = self.extract_amenities(place_data) if isinstance(place_data, dict) else []
         reviews = self.process_reviews(place_data.get('reviews', [])) if isinstance(place_data, dict) else []
         photos = self.get_photo_urls(place_data.get('photos', [])) if isinstance(place_data, dict) else []
 
-        address_components = place_data.get('address_components', [])
-        city = next((comp['long_name'] for comp in address_components if 'locality' in comp['types']), '') if isinstance(address_components, list) else ''
         prefecture = next((comp['long_name'] for comp in address_components if 'administrative_area_level_1' in comp['types']), '') if isinstance(address_components, list) else ''
         postal_code = next((comp['long_name'] for comp in address_components if 'postal_code' in comp['types']), '') if isinstance(address_components, list) else ''
 
         record = {
-            'provider_name': place_data.get('name', ''),
+            'provider_name': name,
             'address': place_data.get('formatted_address', ''),
             'city': city,
             'prefecture': prefecture,
@@ -545,7 +559,7 @@ class GooglePlacesHealthcareCollector:
         try:
             providers = collector.search_and_collect_providers(search_queries, max_per_query=1, daily_limit=5)
             print(f"\n📈 Collection Summary:")
-            print(f"   Total providers found: {len(providers)}")
+            print(f"   Total unique providers collected: {len(providers)}")
             if providers:
                 print(f"\n💾 Saving to PostgreSQL...")
                 saved_count = collector.save_to_postgres(providers)

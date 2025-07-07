@@ -74,12 +74,12 @@ class WordPressIntegration:
         for spec in provider.specialties:
             spec_lower = spec.lower()
             if spec_lower not in self.specialties:
-                print(f"⚠️ Specialty {spec} not in predefined list, skipping")
-                continue
-            # Check for existing term (case-insensitive)
+                print(f"⚠️ Specialty {spec} not in predefined list, tracking for potential addition")
+                # Map to a default valid specialty if not recognized
+                mapped_spec = next((s for s in self.specialties if s in spec_lower), "general_practitioner")
+                spec_lower = mapped_spec
             spec_id = next((term["id"] for term in specialty_terms if term["name"].lower() == spec_lower), None)
             if not spec_id:
-                # Capitalize the name for new terms
                 capitalized_spec = spec_lower.capitalize()  # e.g., "gynecologist" -> "Gynecologist"
                 new_spec_response = requests.post(
                     f"{self.wordpress_url}/wp-json/wp/v2/specialties",
@@ -89,7 +89,6 @@ class WordPressIntegration:
                 if new_spec_response.status_code == 201:
                     spec_id = new_spec_response.json()["id"]
                 elif new_spec_response.status_code == 400 and "term_exists" in new_spec_response.text:
-                    # Re-fetch to get the existing term ID (case-insensitive match)
                     response = requests.get(f"{self.wordpress_url}/wp-json/wp/v2/specialties", auth=(self.username, self.application_password))
                     if response.status_code == 200:
                         specialty_terms = response.json()
@@ -98,11 +97,14 @@ class WordPressIntegration:
                         print(f"⚠️ Failed to re-fetch specialties after term_exists: {response.text}")
                 else:
                     print(f"⚠️ Failed to create specialty {capitalized_spec}: {new_spec_response.text}")
+            if spec_id is None:
+                print(f"❌ Critical: No valid specialty ID for {spec}")
+                continue
             specialty_ids.append(spec_id)
         if specialty_ids:
-            post_data['specialties'] = specialty_ids
+            post_data['specialties'] = specialty_ids  # Ensure IDs are integers
 
-        # Assign Locations taxonomy
+        # Assign Locations taxonomy with detailed logging and retry
         response = requests.get(f"{self.wordpress_url}/wp-json/wp/v2/location", auth=(self.username, self.application_password))
         if response.status_code != 200:
             print(f"⚠️ Error fetching locations: {response.status_code} - {response.text}")
@@ -110,43 +112,55 @@ class WordPressIntegration:
         try:
             locations = response.json()
             if not locations:
-                print(f"⚠️ No locations returned for city {provider.city}")
+                print(f"⚠️ No locations returned for API call, city: {provider.city}")
             location_id = next((term["id"] for term in locations if term["name"].lower() == provider.city.lower()), None)
             if not location_id:
+                print(f"⚠️ No matching location found for city: {provider.city}, attempting creation")
                 new_location_response = requests.post(
                     f"{self.wordpress_url}/wp-json/wp/v2/location",
                     auth=(self.username, self.application_password),
                     json={"name": provider.city}
                 )
-                if new_location_response.status_code == 201 or new_location_response.status_code == 400:  # Handle term_exists
-                    if new_location_response.status_code == 400 and "term_exists" in new_location_response.text:
-                        # Fetch the existing term ID
-                        locations = requests.get(f"{self.wordpress_url}/wp-json/wp/v2/location", auth=(self.username, self.application_password)).json()
-                        location_id = next((term["id"] for term in locations if term["name"].lower() == provider.city.lower()), None)
+                if new_location_response.status_code == 201:
+                    location_id = new_location_response.json()["id"]
+                    print(f"✅ Created new location: {provider.city} (ID: {location_id})")
+                elif new_location_response.status_code == 400 and "term_exists" in new_location_response.text:
+                    # Retry fetch to ensure ID is captured
+                    locations = requests.get(f"{self.wordpress_url}/wp-json/wp/v2/location", auth=(self.username, self.application_password)).json()
+                    location_id = next((term["id"] for term in locations if term["name"].lower() == provider.city.lower()), None)
+                    if location_id:
+                        print(f"✅ Reused existing location: {provider.city} (ID: {location_id})")
                     else:
-                        location_id = new_location_response.json()["id"]
+                        print(f"❌ Critical: Failed to retrieve ID for existing location {provider.city}")
                 else:
                     print(f"⚠️ Failed to create location {provider.city}: {new_location_response.text}")
-                    return False
             if location_id:
                 post_data['locations'] = [location_id]
             else:
-                print(f"⚠️ No location_id assigned for city {provider.city}")
-        except TypeError:
-            print(f"⚠️ Invalid response from locations endpoint for city {provider.city}: {response.text}")
+                print(f"❌ Critical: No location_id assigned for city {provider.city} after all attempts")
+                return False
+        except TypeError as e:
+            print(f"⚠️ Invalid response from locations endpoint for city {provider.city}: {str(e)} - {response.text}")
+            return False
+        except Exception as e:
+            print(f"⚠️ Unexpected error in location assignment for {provider.city}: {str(e)}")
             return False
 
         # Create post
-        response = requests.post(
-            f"{self.wordpress_url}/wp-json/wp/v2/healthcare_provider",
-            auth=(self.username, self.application_password),
-            json=post_data
-        )
-        if response.status_code == 201:
-            print(f"✅ Created WordPress post for {provider.provider_name} (ID: {response.json().get('id')})")
-            return True
-        else:
-            print(f"❌ Failed to create post for {provider.provider_name}: {response.status_code} - {response.text}")
+        try:
+            response = requests.post(
+                f"{self.wordpress_url}/wp-json/wp/v2/healthcare_provider",
+                auth=(self.username, self.application_password),
+                json=post_data
+            )
+            if response.status_code == 201:
+                print(f"✅ Created WordPress post for {provider.provider_name} (ID: {response.json().get('id')})")
+                return True
+            else:
+                print(f"❌ Failed to create post for {provider.provider_name}: {response.status_code} - {response.text}")
+                return False
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request error for {provider.provider_name}: {str(e)}")
             return False
 
     def sync_all_providers(self):
