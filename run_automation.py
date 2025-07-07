@@ -6,7 +6,7 @@ Orchestrates data collection, AI description generation, and WordPress publishin
 
 import argparse
 from google_places_integration import GooglePlacesHealthcareCollector
-from ai_description_generator import ClaudeDescriptionGenerator
+from claude_description_generator import ClaudeDescriptionGenerator
 from wordpress_integration import WordPressIntegration
 from flask import Flask, render_template
 
