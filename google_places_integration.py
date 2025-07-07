@@ -13,7 +13,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from postgres_integration import PostgresIntegration, Provider
+from postgres_integration import PostgresIntegration, Provider, Metric
 from textblob import TextBlob
 
 class GooglePlacesHealthcareCollector:
@@ -46,9 +46,10 @@ class GooglePlacesHealthcareCollector:
         """Log API usage to metrics table"""
         session = self.Session()
         session.add(Metric(
-            metric_type="api_calls",
+            metric_type=call_type,
             value=count,
-            details={"call_type": call_type, "estimated_cost": count * cost_per_call}
+            details={"call_type": call_type, "estimated_cost": count * cost_per_call},
+            timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ))
         session.commit()
         session.close()
@@ -262,6 +263,12 @@ class GooglePlacesHealthcareCollector:
         print(f"\n📈 Collection Summary:")
         print(f"   Total unique providers collected: {len(all_providers)}")
         print(f"   Processed place IDs: {len(processed_place_ids)}")
+        
+        if all_providers:
+            saved_count = self.save_to_postgres(all_providers)
+            print(f"💾 Saved to PostgreSQL: {saved_count} providers")
+        else:
+            print("⚠️ No providers to save to PostgreSQL")
         
         return all_providers
 
