@@ -1,13 +1,20 @@
 {
     "specialties": [
-        {"name": "doctor", "category": "General Medicine"},
-        {"name": "dentist", "category": "Dental Care"},
-        {"name": "gynecologist", "category": "Women’s Health"},
-        {"name": "pediatrician", "category": "Pediatrics"},
-        {"name": "cardiologist", "category": "Cardiology"},
-        {"name": "dermatologist", "category": "Dermatology"},
-        {"name": "orthopedist", "category": "Orthopedics"},
-        {"name": "ophthalmologist", "category": "Ophthalmology"},
-        {"name": "psychiatrist", "category": "Mental Health"}
+        "gynecologist",
+        "oncologist",
+        "general_practitioner",
+        "pediatrician",
+        "cardiologist",
+        "dermatologist",
+        "orthopedic_surgeon",
+        "ophthalmologist",
+        "psychiatrist",
+        "dentist",
+        "neurologist",
+        "surgeon",
+        "urologist",
+        "otolaryngologist",
+        "allergist",
+        "endocrinologist"
     ]
 }

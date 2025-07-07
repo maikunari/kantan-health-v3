@@ -68,14 +68,15 @@ class GooglePlacesHealthcareCollector:
                 return pickle.load(f)
         return None
 
-    def generate_search_queries(self, limit=50, initial_cities=["Tokyo", "Yokohama", "Osaka City", "Nagoya"]):
+    def generate_search_queries(self, limit=100, initial_cities=["Tokyo", "Yokohama", "Osaka City", "Nagoya"]):
         """Generate dynamic search queries for specified cities and specialties from JSON"""
         with open("cities.json", "r") as f:
             prefectures = json.load(f)["prefectures"]
         
         with open("specialties.json", "r") as f:
             specialties_data = json.load(f)["specialties"]
-            specialties = [s["name"] for s in specialties_data]
+        
+        specialties = specialties_data  # Use the list of strings directly
         
         cities = []
         if initial_cities:
@@ -88,9 +89,6 @@ class GooglePlacesHealthcareCollector:
         
         base_terms = [
             "English speaking {specialty} {city}",
-            "International clinic {city}",
-            "Foreign friendly hospital {city}",
-            "Expat clinic {city}",
             "doctor {city}",
             "clinic {city}"
         ]
@@ -104,7 +102,7 @@ class GooglePlacesHealthcareCollector:
                     queries.append(term.format(city=city))
         return queries[:limit]
 
-    def search_healthcare_providers(self, query, location="Japan", radius=50000):
+    def search_healthcare_providers(self, query, location="Japan", radius=25000):
         """Search for healthcare providers using Google Places API"""
         cached_results = self.load_cached_results(query)
         if cached_results:
@@ -144,14 +142,23 @@ class GooglePlacesHealthcareCollector:
             'language': 'en'
         }
         response = requests.get(self.details_url, params=params)
+        if response.status_code == 429:
+            print(f"⚠️ Rate limit exceeded, backing off for {2 ** 3} seconds")
+            time.sleep(8)
+            response = requests.get(self.details_url, params=params)
         self.log_api_usage("details", 1)
         if response.status_code == 200:
-            result = response.json().get('result', {})
-            if result:
+            data = response.json()
+            if data.get("status") == "OK":
+                result = data.get('result', {})
+                if not isinstance(result, dict) or not result.get('name'):  # Validate result
+                    print(f"⚠️ Invalid result structure for place_id {place_id}: {result}")
+                    return {}
                 print(f"✅ Got details for: {result.get('name', 'Unknown')}")
+                return result
             else:
-                print(f"⚠️ Empty result for place_id: {place_id}")
-            return result
+                print(f"⚠️ API error for place_id {place_id}: {data.get('status', 'Unknown')} - {data.get('error_message', 'No message')}")
+                return {}
         else:
             print(f"❌ Details error: {response.status_code} - {response.text}")
             return {}
@@ -205,17 +212,21 @@ class GooglePlacesHealthcareCollector:
                     }
         return nearest_station
 
-    def search_and_collect_providers(self, search_queries, max_per_query=10):
-        """Search for providers and collect comprehensive data"""
-        print(f"🔍 Searching {len(search_queries)} queries with max {max_per_query} results per query")
+    def search_and_collect_providers(self, search_queries, max_per_query=1, daily_limit=5):
+        """Search for providers and collect comprehensive data with a total provider limit"""
+        print(f"🔍 Searching {len(search_queries)} queries with max {max_per_query} results per query and daily limit {daily_limit}")
         all_providers = []
         processed_place_ids = set()
-        
+        daily_requests = 0
+        max_requests = 150  # Cap to ~$2.55 at $0.017/request
+        providers_collected = 0
+
         for i, query in enumerate(search_queries):
             print(f"🔍 Processing query {i+1}/{len(search_queries)}: {query}")
             
             # Search for providers
             search_results = self.search_healthcare_providers(query)
+            daily_requests += 1
             
             if not search_results:
                 print(f"⚠️ No results for query: {query}")
@@ -230,6 +241,10 @@ class GooglePlacesHealthcareCollector:
                 continue
             
             for j, provider in enumerate(limited_results, 1):
+                if providers_collected >= daily_limit:
+                    print(f"⏹️ Daily limit of {daily_limit} providers reached, stopping collection")
+                    break
+                
                 print(f"📊 Processing provider {j}/{len(limited_results)} for {query}: {provider.get('name', 'Unknown')}")
                 place_id = provider.get('place_id')
                 if not place_id:
@@ -243,6 +258,8 @@ class GooglePlacesHealthcareCollector:
                 
                 # Get detailed information
                 detailed_data = self.get_place_details(place_id)
+                daily_requests += 1
+                
                 if not detailed_data:
                     print(f"⚠️ Could not get details for {provider.get('name', 'Unknown')}")
                     continue
@@ -252,17 +269,24 @@ class GooglePlacesHealthcareCollector:
                     comprehensive_record = self.create_comprehensive_provider_record(detailed_data)
                     all_providers.append(comprehensive_record)
                     processed_place_ids.add(place_id)
+                    providers_collected += 1
                     print(f"✅ Successfully processed: {comprehensive_record['provider_name']}")
                 except Exception as e:
                     print(f"❌ Error processing {provider.get('name', 'Unknown')}: {str(e)}")
                     continue
                 
-                # Add small delay to respect API rate limits
-                time.sleep(0.1)
+                # Check daily request limit
+                if daily_requests >= max_requests:
+                    print(f"⚠️ Daily request limit ({max_requests}) reached, stopping collection")
+                    break
+            
+            if providers_collected >= daily_limit or daily_requests >= max_requests:
+                break
         
         print(f"\n📈 Collection Summary:")
         print(f"   Total unique providers collected: {len(all_providers)}")
         print(f"   Processed place IDs: {len(processed_place_ids)}")
+        print(f"   Total requests made: {daily_requests}")
         
         if all_providers:
             saved_count = self.save_to_postgres(all_providers)
@@ -357,33 +381,33 @@ class GooglePlacesHealthcareCollector:
         return categories
 
     def determine_medical_specialties(self, place_data):
-        """Intelligently determine medical specialties from provider data"""
+        """Intelligently determine medical specialties and parent category from provider data"""
         name = place_data.get('name', '').lower()
         specialties = []
         with open("specialties.json", "r") as f:
             specialties_data = json.load(f)["specialties"]
-            specialty_keywords = {s["name"]: s["category"] for s in specialties_data}
-        for specialty, category in specialty_keywords.items():
-            keywords = specialty.lower().split() + [specialty]
+            specialty_keywords = {s.lower(): s for s in specialties_data}  # Map lowercase to original case
+        for specialty, original in specialty_keywords.items():
+            keywords = specialty.split() + [specialty]
             if any(keyword in name for keyword in keywords):
-                specialties.append(category)
+                specialties.append(original)
         try:
             reviews = place_data.get('reviews', [])
             review_text = ' '.join([review.get('text', '').lower() for review in reviews[:5]])
-            for specialty, category in specialty_keywords.items():
-                if category not in specialties:
-                    if any(keyword in review_text for keyword in specialty.lower().split()):
-                        specialties.append(category)
+            for specialty, original in specialty_keywords.items():
+                if specialty not in [s.lower() for s in specialties]:
+                    if any(keyword in review_text for keyword in specialty.split()):
+                        specialties.append(original)
                         break
         except:
             pass
         if not specialties:
             if 'clinic' in name and 'international' in name:
-                specialties.append('General Practice')
+                specialties.append('general_practitioner')
             elif 'hospital' in name or 'medical_center' in name:
-                specialties.append('Internal Medicine')
+                specialties.append('general_practitioner')
             else:
-                specialties.append('General Medicine')
+                specialties.append('general_practitioner')
         specialties = list(dict.fromkeys(specialties))[:2]
         return specialties
 
@@ -402,7 +426,7 @@ class GooglePlacesHealthcareCollector:
         return processed_reviews
 
     def get_photo_urls(self, photos, max_photos=5):
-        """Get photo URLs from Google Places photos"""
+        """Get photo URLs from Google Places photos, strictly limited to 5"""
         photo_urls = []
         for photo in photos[:max_photos]:
             photo_reference = photo.get('photo_reference')
@@ -413,17 +437,21 @@ class GooglePlacesHealthcareCollector:
         return photo_urls
 
     def create_comprehensive_provider_record(self, place_data):
-        """Create a comprehensive provider record with all available data"""
-        english_proficiency, english_indicators, proficiency_score = self.analyze_english_proficiency(place_data)
-        amenities = self.extract_amenities(place_data)
-        reviews = self.process_reviews(place_data.get('reviews', []))
-        photos = self.get_photo_urls(place_data.get('photos', []))
-        
+        """Create a comprehensive provider record with all available data, handling invalid data"""
+        if not isinstance(place_data, dict):
+            print(f"⚠️ Invalid place_data type for {place_data}: {type(place_data)}")
+            return {}
+
+        english_proficiency, english_indicators, proficiency_score = self.analyze_english_proficiency(place_data) if isinstance(place_data, dict) else ("Unknown", [], 0)
+        amenities = self.extract_amenities(place_data) if isinstance(place_data, dict) else []
+        reviews = self.process_reviews(place_data.get('reviews', [])) if isinstance(place_data, dict) else []
+        photos = self.get_photo_urls(place_data.get('photos', [])) if isinstance(place_data, dict) else []
+
         address_components = place_data.get('address_components', [])
-        city = next((comp['long_name'] for comp in address_components if 'locality' in comp['types']), '')
-        prefecture = next((comp['long_name'] for comp in address_components if 'administrative_area_level_1' in comp['types']), '')
-        postal_code = next((comp['long_name'] for comp in address_components if 'postal_code' in comp['types']), '')
-        
+        city = next((comp['long_name'] for comp in address_components if 'locality' in comp['types']), '') if isinstance(address_components, list) else ''
+        prefecture = next((comp['long_name'] for comp in address_components if 'administrative_area_level_1' in comp['types']), '') if isinstance(address_components, list) else ''
+        postal_code = next((comp['long_name'] for comp in address_components if 'postal_code' in comp['types']), '') if isinstance(address_components, list) else ''
+
         record = {
             'provider_name': place_data.get('name', ''),
             'address': place_data.get('formatted_address', ''),
@@ -431,15 +459,15 @@ class GooglePlacesHealthcareCollector:
             'prefecture': prefecture,
             'phone': place_data.get('formatted_phone_number', ''),
             'website': place_data.get('website', ''),
-            'specialties': self.determine_medical_specialties(place_data),
+            'specialties': self.determine_medical_specialties(place_data) if isinstance(place_data, dict) else [],
             'english_proficiency': english_proficiency,
             'created_at': datetime.now().strftime('%Y-%m-%d'),
             'status': 'pending',
             'rating': place_data.get('rating', 0),
             'total_reviews': place_data.get('user_ratings_total', 0),
             'review_content': json.dumps([{'author': r.get('author', 'Anonymous'), 'rating': r.get('rating', 0), 'text': r.get('text', ''), 'date': r.get('date', '')} for r in reviews], ensure_ascii=False) if reviews else '',
-            'latitude': place_data.get('geometry', {}).get('location', {}).get('lat', 0),
-            'longitude': place_data.get('geometry', {}).get('location', {}).get('lng', 0),
+            'latitude': place_data.get('geometry', {}).get('location', {}).get('lat', 0) if isinstance(place_data.get('geometry', {}), dict) else 0,
+            'longitude': place_data.get('geometry', {}).get('location', {}).get('lng', 0) if isinstance(place_data.get('geometry', {}), dict) else 0,
             'plus_code': place_data.get('plus_code', {}).get('global_code', ''),
             'postal_code': postal_code,
             'photo_references': json.dumps([p.get('photo_reference') for p in place_data.get('photos', [])], ensure_ascii=False),
@@ -451,16 +479,10 @@ class GooglePlacesHealthcareCollector:
             'ai_description': '',
             'google_place_id': place_data.get('place_id', ''),
             'business_status': place_data.get('business_status', 'UNKNOWN'),
-            'service_categories': self._categorize_services(place_data.get('types', [])),
+            'service_categories': self._categorize_services(place_data.get('types', [])) if isinstance(place_data, dict) else [],
             'wheelchair_accessible': place_data.get('wheelchair_accessible_entrance', False),
-            'parking_available': 'parking' in str(place_data.get('types', [])).lower()
+            'parking_available': 'parking' in str(place_data.get('types', [])).lower() if isinstance(place_data.get('types', []), list) else False
         }
-        
-        location = place_data.get('geometry', {}).get('location', {})
-        nearest_station = self.get_nearest_station(location)
-        if nearest_station:
-            record['nearest_station'] = f"{nearest_station['time']} to {nearest_station['name']}"
-        
         return record
 
     def save_to_postgres(self, providers):
@@ -514,14 +536,14 @@ class GooglePlacesHealthcareCollector:
     def main():
         """Main execution function for testing"""
         collector = GooglePlacesHealthcareCollector()
-        search_queries = collector.generate_search_queries(limit=10, initial_cities=["Tokyo", "Yokohama", "Osaka City", "Nagoya"])
+        search_queries = collector.generate_search_queries(limit=100, initial_cities=["Tokyo", "Yokohama", "Osaka City", "Nagoya"])
         print("🏥 Google Places Healthcare Data Collection")
         print("=" * 50)
         print(f"📊 Searching {len(search_queries)} query types")
         print(f"🎯 Target: Comprehensive provider profiles")
         print()
         try:
-            providers = collector.search_and_collect_providers(search_queries, max_per_query=10)
+            providers = collector.search_and_collect_providers(search_queries, max_per_query=1, daily_limit=5)
             print(f"\n📈 Collection Summary:")
             print(f"   Total providers found: {len(providers)}")
             if providers:
