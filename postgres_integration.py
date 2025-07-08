@@ -213,12 +213,16 @@ class PostgresIntegration:
         try:
             session = self.Session()
             total_providers = session.query(Provider).count()
-            active_providers = session.query(Provider).filter_by(status="approved").count()
+            pending_providers = session.query(Provider).filter_by(status="pending").count()
+            description_generated = session.query(Provider).filter_by(status="description_generated").count()
+            published_providers = session.query(Provider).filter_by(status="published").count()
             session.close()
             return {
                 "total_providers": total_providers,
-                "active_providers": active_providers,
-                "inactive_providers": total_providers - active_providers,
+                "pending_providers": pending_providers,
+                "description_generated": description_generated,
+                "published_providers": published_providers,
+                "ready_for_wordpress": description_generated,
                 "health_status": "healthy" if total_providers > 0 else "empty"
             }
         except Exception as e:
