@@ -8,7 +8,7 @@ import argparse
 from google_places_integration import GooglePlacesHealthcareCollector
 from wordpress_integration import WordPressIntegration
 from flask import Flask, render_template
-from claude_description_generator import run_ai_description_generation  # Corrected import
+from claude_description_generator import run_batch_ai_description_generation  # Updated to use batch processing
 
 app = Flask(__name__)
 duplicates_detected = []
@@ -44,10 +44,11 @@ def main():
     print("=" * 50)
     providers = run_data_collection(daily_limit=args.daily_limit)
 
-    # Phase 2: AI Description Generation
-    print("🤖 PHASE 2: AI Description Generation")
+    # Phase 2: AI Description Generation (Batch Processing)
+    print("🤖 PHASE 2: AI Description Generation (Batch Processing)")
     print("=" * 50)
-    run_ai_description_generation(providers)
+    print(f"📦 Using batch size: {args.batch_size}")
+    run_batch_ai_description_generation(providers, batch_size=args.batch_size)
 
     # Phase 3: WordPress Publishing
     print("🌐 PHASE 3: WordPress Publishing")
