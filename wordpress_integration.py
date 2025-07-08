@@ -1028,20 +1028,20 @@ class WordPressIntegration:
     def format_wheelchair_accessibility(self, wheelchair_accessible):
         """Format wheelchair accessibility for ACF dropdown field"""
         if wheelchair_accessible is True:
-            return "accessible"
+            return "Wheelchair accessible"
         elif wheelchair_accessible is False:
-            return "not_accessible"
+            return "Not wheelchair accessible"
         else:
-            return "unknown"
+            return "Wheelchair accessibility unknown"
     
     def format_parking_availability(self, parking_available):
         """Format parking availability for ACF dropdown field"""
         if parking_available is True:
-            return "available"
+            return "Parking is available"
         elif parking_available is False:
-            return "not_available"
+            return "Parking is not available"
         else:
-            return "unknown"
+            return "Parking unknown"
 
     def format_business_hours(self, business_hours):
         """Format business hours for display in ACF field"""

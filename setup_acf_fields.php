@@ -85,16 +85,28 @@ function healthcare_register_acf_fields() {
                 'key' => 'field_wheelchair_accessible',
                 'label' => 'Wheelchair Accessible',
                 'name' => 'wheelchair_accessible',
-                'type' => 'true_false',
-                'instructions' => 'Is this facility wheelchair accessible?',
+                'type' => 'select',
+                'instructions' => 'Wheelchair accessibility status',
+                'choices' => array(
+                    'Wheelchair accessible' => 'Wheelchair accessible',
+                    'Not wheelchair accessible' => 'Not wheelchair accessible',
+                    'Wheelchair accessibility unknown' => 'Wheelchair accessibility unknown',
+                ),
+                'default_value' => 'Wheelchair accessibility unknown',
                 'wrapper' => array('width' => '50'),
             ),
             array(
                 'key' => 'field_parking_available',
                 'label' => 'Parking Available',
                 'name' => 'parking_available',
-                'type' => 'true_false',
-                'instructions' => 'Is parking available at this facility?',
+                'type' => 'select',
+                'instructions' => 'Parking availability status',
+                'choices' => array(
+                    'Parking is available' => 'Parking is available',
+                    'Parking is not available' => 'Parking is not available',
+                    'Parking unknown' => 'Parking unknown',
+                ),
+                'default_value' => 'Parking unknown',
                 'wrapper' => array('width' => '50'),
             ),
             array(
@@ -199,7 +211,107 @@ function healthcare_register_acf_fields() {
         'show_in_rest' => 1,
     ));
 
-    // 3. LANGUAGE SUPPORT FIELD GROUP
+    // 3. BUSINESS HOURS FIELD GROUP
+    acf_add_local_field_group(array(
+        'key' => 'group_business_hours',
+        'title' => 'Business Hours',
+        'fields' => array(
+            array(
+                'key' => 'field_business_hours',
+                'label' => 'Complete Business Hours',
+                'name' => 'business_hours',
+                'type' => 'textarea',
+                'instructions' => 'Complete formatted business hours for all days',
+                'rows' => 8,
+                'wrapper' => array('width' => '100'),
+            ),
+            array(
+                'key' => 'field_hours_monday',
+                'label' => 'Monday Hours',
+                'name' => 'hours_monday',
+                'type' => 'text',
+                'instructions' => 'Monday operating hours',
+                'wrapper' => array('width' => '50'),
+            ),
+            array(
+                'key' => 'field_hours_tuesday',
+                'label' => 'Tuesday Hours',
+                'name' => 'hours_tuesday',
+                'type' => 'text',
+                'instructions' => 'Tuesday operating hours',
+                'wrapper' => array('width' => '50'),
+            ),
+            array(
+                'key' => 'field_hours_wednesday',
+                'label' => 'Wednesday Hours',
+                'name' => 'hours_wednesday',
+                'type' => 'text',
+                'instructions' => 'Wednesday operating hours',
+                'wrapper' => array('width' => '50'),
+            ),
+            array(
+                'key' => 'field_hours_thursday',
+                'label' => 'Thursday Hours',
+                'name' => 'hours_thursday',
+                'type' => 'text',
+                'instructions' => 'Thursday operating hours',
+                'wrapper' => array('width' => '50'),
+            ),
+            array(
+                'key' => 'field_hours_friday',
+                'label' => 'Friday Hours',
+                'name' => 'hours_friday',
+                'type' => 'text',
+                'instructions' => 'Friday operating hours',
+                'wrapper' => array('width' => '50'),
+            ),
+            array(
+                'key' => 'field_hours_saturday',
+                'label' => 'Saturday Hours',
+                'name' => 'hours_saturday',
+                'type' => 'text',
+                'instructions' => 'Saturday operating hours',
+                'wrapper' => array('width' => '50'),
+            ),
+            array(
+                'key' => 'field_hours_sunday',
+                'label' => 'Sunday Hours',
+                'name' => 'hours_sunday',
+                'type' => 'text',
+                'instructions' => 'Sunday operating hours',
+                'wrapper' => array('width' => '50'),
+            ),
+            array(
+                'key' => 'field_open_now',
+                'label' => 'Open Now Status',
+                'name' => 'open_now',
+                'type' => 'select',
+                'instructions' => 'Current open/closed status',
+                'choices' => array(
+                    'Open Now' => 'Currently Open',
+                    'Closed' => 'Currently Closed',
+                    'Status unknown' => 'Status Unknown',
+                ),
+                'default_value' => 'Status unknown',
+                'wrapper' => array('width' => '50'),
+            ),
+        ),
+        'location' => array(
+            array(
+                array(
+                    'param' => 'post_type',
+                    'operator' => '==',
+                    'value' => 'healthcare_provider',
+                ),
+            ),
+        ),
+        'menu_order' => 3,
+        'position' => 'normal',
+        'style' => 'default',
+        'show_in_rest' => 1,
+    ));
+
+    // 4. LANGUAGE SUPPORT FIELD GROUP
     acf_add_local_field_group(array(
         'key' => 'group_language_support',
         'title' => 'Language Support',
@@ -247,13 +359,13 @@ function healthcare_register_acf_fields() {
                 ),
             ),
         ),
-        'menu_order' => 3,
+        'menu_order' => 4,
         'position' => 'normal',
         'style' => 'default',
         'show_in_rest' => 1,
     ));
 
-    // 4. PHOTO GALLERY FIELD GROUP
+    // 5. PHOTO GALLERY FIELD GROUP
     acf_add_local_field_group(array(
         'key' => 'group_photo_gallery',
         'title' => 'Photo Gallery',
@@ -287,13 +399,13 @@ function healthcare_register_acf_fields() {
                 ),
             ),
         ),
-        'menu_order' => 4,
+        'menu_order' => 5,
         'position' => 'normal',
         'style' => 'default',
         'show_in_rest' => 1,
     ));
 
-    // 5. PATIENT INSIGHTS FIELD GROUP
+    // 6. PATIENT INSIGHTS FIELD GROUP
     acf_add_local_field_group(array(
         'key' => 'group_patient_insights',
         'title' => 'Patient Insights',
@@ -344,7 +456,7 @@ function healthcare_register_acf_fields() {
                 ),
             ),
         ),
-        'menu_order' => 5,
+        'menu_order' => 6,
         'position' => 'normal',
         'style' => 'default',
         'show_in_rest' => 1,
