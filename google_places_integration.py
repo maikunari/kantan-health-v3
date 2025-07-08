@@ -520,20 +520,39 @@ class GooglePlacesHealthcareCollector:
         return record
 
     def save_to_postgres(self, providers):
-        """Save comprehensive provider data to PostgreSQL"""
+        """Save comprehensive provider data to PostgreSQL with duplicate checking by Google Place ID"""
         try:
             postgres = PostgresIntegration()
             is_connected, message = postgres.test_connection()
             if not is_connected:
                 print(f"❌ PostgreSQL connection failed: {message}")
                 return 0
-            saved_count, error_count = 0, 0
+            saved_count, error_count, skipped_count = 0, 0, 0
             session = postgres.Session()
+            
+            # Get existing Google Place IDs to prevent duplicates
+            existing_place_ids = set()
+            existing_providers = session.query(Provider.google_place_id).filter(Provider.google_place_id.isnot(None)).all()
+            for provider in existing_providers:
+                if provider.google_place_id:
+                    existing_place_ids.add(provider.google_place_id)
+            
+            print(f"📊 Found {len(existing_place_ids)} existing Google Place IDs in database")
+            
             for provider in providers:
                 try:
-                    print(f"🔍 Saving provider: {provider['provider_name']} with status {provider.get('status', 'Not set')}")
+                    google_place_id = provider.get('google_place_id', '')
+                    provider_name = provider.get('provider_name', 'Unknown')
+                    
+                    # Check for duplicate by Google Place ID
+                    if google_place_id and google_place_id in existing_place_ids:
+                        print(f"⏭️ Skipping duplicate provider: {provider_name} (Google Place ID: {google_place_id})")
+                        skipped_count += 1
+                        continue
+                    
+                    print(f"🔍 Saving provider: {provider_name} with status {provider.get('status', 'Not set')}")
                     provider_obj = Provider(
-                        provider_name=provider.get('provider_name', ''),
+                        provider_name=provider_name,
                         address=provider.get('address', ''),
                         city=provider.get('city', ''),
                         prefecture=provider.get('prefecture', ''),
@@ -549,19 +568,31 @@ class GooglePlacesHealthcareCollector:
                         photo_urls=provider.get('photo_urls', ''),
                         nearest_station=provider.get('nearest_station', ''),
                         status=provider.get('status', 'pending'),
-                        created_at=provider.get('created_at', datetime.now().strftime('%Y-%m-%d'))
+                        created_at=provider.get('created_at', datetime.now().strftime('%Y-%m-%d')),
+                        google_place_id=google_place_id,
+                        ai_description=provider.get('ai_description', '')
                     )
                     session.add(provider_obj)
                     session.commit()
                     saved_count += 1
-                    print(f"✅ Saved {provider['provider_name']} with status {provider_obj.status}")
+                    
+                    # Add to existing set to prevent duplicates within this batch
+                    if google_place_id:
+                        existing_place_ids.add(google_place_id)
+                    
+                    print(f"✅ Saved {provider_name} with status {provider_obj.status}")
                 except Exception as e:
                     session.rollback()
-                    print(f"⚠️ Error saving {provider['provider_name']}: {str(e)}")
+                    print(f"⚠️ Error saving {provider_name}: {str(e)}")
                     error_count += 1
+            
             session.close()
-            if error_count > 0:
-                print(f"⚠️ {error_count} providers had errors during save")
+            
+            print(f"📈 Save Summary:")
+            print(f"   ✅ Saved: {saved_count}")
+            print(f"   ⏭️ Skipped duplicates: {skipped_count}")
+            print(f"   ❌ Errors: {error_count}")
+            
             return saved_count
         except Exception as e:
             print(f"❌ Error in PostgreSQL integration: {str(e)}")

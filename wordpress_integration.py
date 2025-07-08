@@ -39,13 +39,26 @@ class WordPressIntegration:
             ).all()
             print(f"🔍 Found {len(providers)} providers ready for WordPress publishing")
             
-            if not providers:
+            # Group providers by Google Place ID to prevent duplicates
+            providers_by_place_id = {}
+            for provider in providers:
+                place_id = provider.google_place_id
+                if place_id and place_id not in providers_by_place_id:
+                    providers_by_place_id[place_id] = provider
+                elif not place_id:
+                    # Handle providers without Google Place ID (keep them)
+                    providers_by_place_id[f"no_place_id_{provider.id}"] = provider
+            
+            unique_providers = list(providers_by_place_id.values())
+            print(f"🔍 Deduplicated to {len(unique_providers)} unique providers (by Google Place ID)")
+            
+            if not unique_providers:
                 print("ℹ️ No providers ready for publishing")
                 return {"published": 0, "errors": 0, "skipped": 0}
             
             results = {"published": 0, "errors": 0, "skipped": 0}
             
-            for provider in providers:
+            for provider in unique_providers:
                 try:
                     # Double-check if already published to WordPress
                     if provider.wordpress_post_id:
@@ -62,6 +75,19 @@ class WordPressIntegration:
                         # Update database with existing WordPress post ID
                         provider.wordpress_post_id = duplicate_id
                         provider.status = 'published'
+                        
+                        # Also update all duplicate records with the same Google Place ID
+                        if provider.google_place_id:
+                            duplicate_providers = session.query(Provider).filter(
+                                Provider.google_place_id == provider.google_place_id,
+                                Provider.id != provider.id  # Exclude current provider
+                            ).all()
+                            
+                            for duplicate in duplicate_providers:
+                                duplicate.wordpress_post_id = duplicate_id
+                                duplicate.status = 'published'
+                                print(f"📄 Also marked duplicate as existing: {duplicate.provider_name} (ID: {duplicate.id})")
+                        
                         session.commit()
                         results["skipped"] += 1
                         continue
@@ -71,6 +97,19 @@ class WordPressIntegration:
                         # Update database with WordPress post ID and status
                         provider.wordpress_post_id = wordpress_post_id
                         provider.status = 'published'
+                        
+                        # Also update all duplicate records with the same Google Place ID
+                        if provider.google_place_id:
+                            duplicate_providers = session.query(Provider).filter(
+                                Provider.google_place_id == provider.google_place_id,
+                                Provider.id != provider.id  # Exclude current provider
+                            ).all()
+                            
+                            for duplicate in duplicate_providers:
+                                duplicate.wordpress_post_id = wordpress_post_id
+                                duplicate.status = 'published'
+                                print(f"📄 Also marked duplicate as published: {duplicate.provider_name} (ID: {duplicate.id})")
+                        
                         session.commit()
                         results["published"] += 1
                         print(f"✅ Published: {provider.provider_name} (WordPress ID: {wordpress_post_id})")
@@ -90,25 +129,43 @@ class WordPressIntegration:
     def create_wordpress_post(self, provider):
         """Create a WordPress post for a healthcare provider"""
         try:
-            # Extract specialty from specialties field (it's a JSON array)
-            specialty_name = "General Medicine"  # Default
+            # Process ALL specialties from provider (not just the first one)
+            provider_specialties = []
             if provider.specialties:
-                if isinstance(provider.specialties, list) and provider.specialties:
-                    specialty_name = provider.specialties[0]  # Use first specialty
+                if isinstance(provider.specialties, list):
+                    provider_specialties = provider.specialties
                 elif isinstance(provider.specialties, str):
-                    specialty_name = provider.specialties
+                    provider_specialties = [provider.specialties]
             
-            # Find or create location and specialty terms
+            # Default to General Medicine if no specialties found
+            if not provider_specialties:
+                provider_specialties = ["General Medicine"]
+            
+            print(f"🏥 Processing {len(provider_specialties)} specialties: {provider_specialties}")
+            
+            # Find or create location
             location_id = self.find_or_create_location(provider.city)
-            specialty_id = self.find_or_create_specialty(specialty_name)
-            
             if not location_id:
                 print(f"❌ Failed to create/find location for {provider.city}")
                 return None
             
-            if not specialty_id:
-                print(f"❌ Failed to create/find specialty for {specialty_name}")
+            # Find or create ALL specialty terms
+            specialty_ids = []
+            primary_specialty = provider_specialties[0]  # Keep track of primary for content
+            
+            for specialty in provider_specialties:
+                specialty_id = self.find_or_create_specialty(specialty)
+                if specialty_id:
+                    specialty_ids.append(specialty_id)
+                    print(f"✅ Added specialty: {specialty} (ID: {specialty_id})")
+                else:
+                    print(f"⚠️ Failed to create/find specialty: {specialty}")
+            
+            if not specialty_ids:
+                print(f"❌ Failed to create/find any specialties for {provider.provider_name}")
                 return None
+            
+            print(f"🎯 Final specialty assignment: {len(specialty_ids)} specialties")
             
             # Prepare post data with comprehensive ACF fields
             post_data = {
@@ -117,7 +174,7 @@ class WordPressIntegration:
                 "status": "publish",
                 "type": "healthcare_provider",
                 "location": [location_id],
-                "specialties": [specialty_id],
+                "specialties": specialty_ids,
                 "acf": {
                     # Provider Details Field Group
                     "provider_phone": getattr(provider, 'phone', ''),
@@ -163,7 +220,7 @@ class WordPressIntegration:
                     "review_content": getattr(provider, 'review_content', '[]'),
                     "service_categories": json.dumps(getattr(provider, 'service_categories', [])) if hasattr(provider, 'service_categories') else '[]',
                     "google_place_id": getattr(provider, 'google_place_id', ''),
-                    "specialties_list": json.dumps(getattr(provider, 'specialties', []) if hasattr(provider, 'specialties') else [specialty_name] if specialty_name else []),
+                    "specialties_list": json.dumps(getattr(provider, 'specialties', []) if hasattr(provider, 'specialties') else provider_specialties),
                     "amenities": json.dumps(getattr(provider, 'amenities', [])) if hasattr(provider, 'amenities') else '[]',
                     "last_verified": getattr(provider, 'last_verified', ''),
                     "data_source": 'Google Places API',
@@ -234,11 +291,27 @@ class WordPressIntegration:
     
     def generate_provider_content(self, provider):
         """Generate content for a WordPress post based on provider data."""
-        # Extract specialty from specialties field
+        # Extract and format all specialties
         specialty_display = "General Practitioner"
         if provider.specialties:
             if isinstance(provider.specialties, list) and provider.specialties:
-                specialty_display = ", ".join(provider.specialties)
+                # Clean and format specialty names for display
+                cleaned_specialties = []
+                for specialty in provider.specialties:
+                    # Convert common technical terms to readable names
+                    specialty_mapping = {
+                        "general_practitioner": "General Medicine",
+                        "oncologist": "Oncology", 
+                        "ent": "ENT (Ear, Nose & Throat)",
+                        "Point_of_interest": "General Healthcare",
+                        "Health": "General Healthcare",
+                        "Establishment": "Medical Facility"
+                    }
+                    clean_specialty = specialty_mapping.get(specialty.lower(), specialty.title())
+                    if clean_specialty not in cleaned_specialties:
+                        cleaned_specialties.append(clean_specialty)
+                
+                specialty_display = ", ".join(cleaned_specialties) if cleaned_specialties else "General Practitioner"
             elif isinstance(provider.specialties, str):
                 specialty_display = provider.specialties
         
@@ -304,7 +377,15 @@ class WordPressIntegration:
             "psychiatrist": "Psychiatry",
             "psychiatry": "Psychiatry",
             "oncologist": "Oncology",
-            "oncology": "Oncology"
+            "oncology": "Oncology",
+            "ent": "ENT (Ear, Nose & Throat)",
+            # Google Places API types mapping
+            "point_of_interest": "General Healthcare",
+            "health": "General Medicine",
+            "establishment": "Medical Facility",
+            "doctor": "General Medicine",
+            "hospital": "General Medicine",
+            "medical_center": "General Medicine"
         }
         
         # Normalize the specialty name
