@@ -47,8 +47,7 @@ def main():
     # Phase 2: AI Description Generation (Batch Processing)
     print("🤖 PHASE 2: AI Description Generation (Batch Processing)")
     print("=" * 50)
-    print(f"📦 Using batch size: {args.batch_size}")
-    run_batch_ai_description_generation(providers, batch_size=args.batch_size)
+    run_batch_ai_description_generation(providers, batch_size=5)
 
     # Phase 3: WordPress Publishing
     print("🌐 PHASE 3: WordPress Publishing")

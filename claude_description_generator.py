@@ -1,30 +1,39 @@
 #!/usr/bin/env python3
 """
-AI Description Generator Module
-Generates AI-powered descriptions for healthcare providers using Anthropic.
+Enhanced AI Description Generator Module
+Generates comprehensive, natural AI-powered descriptions for healthcare providers using Anthropic.
+Integrates patient review data, facility information, and accessibility details for informative descriptions.
 
 Usage Examples:
 
-Single Provider Generation:
+Enhanced Single Provider Generation:
     generator = ClaudeDescriptionGenerator()
     provider_data = {
         'provider_name': 'Tokyo Medical Center',
         'city': 'Tokyo',
         'specialties': ['General Medicine'],
-        'english_proficiency': 'Fluent'
+        'english_proficiency': 'Fluent',
+        'rating': 4.3,
+        'total_reviews': 127,
+        'review_content': '[{"author": "John", "rating": 5, "text": "Excellent care..."}]',
+        'wheelchair_accessible': True,
+        'parking_available': True,
+        'website': 'https://example.com',
+        'phone': '+81-3-1234-5678'
     }
     description = generator.generate_description(provider_data)
 
-Batch Generation (Recommended for multiple providers):
-    providers = [provider_data1, provider_data2, provider_data3, ...]
+Enhanced Batch Generation (Recommended - integrates review data and patient feedback):
+    providers = [comprehensive_provider_data1, provider_data2, provider_data3, ...]
     descriptions = generator.generate_batch_descriptions(providers, batch_size=5)
     
-Database Integration:
-    # For existing providers in database
+Database Integration with Full Enhancement:
+    # Automatically pulls all provider data including reviews for enhanced descriptions
     run_batch_ai_description_generation(provider_list, batch_size=5)
 """
 
 import os
+import json
 import logging
 from dotenv import load_dotenv
 from anthropic import Anthropic
@@ -48,36 +57,181 @@ class ClaudeDescriptionGenerator:
         self.claude = Anthropic(api_key=self.anthropic_api_key)
         logger.info("ClaudeDescriptionGenerator initialized successfully")
 
-    def generate_description(self, provider_data):
-        """Generate a description for a single provider using Claude."""
+    def process_review_content(self, review_content):
+        """Process review content to extract meaningful insights."""
+        if not review_content:
+            return {
+                'avg_rating': 0,
+                'total_reviews': 0,
+                'positive_themes': [],
+                'concerns': [],
+                'english_mentions': []
+            }
+        
+        try:
+            # Parse review content
+            if isinstance(review_content, str):
+                reviews = json.loads(review_content) if review_content.strip() else []
+            else:
+                reviews = review_content
+            
+            if not reviews or not isinstance(reviews, list):
+                return {
+                    'avg_rating': 0,
+                    'total_reviews': 0,
+                    'positive_themes': [],
+                    'concerns': [],
+                    'english_mentions': []
+                }
+            
+            # Calculate statistics
+            avg_rating = sum(r.get('rating', 0) for r in reviews) / len(reviews) if reviews else 0
+            total_reviews = len(reviews)
+            
+            # Extract positive feedback (4+ stars)
+            positive_reviews = [r.get('text', '') for r in reviews if r.get('rating', 0) >= 4]
+            positive_themes = []
+            for review in positive_reviews[:3]:  # Limit to 3 most relevant
+                if len(review) > 20:  # Skip very short reviews
+                    # Extract key phrases (simplified)
+                    if 'professional' in review.lower() or 'excellent' in review.lower():
+                        positive_themes.append('professional service')
+                    if 'clean' in review.lower() or 'modern' in review.lower():
+                        positive_themes.append('clean facilities')
+                    if 'friendly' in review.lower() or 'kind' in review.lower():
+                        positive_themes.append('friendly staff')
+                    if 'wait' in review.lower() and ('short' in review.lower() or 'quick' in review.lower()):
+                        positive_themes.append('minimal wait times')
+            
+            # Extract concerns (3 stars or less)
+            negative_reviews = [r.get('text', '') for r in reviews if r.get('rating', 0) <= 3]
+            concerns = []
+            for review in negative_reviews[:2]:  # Limit to 2 concerns
+                if len(review) > 20:
+                    if 'wait' in review.lower() and ('long' in review.lower() or 'delay' in review.lower()):
+                        concerns.append('longer wait times')
+                    if 'expensive' in review.lower() or 'cost' in review.lower():
+                        concerns.append('higher costs')
+                    if 'language' in review.lower() or 'communication' in review.lower():
+                        concerns.append('language barriers')
+            
+            # Extract English language mentions
+            english_mentions = []
+            for review in reviews:
+                text = review.get('text', '').lower()
+                if 'english' in text:
+                    if 'speak' in text or 'speaking' in text:
+                        english_mentions.append('English-speaking staff')
+                    elif 'understand' in text:
+                        english_mentions.append('English understanding')
+                    elif 'translate' in text:
+                        english_mentions.append('Translation services')
+            
+            return {
+                'avg_rating': round(avg_rating, 1),
+                'total_reviews': total_reviews,
+                'positive_themes': list(set(positive_themes))[:3],  # Remove duplicates, limit to 3
+                'concerns': list(set(concerns))[:2],  # Remove duplicates, limit to 2
+                'english_mentions': list(set(english_mentions))[:2]  # Remove duplicates, limit to 2
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing review content: {str(e)}")
+            return {
+                'avg_rating': 0,
+                'total_reviews': 0,
+                'positive_themes': [],
+                'concerns': [],
+                'english_mentions': []
+            }
+
+    def create_enhanced_prompt(self, provider_data):
+        """Create an enhanced prompt with review data and detailed information."""
         provider_name = provider_data.get('provider_name', 'Unknown Provider')
         city = provider_data.get('city', 'Unknown City')
-        specialties = ', '.join(provider_data.get('specialties', ['General Practitioner']))
+        prefecture = provider_data.get('prefecture', '')
+        specialties = provider_data.get('specialties', ['General Practitioner'])
         english_proficiency = provider_data.get('english_proficiency', 'Unknown')
-
+        
+        # Process additional data
+        rating = provider_data.get('rating', 0)
+        total_reviews = provider_data.get('total_reviews', 0)
+        business_hours = provider_data.get('business_hours', {})
+        wheelchair_accessible = provider_data.get('wheelchair_accessible', False)
+        parking_available = provider_data.get('parking_available', False)
+        website = provider_data.get('website', '')
+        phone = provider_data.get('phone', '')
+        
+        # Process reviews for insights
+        review_content = provider_data.get('review_content', '')
+        review_insights = self.process_review_content(review_content)
+        
+        # Format specialties naturally
+        if isinstance(specialties, list):
+            specialty_text = ', '.join(specialties) if specialties else 'General Practitioner'
+        else:
+            specialty_text = specialties
+        
+        # Location context
+        location_text = f"{city}"
+        if prefecture and prefecture != city:
+            location_text += f", {prefecture}"
+        
+        # Build enhanced prompt
         prompt = f"""
-        Generate a concise and professional description for a healthcare provider.
-        Provider Name: {provider_name}
-        Location: {city}
-        Specialties: {specialties}
-        English Proficiency: {english_proficiency}
-        The description should be suitable for a directory listing, highlighting the provider's services and language capabilities.
-        """
+Write a natural, informative description for this healthcare provider. Focus on being specific and helpful to potential patients.
+
+PROVIDER DETAILS:
+- Name: {provider_name}
+- Location: {location_text}  
+- Medical Specialties: {specialty_text}
+- English Language Support: {english_proficiency}
+
+PATIENT EXPERIENCE DATA:
+- Google Rating: {rating}/5 stars ({total_reviews} reviews)
+- Positive Patient Feedback: {', '.join(review_insights['positive_themes']) if review_insights['positive_themes'] else 'Limited feedback available'}
+- Patient Concerns: {', '.join(review_insights['concerns']) if review_insights['concerns'] else 'No significant concerns noted'}
+- English Language Notes: {', '.join(review_insights['english_mentions']) if review_insights['english_mentions'] else 'English support level varies'}
+
+FACILITY INFORMATION:
+- Wheelchair Accessibility: {'Yes' if wheelchair_accessible else 'Not specified'}
+- Parking Available: {'Yes' if parking_available else 'Not specified'}
+- Contact: {phone if phone else 'Contact via facility'}
+- Website: {'Available' if website else 'Not available'}
+
+INSTRUCTIONS:
+Write 2-3 sentences that sound natural and helpful. Include:
+1. What medical services they provide and their specialty focus
+2. Their English language capabilities for international patients  
+3. Key patient experience highlights (if available)
+4. Practical details (location, accessibility) that help patients
+
+Make it sound like a knowledgeable local would describe this provider to a friend. Avoid generic phrases like "quality care" unless backed by specific patient feedback.
+"""
+        
+        return prompt
+
+    def generate_description(self, provider_data):
+        """Generate a description for a single provider using Claude with enhanced prompts."""
+        provider_name = provider_data.get('provider_name', 'Unknown Provider')
+        
+        # Use enhanced prompt with review data
+        prompt = self.create_enhanced_prompt(provider_data)
 
         try:
-            logger.info(f"Generating description for {provider_name}")
+            logger.info(f"Generating enhanced description for {provider_name}")
             response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=200,
+                max_tokens=300,  # Increased for more detailed descriptions
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
             description = response.content[0].text.strip()
-            logger.info(f"✅ Generated description for {provider_name}: {description[:50]}...")
+            logger.info(f"✅ Generated enhanced description for {provider_name}: {description[:50]}...")
             return description
         except Exception as e:
             logger.error(f"⚠️ Error generating description for {provider_name}: {str(e)}")
-            return "Description generation failed. Please contact support."
+            return "Professional healthcare provider offering medical services. Please contact the facility directly for more information."
 
     def generate_batch_descriptions(self, provider_data_list, batch_size=5):
         """Generate descriptions for a batch of providers in a single API call.
@@ -103,43 +257,72 @@ class ClaudeDescriptionGenerator:
         return all_descriptions
 
     def _generate_batch_chunk(self, provider_batch):
-        """Generate descriptions for a single batch chunk."""
+        """Generate enhanced descriptions for a single batch chunk with review data."""
         if not provider_batch:
             return []
 
-        # Build the batch prompt with all providers
+        # Build enhanced batch prompt with comprehensive provider data
         provider_details = []
         for idx, provider_data in enumerate(provider_batch, 1):
             provider_name = provider_data.get('provider_name', 'Unknown Provider')
             city = provider_data.get('city', 'Unknown City')
-            specialties = ', '.join(provider_data.get('specialties', ['General Practitioner']))
+            prefecture = provider_data.get('prefecture', '')
+            specialties = provider_data.get('specialties', ['General Practitioner'])
             english_proficiency = provider_data.get('english_proficiency', 'Unknown')
+            rating = provider_data.get('rating', 0)
+            total_reviews = provider_data.get('total_reviews', 0)
+            wheelchair_accessible = provider_data.get('wheelchair_accessible', False)
+            
+            # Process reviews for insights
+            review_insights = self.process_review_content(provider_data.get('review_content', ''))
+            
+            # Format specialties
+            if isinstance(specialties, list):
+                specialty_text = ', '.join(specialties) if specialties else 'General Practitioner'
+            else:
+                specialty_text = specialties
+            
+            # Location context
+            location_text = f"{city}"
+            if prefecture and prefecture != city:
+                location_text += f", {prefecture}"
             
             provider_details.append(f"""
-Provider {idx}:
-- Name: {provider_name}
-- Location: {city}
-- Specialties: {specialties}
-- English Proficiency: {english_proficiency}""")
+Provider {idx}: {provider_name}
+- Location: {location_text}
+- Specialties: {specialty_text}
+- English Support: {english_proficiency}
+- Patient Rating: {rating}/5 stars ({total_reviews} reviews)
+- Positive Feedback: {', '.join(review_insights['positive_themes']) if review_insights['positive_themes'] else 'Limited feedback available'}
+- English Language Notes: {', '.join(review_insights['english_mentions']) if review_insights['english_mentions'] else 'Support level varies'}
+- Accessibility: {'Wheelchair accessible' if wheelchair_accessible else 'Not specified'}""")
 
         batch_prompt = f"""
-Generate concise and professional descriptions for the following {len(provider_batch)} healthcare providers. Each description should be suitable for a directory listing, highlighting the provider's services and language capabilities.
+Write natural, informative descriptions for these {len(provider_batch)} healthcare providers. Each description should be 2-3 sentences that sound helpful and specific to potential patients.
 
 {chr(10).join(provider_details)}
 
-Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provider_batch)}, with each description being 1-2 sentences long and professional in tone. Format your response as:
+INSTRUCTIONS FOR EACH DESCRIPTION:
+1. Mention their medical specialty and location naturally
+2. Include English language capabilities for international patients
+3. Reference specific patient feedback when available (not generic "quality care")
+4. Add practical details that help patients choose
 
-1. [Description for Provider 1]
-2. [Description for Provider 2]
-3. [Description for Provider 3]
+Make each description sound like a knowledgeable local recommending the provider. Avoid vague terms unless backed by specific evidence.
+
+Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provider_batch)}:
+
+1. [Natural description for Provider 1]
+2. [Natural description for Provider 2]
+3. [Natural description for Provider 3]
 ...and so on.
 """
 
         try:
-            logger.info(f"Generating batch descriptions for {len(provider_batch)} providers")
+            logger.info(f"Generating enhanced batch descriptions for {len(provider_batch)} providers")
             response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=250 * len(provider_batch),  # Scale tokens with batch size
+                max_tokens=400 * len(provider_batch),  # Increased for enhanced descriptions
                 temperature=0.7,
                 messages=[{"role": "user", "content": batch_prompt}]
             )
@@ -150,13 +333,13 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             # Log results
             for provider_data, description in zip(provider_batch, descriptions):
                 provider_name = provider_data.get('provider_name', 'Unknown Provider')
-                logger.info(f"✅ Generated description for {provider_name}: {description[:50]}...")
+                logger.info(f"✅ Generated enhanced description for {provider_name}: {description[:50]}...")
                 
             return descriptions
             
         except Exception as e:
-            logger.error(f"⚠️ Error generating batch descriptions: {str(e)}")
-            fallback_descriptions = ["Description generation failed. Please contact support."] * len(provider_batch)
+            logger.error(f"⚠️ Error generating enhanced batch descriptions: {str(e)}")
+            fallback_descriptions = ["Professional healthcare provider offering medical services. Please contact the facility directly for more information."] * len(provider_batch)
             return fallback_descriptions
 
     def _parse_batch_response(self, response_text, expected_count):
@@ -181,18 +364,48 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
         return descriptions[:expected_count]
 
 def run_ai_description_generation(providers):
-    """Generate descriptions for a list of provider dictionaries (single provider mode)."""
+    """Generate enhanced descriptions for a list of provider dictionaries (single provider mode)."""
     generator = ClaudeDescriptionGenerator()
     collector = GooglePlacesHealthcareCollector()
     session = collector.Session()
     
     for provider in providers:
-        provider_data = {
-            'provider_name': provider.get('provider_name', 'Unknown Provider'),
-            'city': provider.get('city', 'Unknown City'),
-            'specialties': provider.get('specialties', ['General Practitioner']),
-            'english_proficiency': provider.get('english_proficiency', 'Unknown')
-        }
+        # Prepare comprehensive provider data for enhanced descriptions
+        if hasattr(provider, '__dict__'):
+            # Provider object from database
+            provider_data = {
+                'provider_name': getattr(provider, 'provider_name', 'Unknown Provider'),
+                'city': getattr(provider, 'city', 'Unknown City'),
+                'prefecture': getattr(provider, 'prefecture', ''),
+                'specialties': getattr(provider, 'specialties', ['General Practitioner']),
+                'english_proficiency': getattr(provider, 'english_proficiency', 'Unknown'),
+                'rating': getattr(provider, 'rating', 0),
+                'total_reviews': getattr(provider, 'total_reviews', 0),
+                'review_content': getattr(provider, 'review_content', ''),
+                'business_hours': getattr(provider, 'business_hours', {}),
+                'wheelchair_accessible': getattr(provider, 'wheelchair_accessible', False),
+                'parking_available': getattr(provider, 'parking_available', False),
+                'website': getattr(provider, 'website', ''),
+                'phone': getattr(provider, 'phone', '')
+            }
+        else:
+            # Dictionary input
+            provider_data = {
+                'provider_name': provider.get('provider_name', 'Unknown Provider'),
+                'city': provider.get('city', 'Unknown City'),
+                'prefecture': provider.get('prefecture', ''),
+                'specialties': provider.get('specialties', ['General Practitioner']),
+                'english_proficiency': provider.get('english_proficiency', 'Unknown'),
+                'rating': provider.get('rating', 0),
+                'total_reviews': provider.get('total_reviews', 0),
+                'review_content': provider.get('review_content', ''),
+                'business_hours': provider.get('business_hours', {}),
+                'wheelchair_accessible': provider.get('wheelchair_accessible', False),
+                'parking_available': provider.get('parking_available', False),
+                'website': provider.get('website', ''),
+                'phone': provider.get('phone', '')
+            }
+            
         description = generator.generate_description(provider_data)
         
         # Update the corresponding database record
@@ -201,7 +414,7 @@ def run_ai_description_generation(providers):
             db_provider.ai_description = description
             db_provider.status = 'description_generated'
             session.commit()
-            logger.info(f"✅ Updated {provider_data['provider_name']} with description and status")
+            logger.info(f"✅ Updated {provider_data['provider_name']} with enhanced description and status")
     
     session.close()
 
@@ -220,15 +433,44 @@ def run_batch_ai_description_generation(providers, batch_size=5):
     collector = GooglePlacesHealthcareCollector()
     session = collector.Session()
     
-    # Prepare provider data for batch processing
+    # Prepare comprehensive provider data for enhanced batch processing
     provider_data_list = []
     for provider in providers:
-        provider_data = {
-            'provider_name': provider.get('provider_name', 'Unknown Provider'),
-            'city': provider.get('city', 'Unknown City'),
-            'specialties': provider.get('specialties', ['General Practitioner']),
-            'english_proficiency': provider.get('english_proficiency', 'Unknown')
-        }
+        # Handle both dictionary and Provider object inputs
+        if hasattr(provider, '__dict__'):
+            # Provider object from database
+            provider_data = {
+                'provider_name': getattr(provider, 'provider_name', 'Unknown Provider'),
+                'city': getattr(provider, 'city', 'Unknown City'),
+                'prefecture': getattr(provider, 'prefecture', ''),
+                'specialties': getattr(provider, 'specialties', ['General Practitioner']),
+                'english_proficiency': getattr(provider, 'english_proficiency', 'Unknown'),
+                'rating': getattr(provider, 'rating', 0),
+                'total_reviews': getattr(provider, 'total_reviews', 0),
+                'review_content': getattr(provider, 'review_content', ''),
+                'business_hours': getattr(provider, 'business_hours', {}),
+                'wheelchair_accessible': getattr(provider, 'wheelchair_accessible', False),
+                'parking_available': getattr(provider, 'parking_available', False),
+                'website': getattr(provider, 'website', ''),
+                'phone': getattr(provider, 'phone', '')
+            }
+        else:
+            # Dictionary input
+            provider_data = {
+                'provider_name': provider.get('provider_name', 'Unknown Provider'),
+                'city': provider.get('city', 'Unknown City'),
+                'prefecture': provider.get('prefecture', ''),
+                'specialties': provider.get('specialties', ['General Practitioner']),
+                'english_proficiency': provider.get('english_proficiency', 'Unknown'),
+                'rating': provider.get('rating', 0),
+                'total_reviews': provider.get('total_reviews', 0),
+                'review_content': provider.get('review_content', ''),
+                'business_hours': provider.get('business_hours', {}),
+                'wheelchair_accessible': provider.get('wheelchair_accessible', False),
+                'parking_available': provider.get('parking_available', False),
+                'website': provider.get('website', ''),
+                'phone': provider.get('phone', '')
+            }
         provider_data_list.append(provider_data)
     
     logger.info(f"🚀 Starting batch description generation for {len(provider_data_list)} providers")
