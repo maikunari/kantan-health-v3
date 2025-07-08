@@ -199,8 +199,8 @@ class WordPressIntegration:
                     "google_maps_embed": self.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name),
                     
                     # Language Support Field Group
-                    "english_proficiency": self.determine_english_proficiency(provider),
-                    "proficiency_score": self.calculate_proficiency_score(provider),
+                    "english_proficiency": getattr(provider, 'english_proficiency', 'Unknown'),
+                    "proficiency_score": getattr(provider, 'proficiency_score', 0),
                     "english_indicators": self.extract_english_indicators(provider),
                     
                     # Photo Gallery Field Group
@@ -865,86 +865,9 @@ class WordPressIntegration:
             print(f"⚠️ Error uploading featured image: {str(e)}")
             return None
     
-    def determine_english_proficiency(self, provider):
-        """Determine English proficiency level from review content and provider data"""
-        try:
-            # Check if provider has explicit proficiency data
-            explicit_proficiency = getattr(provider, 'english_proficiency', 'Unknown')
-            if explicit_proficiency and explicit_proficiency != 'Unknown':
-                return explicit_proficiency
-            
-            # Analyze review content for English indicators
-            review_content = getattr(provider, 'review_content', '')
-            if not review_content:
-                return 'Unknown'
-            
-            # Parse reviews
-            if isinstance(review_content, str):
-                reviews = json.loads(review_content)
-            else:
-                reviews = review_content
-            
-            if not reviews or not isinstance(reviews, list):
-                return 'Unknown'
-            
-            # Collect all review text
-            all_text = " ".join([review.get('text', '') for review in reviews if review.get('text')]).lower()
-            
-            # Strong English indicators
-            strong_indicators = [
-                "excellent english", "great english", "perfect english", "fluent english",
-                "english communication skills", "speaks english well", "english speaking"
-            ]
-            
-            # Good English indicators
-            good_indicators = [
-                "english", "communicate in english", "english doctor", "english speaking staff"
-            ]
-            
-            # Poor English indicators
-            poor_indicators = [
-                "no english", "poor english", "limited english", "not good at english",
-                "don't speak english", "cannot speak english"
-            ]
-            
-            # Check for strong indicators - map to WordPress values
-            for indicator in strong_indicators:
-                if indicator in all_text:
-                    return "Fluent"
-            
-            # Check for poor indicators
-            for indicator in poor_indicators:
-                if indicator in all_text:
-                    return "Basic"
-            
-            # Check for general English mentions
-            for indicator in good_indicators:
-                if indicator in all_text:
-                    return "Conversational"
-            
-            return "Unknown"
-            
-        except Exception as e:
-            print(f"Error determining English proficiency: {str(e)}")
-            return "Unknown"
+
     
-    def calculate_proficiency_score(self, provider):
-        """Calculate numeric proficiency score from review analysis"""
-        try:
-            proficiency_level = self.determine_english_proficiency(provider)
-            
-            score_mapping = {
-                "Fluent": 5,
-                "Conversational": 4,
-                "Basic": 3,
-                "Unknown": 0
-            }
-            
-            return score_mapping.get(proficiency_level, 0)
-            
-        except Exception as e:
-            print(f"Error calculating proficiency score: {str(e)}")
-            return 0
+
     
     def extract_english_indicators(self, provider):
         """Extract English language indicators from review content"""

@@ -56,8 +56,8 @@ def test_acf_data_format():
         "google_maps_embed": wp.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name),
         
         # Language Support Field Group
-        "english_proficiency": wp.determine_english_proficiency(provider),
-        "proficiency_score": wp.calculate_proficiency_score(provider),
+        "english_proficiency": getattr(provider, 'english_proficiency', 'Unknown'),
+        "proficiency_score": getattr(provider, 'proficiency_score', 0),
         "english_indicators": wp.extract_english_indicators(provider),
         
         # Photo Gallery Field Group

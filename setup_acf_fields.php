@@ -54,14 +54,6 @@ function healthcare_register_acf_fields() {
                 'rows' => 3,
             ),
             array(
-                'key' => 'field_postal_code',
-                'label' => 'Postal Code',
-                'name' => 'postal_code',
-                'type' => 'text',
-                'instructions' => 'Japanese postal code',
-                'wrapper' => array('width' => '33'),
-            ),
-            array(
                 'key' => 'field_provider_rating',
                 'label' => 'Rating',
                 'name' => 'provider_rating',
@@ -318,9 +310,9 @@ function healthcare_register_acf_fields() {
                 'label' => 'Proficiency Score',
                 'name' => 'proficiency_score',
                 'type' => 'number',
-                'instructions' => 'Numerical score (0-100) based on evidence',
+                'instructions' => 'Numerical score (0-5): 0=Unknown, 3=Basic, 4=Conversational, 5=Fluent',
                 'min' => 0,
-                'max' => 100,
+                'max' => 5,
                 'wrapper' => array('width' => '50'),
             ),
             array(
@@ -618,7 +610,6 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         'parking_available' => 'parking_available',
         'business_status' => 'business_status',
         'prefecture' => 'prefecture',
-        'postal_code' => 'postal_code',
         'ai_description' => 'ai_description',
         
         // Location & Navigation Field Group

@@ -127,8 +127,8 @@ class PostgresIntegration:
                 if not isinstance(provider["total_reviews"], int) or provider["total_reviews"] < 0:
                     return False, "Total Reviews must be a non-negative integer"
             if "proficiency_score" in provider and provider["proficiency_score"]:
-                if not isinstance(provider["proficiency_score"], int) or not (0 <= provider["proficiency_score"] <= 100):
-                    return False, "Proficiency Score must be an integer between 0 and 100"
+                if not isinstance(provider["proficiency_score"], int) or not (0 <= provider["proficiency_score"] <= 5):
+                    return False, "Proficiency Score must be an integer between 0 and 5"
             for field in ["provider_name", "address", "city", "prefecture"]:
                 if provider.get(field):
                     provider[field] = self._clean_text(provider[field])

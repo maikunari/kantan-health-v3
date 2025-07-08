@@ -359,17 +359,21 @@ class GooglePlacesHealthcareCollector:
             english_indicators.append('International focus in name')
             proficiency_score += 5
         
-        # Assign proficiency label
+        # Assign proficiency label and convert to 1-5 scale
         if proficiency_score >= 40:
             proficiency = 'Fluent'
+            simple_score = 5
         elif proficiency_score >= 20:
             proficiency = 'Conversational'
+            simple_score = 4
         elif proficiency_score >= 10:
             proficiency = 'Basic'
+            simple_score = 3
         else:
             proficiency = 'Unknown'
+            simple_score = 0
         
-        return proficiency, english_indicators, proficiency_score
+        return proficiency, english_indicators, simple_score
 
     def extract_amenities(self, place_data):
         """Extract all amenities and services from place data"""
@@ -643,7 +647,7 @@ class GooglePlacesHealthcareCollector:
                 print(f"⚠️ City detection error for {city}: {str(e)}")
                 city = city  # Fallback to original
 
-        english_proficiency, english_indicators, proficiency_score = self.analyze_english_proficiency(place_data) if isinstance(place_data, dict) else ("Unknown", [], 0)
+        english_proficiency, english_indicators, simple_score = self.analyze_english_proficiency(place_data) if isinstance(place_data, dict) else ("Unknown", [], 0)
         amenities = self.extract_amenities(place_data) if isinstance(place_data, dict) else []
         reviews = self.process_reviews(place_data.get('reviews', [])) if isinstance(place_data, dict) else []
         photos = self.get_photo_urls(place_data.get('photos', [])) if isinstance(place_data, dict) else []
@@ -705,7 +709,7 @@ class GooglePlacesHealthcareCollector:
             'photo_count': len(place_data.get('photos', [])),
             'photo_urls': json.dumps(photos, ensure_ascii=False),
             'english_indicators': english_indicators,
-            'proficiency_score': proficiency_score,
+            'proficiency_score': simple_score,
             'language_evidence': json.dumps(english_indicators, ensure_ascii=False) if english_indicators else '',
             'ai_description': '',
             'google_place_id': place_data.get('place_id', ''),
