@@ -1007,18 +1007,29 @@ class WordPressIntegration:
             return url
     
     def clean_address(self, address):
-        """Clean address by removing 'Japan' and extra whitespace"""
+        """Clean address by removing 'Japan' from the end and extra whitespace"""
         if not address:
             return ""
         
         try:
-            # Remove 'Japan' from the address (case-insensitive)
-            cleaned_address = address.replace(', Japan', '').replace(',Japan', '')
-            cleaned_address = cleaned_address.replace(' Japan', '').replace('Japan', '')
+            cleaned_address = address.strip()
             
-            # Clean up extra whitespace and commas
-            cleaned_address = ' '.join(cleaned_address.split())
+            # Remove 'Japan' from the end of the address (case-insensitive)
+            japan_suffixes = [', Japan', ',Japan', ' Japan']
+            for suffix in japan_suffixes:
+                if cleaned_address.lower().endswith(suffix.lower()):
+                    cleaned_address = cleaned_address[:-len(suffix)]
+                    break
+            
+            # If address ends with just 'Japan' (no comma or space before)
+            if cleaned_address.lower().endswith('japan'):
+                # Only remove if it's at the very end and preceded by a space or comma
+                if len(cleaned_address) > 5 and cleaned_address[-6] in [' ', ',']:
+                    cleaned_address = cleaned_address[:-5]
+            
+            # Clean up extra whitespace and trailing commas
             cleaned_address = cleaned_address.strip(' ,')
+            cleaned_address = ' '.join(cleaned_address.split())
             
             return cleaned_address
         except Exception as e:

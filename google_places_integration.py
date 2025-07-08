@@ -219,6 +219,18 @@ class GooglePlacesHealthcareCollector:
                     }
         return nearest_station
 
+    def format_nearest_station(self, nearest_station_info):
+        """Format nearest station information for ACF field"""
+        if not nearest_station_info or not isinstance(nearest_station_info, dict):
+            return ""
+        
+        station_name = nearest_station_info.get('name', 'Unknown Station')
+        walking_time = nearest_station_info.get('time', 'Unknown time')
+        distance = nearest_station_info.get('distance', 'Unknown distance')
+        
+        # Format as: "Station Name (X min walk, Y.Z km)"
+        return f"{station_name} ({walking_time} walk, {distance})"
+
     def search_and_collect_providers(self, search_queries, max_per_query=1, daily_limit=5):
         """Search for providers and collect comprehensive data with a total provider limit"""
         print(f"🔍 Searching {len(search_queries)} queries with max {max_per_query} results per query and daily limit {daily_limit}")
@@ -449,18 +461,29 @@ class GooglePlacesHealthcareCollector:
             return url
     
     def clean_address(self, address):
-        """Clean address by removing 'Japan' and extra whitespace"""
+        """Clean address by removing 'Japan' from the end and extra whitespace"""
         if not address:
             return ""
         
         try:
-            # Remove 'Japan' from the address (case-insensitive)
-            cleaned_address = address.replace(', Japan', '').replace(',Japan', '')
-            cleaned_address = cleaned_address.replace(' Japan', '').replace('Japan', '')
+            cleaned_address = address.strip()
             
-            # Clean up extra whitespace and commas
-            cleaned_address = ' '.join(cleaned_address.split())
+            # Remove 'Japan' from the end of the address (case-insensitive)
+            japan_suffixes = [', Japan', ',Japan', ' Japan']
+            for suffix in japan_suffixes:
+                if cleaned_address.lower().endswith(suffix.lower()):
+                    cleaned_address = cleaned_address[:-len(suffix)]
+                    break
+            
+            # If address ends with just 'Japan' (no comma or space before)
+            if cleaned_address.lower().endswith('japan'):
+                # Only remove if it's at the very end and preceded by a space or comma
+                if len(cleaned_address) > 5 and cleaned_address[-6] in [' ', ',']:
+                    cleaned_address = cleaned_address[:-5]
+            
+            # Clean up extra whitespace and trailing commas
             cleaned_address = cleaned_address.strip(' ,')
+            cleaned_address = ' '.join(cleaned_address.split())
             
             return cleaned_address
         except Exception as e:
@@ -594,6 +617,24 @@ class GooglePlacesHealthcareCollector:
         amenities = self.extract_amenities(place_data) if isinstance(place_data, dict) else []
         reviews = self.process_reviews(place_data.get('reviews', [])) if isinstance(place_data, dict) else []
         photos = self.get_photo_urls(place_data.get('photos', [])) if isinstance(place_data, dict) else []
+        
+        # Get nearest station using Distance Matrix API
+        nearest_station_info = None
+        if isinstance(place_data, dict) and 'geometry' in place_data:
+            provider_location = {
+                'lat': place_data.get('geometry', {}).get('location', {}).get('lat', 0),
+                'lng': place_data.get('geometry', {}).get('location', {}).get('lng', 0)
+            }
+            if provider_location['lat'] and provider_location['lng']:
+                try:
+                    nearest_station_info = self.get_nearest_station(provider_location)
+                    if nearest_station_info:
+                        print(f"🚃 Found nearest station: {nearest_station_info['name']} ({nearest_station_info['time']})")
+                    else:
+                        print(f"⚠️ No nearby stations found for {name}")
+                except Exception as e:
+                    print(f"❌ Error getting nearest station for {name}: {str(e)}")
+                    nearest_station_info = None
 
         prefecture = next((comp['long_name'] for comp in address_components if 'administrative_area_level_1' in comp['types']), '') if isinstance(address_components, list) else ''
         if prefecture:
@@ -642,7 +683,8 @@ class GooglePlacesHealthcareCollector:
             'service_categories': self._categorize_services(place_data.get('types', [])) if isinstance(place_data, dict) else [],
             'wheelchair_accessible': place_data.get('wheelchair_accessible_entrance', False),
             'parking_available': 'parking' in str(place_data.get('types', [])).lower() if isinstance(place_data.get('types', []), list) else False,
-            'business_hours': self.process_opening_hours(place_data) if isinstance(place_data, dict) else {}
+            'business_hours': self.process_opening_hours(place_data) if isinstance(place_data, dict) else {},
+            'nearest_station': self.format_nearest_station(nearest_station_info) if nearest_station_info else ''
         }
         return record
 
