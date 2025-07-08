@@ -195,8 +195,6 @@ class WordPressIntegration:
                     "open_now": self.get_open_now_status(getattr(provider, 'business_hours', {})),
                     
                     # Location & Navigation Field Group
-                    "latitude": float(getattr(provider, 'latitude', 0)) if getattr(provider, 'latitude', None) else None,
-                    "longitude": float(getattr(provider, 'longitude', 0)) if getattr(provider, 'longitude', None) else None,
                     "nearest_station": getattr(provider, 'nearest_station', ''),
                     "google_maps_embed": self.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name),
                     

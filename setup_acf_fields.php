@@ -160,24 +160,7 @@ function healthcare_register_acf_fields() {
         'key' => 'group_location_navigation',
         'title' => 'Location & Navigation',
         'fields' => array(
-            array(
-                'key' => 'field_latitude',
-                'label' => 'Latitude',
-                'name' => 'latitude',
-                'type' => 'number',
-                'instructions' => 'GPS latitude coordinate',
-                'step' => 0.0000001,
-                'wrapper' => array('width' => '33'),
-            ),
-            array(
-                'key' => 'field_longitude',
-                'label' => 'Longitude',
-                'name' => 'longitude',
-                'type' => 'number',
-                'instructions' => 'GPS longitude coordinate',
-                'step' => 0.0000001,
-                'wrapper' => array('width' => '33'),
-            ),
+
             array(
                 'key' => 'field_nearest_station',
                 'label' => 'Nearest Station',
@@ -639,8 +622,6 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         'ai_description' => 'ai_description',
         
         // Location & Navigation Field Group
-        'latitude' => 'latitude',
-        'longitude' => 'longitude',
         'nearest_station' => 'nearest_station',
         
         // Language Support Field Group
@@ -678,32 +659,7 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
     return $value;
 }
 
-/**
- * Generate Google Maps embed code from coordinates
- */
-add_filter('acf/load_value/name=google_maps_embed', 'healthcare_generate_maps_embed', 10, 3);
-function healthcare_generate_maps_embed($value, $post_id, $field) {
-    
-    if (get_post_type($post_id) !== 'healthcare_provider') {
-        return $value;
-    }
-    
-    $lat = get_post_meta($post_id, 'latitude', true);
-    $lng = get_post_meta($post_id, 'longitude', true);
-    $name = get_the_title($post_id);
-    
-    if ($lat && $lng) {
-        $embed_url = "https://www.google.com/maps/embed/v1/place";
-        $api_key = "YOUR_GOOGLE_MAPS_API_KEY"; // You'll need to add your API key
-        $query = urlencode($name . " " . $lat . "," . $lng);
-        
-        $embed_code = "<iframe width=\"100%\" height=\"300\" frameborder=\"0\" style=\"border:0\" src=\"{$embed_url}?key={$api_key}&q={$query}&zoom=15\" allowfullscreen></iframe>";
-        
-        return $embed_code;
-    }
-    
-    return $value;
-}
+
 
 /**
  * Remove automatic featured image display for healthcare providers
