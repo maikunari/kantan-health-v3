@@ -34,6 +34,10 @@ class Provider(Base):
     nearest_station = Column(Text)
     status = Column(String(50), default="pending")
     created_at = Column(String)
+    # New columns for WordPress integration
+    wordpress_post_id = Column(Integer)
+    ai_description = Column(Text)
+    google_place_id = Column(String(255))
 
 class Metric(Base):
     __tablename__ = "metrics"
@@ -69,7 +73,8 @@ class PostgresIntegration:
                 "provider_name", "address", "city", "prefecture", "phone", "website",
                 "specialties", "english_proficiency", "rating", "total_reviews",
                 "review_content", "review_keywords", "review_highlights", "photo_urls",
-                "nearest_station", "status", "created_at"
+                "nearest_station", "status", "created_at", "wordpress_post_id", 
+                "ai_description", "google_place_id"
             }
             current_fields = set(Provider.__table__.columns.keys())
             missing_fields = expected_fields - current_fields

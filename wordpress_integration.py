@@ -32,9 +32,10 @@ class WordPressIntegration:
         # Get providers ready for publishing
         session = self.db.Session()
         try:
-            # Get providers ready for publishing
+            # Get providers ready for publishing (exclude those already published)
             providers = session.query(Provider).filter(
-                Provider.status == 'description_generated'
+                Provider.status == 'description_generated',
+                Provider.wordpress_post_id.is_(None)  # Only providers not yet published
             ).all()
             print(f"🔍 Found {len(providers)} providers ready for WordPress publishing")
             
@@ -46,11 +47,20 @@ class WordPressIntegration:
             
             for provider in providers:
                 try:
-                    # Check if this provider name + city already exists in WordPress
+                    # Double-check if already published to WordPress
+                    if provider.wordpress_post_id:
+                        print(f"⏭️ Already published: {provider.provider_name} (WordPress ID: {provider.wordpress_post_id})")
+                        provider.status = 'published'
+                        session.commit()
+                        results["skipped"] += 1
+                        continue
+                    
+                    # Check for duplicates by name/city in WordPress API as backup
                     duplicate_id = self.check_duplicate_post(provider.provider_name, provider.city)
                     if duplicate_id:
                         print(f"⏭️ Already exists in WordPress: {provider.provider_name} (ID: {duplicate_id})")
-                        # Mark as published to avoid future attempts
+                        # Update database with existing WordPress post ID
+                        provider.wordpress_post_id = duplicate_id
                         provider.status = 'published'
                         session.commit()
                         results["skipped"] += 1
@@ -58,7 +68,8 @@ class WordPressIntegration:
                     
                     wordpress_post_id = self.create_wordpress_post(provider)
                     if wordpress_post_id:
-                        # Update status to published
+                        # Update database with WordPress post ID and status
+                        provider.wordpress_post_id = wordpress_post_id
                         provider.status = 'published'
                         session.commit()
                         results["published"] += 1
