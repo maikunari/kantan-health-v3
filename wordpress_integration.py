@@ -144,7 +144,7 @@ class WordPressIntegration:
                     "parking_status": self.format_parking_status(getattr(provider, 'parking_available', False)),
                     
                     # Patient Insights Field Group
-                    "review_keywords": getattr(provider, 'review_keywords', '{}'),
+                    "review_keywords": json.dumps(getattr(provider, 'review_keywords', {})) if getattr(provider, 'review_keywords', None) else '',
                     
                     # Additional essential fields
                     "provider_website": getattr(provider, 'website', ''),
