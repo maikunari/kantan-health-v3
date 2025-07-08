@@ -171,6 +171,7 @@ class WordPressIntegration:
             post_data = {
                 "title": provider.provider_name,
                 "content": self.generate_provider_content(provider),
+                "excerpt": getattr(provider, 'ai_excerpt', ''),  # Add excerpt for WordPress preview
                 "status": "publish",
                 "type": "healthcare_provider",
                 "location": [location_id],
@@ -221,6 +222,7 @@ class WordPressIntegration:
                     "provider_reviews": str(getattr(provider, 'total_reviews', 0)),
                     "postal_code": getattr(provider, 'postal_code', ''),
                     "ai_description": getattr(provider, 'ai_description', ''),
+                    "ai_excerpt": getattr(provider, 'ai_excerpt', ''),  # Add excerpt to ACF fields as well
                     "provider_city": provider.city,
                 },
                 "meta": {

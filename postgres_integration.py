@@ -37,6 +37,7 @@ class Provider(Base):
     # New columns for WordPress integration
     wordpress_post_id = Column(Integer)
     ai_description = Column(Text)
+    ai_excerpt = Column(Text)  # Short excerpt for provider preview (50-100 words)
     google_place_id = Column(String(255))
     business_hours = Column(JSON)  # Store business hours data
     wheelchair_accessible = Column(String(50))  # Store wheelchair accessibility status
@@ -81,7 +82,7 @@ class PostgresIntegration:
                 "specialties", "english_proficiency", "rating", "total_reviews",
                 "review_content", "review_keywords", "review_highlights", "photo_urls",
                 "nearest_station", "status", "created_at", "wordpress_post_id", 
-                "ai_description", "google_place_id", "business_hours", "wheelchair_accessible",
+                "ai_description", "ai_excerpt", "google_place_id", "business_hours", "wheelchair_accessible",
                 "parking_available"
             }
             current_fields = set(Provider.__table__.columns.keys())

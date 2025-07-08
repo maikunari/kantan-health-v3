@@ -200,44 +200,108 @@ FACILITY INFORMATION:
 - Website: {'Available' if website else 'Not available'}
 
 INSTRUCTIONS:
-Write a comprehensive 150-160 word description in TWO paragraphs that flow naturally together:
+Write a comprehensive 140-150 word description in TWO paragraphs that flow naturally together:
 
 PARAGRAPH 1 (75-80 words): Focus on core medical services and specialty expertise
 - What medical services they provide and their specialty focus
 - Their English language capabilities for international patients
 - Key professional strengths or unique features that set them apart
 
-PARAGRAPH 2 (75-80 words): Focus on patient experience and practical information  
+PARAGRAPH 2 (65-70 words): Focus on patient experience and practical information  
 - Patient experience highlights from reviews (specific feedback when available)
 - Practical details (location, accessibility, parking) that help patients decide
-- Contact information and convenience factors that matter to patients
+- Convenience factors that matter to patients (NO phone numbers or website mentions)
+
+WORD COUNT REQUIREMENT: Keep total description between 140-150 words exactly. Count carefully to stay within this range.
 
 Make it sound like a knowledgeable local would describe this provider to a friend. Use specific patient feedback when available, avoid generic phrases. Ensure the two paragraphs flow naturally together with smooth transitions - the second paragraph should build upon the first to create one cohesive story about the provider's complete offering.
 """
         
         return prompt
 
-    def generate_description(self, provider_data):
-        """Generate a description for a single provider using Claude with enhanced prompts."""
+    def create_excerpt_prompt(self, provider_data):
+        """Create a prompt for generating a concise excerpt (50-100 words)."""
+        provider_name = provider_data.get('provider_name', 'Unknown Provider')
+        city = provider_data.get('city', 'Unknown City')
+        prefecture = provider_data.get('prefecture', '')
+        specialties = provider_data.get('specialties', ['General Practitioner'])
+        english_proficiency = provider_data.get('english_proficiency', 'Unknown')
+        
+        # Format specialties naturally
+        if isinstance(specialties, list):
+            specialty_text = ', '.join(specialties) if specialties else 'General Practitioner'
+        else:
+            specialty_text = specialties
+        
+        # Location context
+        location_text = f"{city}"
+        if prefecture and prefecture != city:
+            location_text += f", {prefecture}"
+        
+        prompt = f"""
+Create a concise, engaging excerpt for this healthcare provider that will appear as a preview/summary on the website.
+
+PROVIDER DETAILS:
+- Name: {provider_name}
+- Location: {location_text}  
+- Medical Specialties: {specialty_text}
+- English Language Support: {english_proficiency}
+
+INSTRUCTIONS:
+Write a natural, conversational 50-100 word excerpt that:
+- Captures what makes this provider special in a friendly, informative way
+- Mentions their key medical specialties and location naturally
+- Notes English language capabilities for international patients
+- Sounds like a knowledgeable local friend giving practical advice
+- Avoids promotional language, calls-to-action, or advertising phrases
+
+Keep it conversational and informative - like explaining to a friend why this provider might be a good choice for their needs.
+"""
+        
+        return prompt
+
+    def generate_description_and_excerpt(self, provider_data):
+        """Generate both a description and excerpt for a single provider using Claude."""
         provider_name = provider_data.get('provider_name', 'Unknown Provider')
         
         # Use enhanced prompt with review data
-        prompt = self.create_enhanced_prompt(provider_data)
+        description_prompt = self.create_enhanced_prompt(provider_data)
+        excerpt_prompt = self.create_excerpt_prompt(provider_data)
 
         try:
-            logger.info(f"Generating enhanced description for {provider_name}")
-            response = self.claude.messages.create(
+            logger.info(f"Generating enhanced description and excerpt for {provider_name}")
+            
+            # Generate description
+            description_response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=450,  # Increased for 150-160 word two-paragraph descriptions
+                max_tokens=400,  # Adjusted for 140-150 word descriptions
                 temperature=0.7,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": description_prompt}]
             )
-            description = response.content[0].text.strip()
-            logger.info(f"✅ Generated enhanced description for {provider_name}: {description[:50]}...")
-            return description
+            description = description_response.content[0].text.strip()
+            
+            # Generate excerpt
+            excerpt_response = self.claude.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=200,  # For 50-100 word excerpts
+                temperature=0.7,
+                messages=[{"role": "user", "content": excerpt_prompt}]
+            )
+            excerpt = excerpt_response.content[0].text.strip()
+            
+            logger.info(f"✅ Generated description and excerpt for {provider_name}")
+            return description, excerpt
+            
         except Exception as e:
-            logger.error(f"⚠️ Error generating description for {provider_name}: {str(e)}")
-            return "Professional healthcare provider offering medical services. Please contact the facility directly for more information."
+            logger.error(f"⚠️ Error generating description and excerpt for {provider_name}: {str(e)}")
+            fallback_description = "Professional healthcare provider offering medical services. Please contact the facility directly for more information."
+            fallback_excerpt = f"{provider_name} offers professional healthcare services in {provider_data.get('city', 'Japan')}."
+            return fallback_description, fallback_excerpt
+
+    def generate_description(self, provider_data):
+        """Generate a description for a single provider (backwards compatibility)."""
+        description, _ = self.generate_description_and_excerpt(provider_data)
+        return description
 
     def generate_batch_descriptions(self, provider_data_list, batch_size=5):
         """Generate descriptions for a batch of providers in a single API call.
@@ -261,6 +325,29 @@ Make it sound like a knowledgeable local would describe this provider to a frien
             all_descriptions.extend(batch_descriptions)
             
         return all_descriptions
+
+    def generate_batch_excerpts(self, provider_data_list, batch_size=5):
+        """Generate excerpts for a batch of providers in a single API call.
+        
+        Args:
+            provider_data_list: List of provider dictionaries
+            batch_size: Maximum number of providers to process in one API call
+            
+        Returns:
+            List of excerpts matching the input order
+        """
+        if not provider_data_list:
+            return []
+
+        all_excerpts = []
+        
+        # Process in chunks to avoid hitting token limits
+        for i in range(0, len(provider_data_list), batch_size):
+            batch = provider_data_list[i:i + batch_size]
+            batch_excerpts = self._generate_excerpt_batch_chunk(batch)
+            all_excerpts.extend(batch_excerpts)
+            
+        return all_excerpts
 
     def _generate_batch_chunk(self, provider_batch):
         """Generate enhanced descriptions for a single batch chunk with review data."""
@@ -304,22 +391,24 @@ Provider {idx}: {provider_name}
 - Accessibility: {'Wheelchair accessible' if wheelchair_accessible else 'Not specified'}""")
 
         batch_prompt = f"""
-Write comprehensive 150-160 word descriptions for these {len(provider_batch)} healthcare providers. Each description should be formatted in TWO paragraphs that flow naturally together.
+Write comprehensive 140-150 word descriptions for these {len(provider_batch)} healthcare providers. Each description should be formatted in TWO paragraphs that flow naturally together.
 
 {chr(10).join(provider_details)}
 
 INSTRUCTIONS FOR EACH DESCRIPTION:
-Format each as TWO paragraphs (150-160 words total):
+Format each as TWO paragraphs (140-150 words total):
 
 PARAGRAPH 1 (75-80 words): Core medical services and expertise
 - Medical specialty and location
 - English language capabilities for international patients
 - Key professional strengths or unique features that set them apart
 
-PARAGRAPH 2 (75-80 words): Patient experience and practical information
+PARAGRAPH 2 (65-70 words): Patient experience and practical information
 - Patient experience highlights from reviews (specific feedback when available)
 - Practical details (accessibility, parking, location convenience)
-- Contact information and convenience factors that matter to patients
+- Convenience factors that matter to patients (NO phone numbers or website mentions)
+
+WORD COUNT REQUIREMENT: Keep each description between 140-150 words exactly. Count carefully to stay within this range for ALL descriptions.
 
 Make each description sound like a knowledgeable local recommending the provider. Use specific patient feedback when available, avoid generic phrases. Ensure the two paragraphs flow naturally together with smooth transitions - the second paragraph should build upon the first to create one cohesive story about each provider's complete offering.
 
@@ -375,6 +464,82 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             
         # If we got too many, trim to expected count
         return descriptions[:expected_count]
+
+    def _generate_excerpt_batch_chunk(self, provider_batch):
+        """Generate excerpts for a single batch chunk."""
+        if not provider_batch:
+            return []
+
+        # Build excerpt batch prompt
+        provider_details = []
+        for idx, provider_data in enumerate(provider_batch, 1):
+            provider_name = provider_data.get('provider_name', 'Unknown Provider')
+            city = provider_data.get('city', 'Unknown City')
+            prefecture = provider_data.get('prefecture', '')
+            specialties = provider_data.get('specialties', ['General Practitioner'])
+            english_proficiency = provider_data.get('english_proficiency', 'Unknown')
+            
+            # Format specialties
+            if isinstance(specialties, list):
+                specialty_text = ', '.join(specialties) if specialties else 'General Practitioner'
+            else:
+                specialty_text = specialties
+            
+            # Location context
+            location_text = f"{city}"
+            if prefecture and prefecture != city:
+                location_text += f", {prefecture}"
+            
+            provider_details.append(f"""
+Provider {idx}: {provider_name}
+- Location: {location_text}
+- Specialties: {specialty_text}
+- English Support: {english_proficiency}""")
+
+        excerpt_batch_prompt = f"""
+Write compelling 50-100 word excerpts for these {len(provider_batch)} healthcare providers. Each excerpt should capture the essence of what makes the provider special and encourage potential patients to learn more.
+
+{chr(10).join(provider_details)}
+
+INSTRUCTIONS FOR EACH EXCERPT:
+- Keep to 50-100 words per excerpt
+- Mention key medical specialties and location naturally
+- Note English language capabilities for international patients
+- Use conversational, friendly language that sounds natural
+- Sound like a knowledgeable local friend giving practical advice
+- Avoid promotional language, calls-to-action, or advertising phrases
+
+Please provide exactly {len(provider_batch)} excerpts, numbered 1-{len(provider_batch)}:
+
+1. [Compelling excerpt for Provider 1]
+2. [Compelling excerpt for Provider 2]
+3. [Compelling excerpt for Provider 3]
+...and so on.
+"""
+
+        try:
+            logger.info(f"Generating excerpts for {len(provider_batch)} providers")
+            response = self.claude.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=250 * len(provider_batch),  # For 50-100 word excerpts
+                temperature=0.7,
+                messages=[{"role": "user", "content": excerpt_batch_prompt}]
+            )
+            
+            response_text = response.content[0].text.strip()
+            excerpts = self._parse_batch_response(response_text, len(provider_batch))
+            
+            # Log results
+            for provider_data, excerpt in zip(provider_batch, excerpts):
+                provider_name = provider_data.get('provider_name', 'Unknown Provider')
+                logger.info(f"✅ Generated excerpt for {provider_name}: {excerpt[:30]}...")
+                
+            return excerpts
+            
+        except Exception as e:
+            logger.error(f"⚠️ Error generating batch excerpts: {str(e)}")
+            fallback_excerpts = [f"{provider_data.get('provider_name', 'Healthcare provider')} offers professional medical services in {provider_data.get('city', 'Japan')}." for provider_data in provider_batch]
+            return fallback_excerpts
 
 def filter_providers_needing_descriptions(providers):
     """Filter providers to only include those that need AI descriptions generated.
@@ -473,15 +638,16 @@ def run_ai_description_generation(providers):
                 'phone': provider.get('phone', '')
             }
             
-        description = generator.generate_description(provider_data)
+        description, excerpt = generator.generate_description_and_excerpt(provider_data)
         
         # Update the corresponding database record
         db_provider = session.query(Provider).filter_by(provider_name=provider_data['provider_name'], city=provider_data['city']).first()
         if db_provider:
             db_provider.ai_description = description
+            db_provider.ai_excerpt = excerpt
             db_provider.status = 'description_generated'
             session.commit()
-            logger.info(f"✅ Updated {provider_data['provider_name']} with enhanced description and status")
+            logger.info(f"✅ Updated {provider_data['provider_name']} with enhanced description, excerpt and status")
     
     session.close()
 
