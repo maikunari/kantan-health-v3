@@ -183,6 +183,7 @@ class WordPressIntegration:
                     "parking_available": self.format_parking_availability(getattr(provider, 'parking_available', False)),
                     "business_status": self.normalize_business_status(getattr(provider, 'business_status', 'Unknown')),
                     "prefecture": getattr(provider, 'prefecture', ''),
+                    "district": getattr(provider, 'district', ''),  # Ward/district within city
                     
                     # Business Hours Field Group
                     "business_hours": self.format_business_hours(getattr(provider, 'business_hours', {})),
@@ -240,6 +241,7 @@ class WordPressIntegration:
                     "data_source": 'Google Places API',
                     "last_updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     "provider_city": provider.city,
+                    "provider_district": getattr(provider, 'district', ''),
                     "provider_address": self.clean_address(provider.address or ""),
                     "provider_phone": provider.phone or "",
                     "provider_website": self.clean_website_url(provider.website or ""),
@@ -329,9 +331,18 @@ class WordPressIntegration:
             elif isinstance(provider.specialties, str):
                 specialty_display = provider.specialties
         
+        # Format location display with district if available
+        location_parts = []
+        if getattr(provider, 'district', ''):
+            location_parts.append(getattr(provider, 'district'))
+        location_parts.append(provider.city)
+        if getattr(provider, 'prefecture', ''):
+            location_parts.append(getattr(provider, 'prefecture'))
+        location_display = ', '.join(filter(None, location_parts))
+        
         content = f"""
         <h2>{provider.provider_name}</h2>
-        <p><strong>Location:</strong> {provider.city}, {getattr(provider, 'prefecture', 'Unknown Prefecture')}</p>
+        <p><strong>Location:</strong> {location_display}</p>
         <p><strong>Address:</strong> {self.clean_address(provider.address) or 'Not available'}</p>
         <p><strong>Phone:</strong> {provider.phone or 'Not available'}</p>
         <p><strong>Website:</strong> {self.clean_website_url(provider.website) or 'Not available'}</p>

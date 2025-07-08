@@ -21,6 +21,7 @@ class Provider(Base):
     address = Column(Text)
     city = Column(String(100))
     prefecture = Column(String(100))
+    district = Column(String(100))  # Ward/district within city (sublocality_level_1)
     phone = Column(String(50))
     website = Column(Text)
     specialties = Column(JSON)
@@ -78,7 +79,7 @@ class PostgresIntegration:
         """Validate database schema"""
         try:
             expected_fields = {
-                "provider_name", "address", "city", "prefecture", "phone", "website",
+                "provider_name", "address", "city", "prefecture", "district", "phone", "website",
                 "specialties", "english_proficiency", "rating", "total_reviews",
                 "review_content", "review_keywords", "review_highlights", "photo_urls",
                 "nearest_station", "status", "created_at", "wordpress_post_id", 

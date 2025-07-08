@@ -172,10 +172,15 @@ class ClaudeDescriptionGenerator:
         else:
             specialty_text = specialties
         
-        # Location context
-        location_text = f"{city}"
+        # Location context (include district if available, like "Showa District, Nagoya, Aichi")
+        district = provider_data.get('district', '')
+        location_parts = []
+        if district:
+            location_parts.append(district)
+        location_parts.append(city)
         if prefecture and prefecture != city:
-            location_text += f", {prefecture}"
+            location_parts.append(prefecture)
+        location_text = ', '.join(filter(None, location_parts))
         
         # Build enhanced prompt
         prompt = f"""
@@ -196,8 +201,6 @@ PATIENT EXPERIENCE DATA:
 FACILITY INFORMATION:
 - Wheelchair Accessibility: {'Yes' if wheelchair_accessible else 'Not specified'}
 - Parking Available: {'Yes' if parking_available else 'Not specified'}
-- Contact: {phone if phone else 'Contact via facility'}
-- Website: {'Available' if website else 'Not available'}
 
 INSTRUCTIONS:
 Write a comprehensive 140-150 word description in TWO paragraphs that flow naturally together:
@@ -224,6 +227,7 @@ Make it sound like a knowledgeable local would describe this provider to a frien
         provider_name = provider_data.get('provider_name', 'Unknown Provider')
         city = provider_data.get('city', 'Unknown City')
         prefecture = provider_data.get('prefecture', '')
+        district = provider_data.get('district', '')
         specialties = provider_data.get('specialties', ['General Practitioner'])
         english_proficiency = provider_data.get('english_proficiency', 'Unknown')
         
@@ -233,10 +237,14 @@ Make it sound like a knowledgeable local would describe this provider to a frien
         else:
             specialty_text = specialties
         
-        # Location context
-        location_text = f"{city}"
+        # Location context (include district if available)
+        location_parts = []
+        if district:
+            location_parts.append(district)
+        location_parts.append(city)
         if prefecture and prefecture != city:
-            location_text += f", {prefecture}"
+            location_parts.append(prefecture)
+        location_text = ', '.join(filter(None, location_parts))
         
         prompt = f"""
 Create a concise, engaging excerpt for this healthcare provider that will appear as a preview/summary on the website.
@@ -375,10 +383,15 @@ Keep it conversational and informative - like explaining to a friend why this pr
             else:
                 specialty_text = specialties
             
-            # Location context
-            location_text = f"{city}"
+            # Location context (include district if available)
+            district = provider_data.get('district', '')
+            location_parts = []
+            if district:
+                location_parts.append(district)
+            location_parts.append(city)
             if prefecture and prefecture != city:
-                location_text += f", {prefecture}"
+                location_parts.append(prefecture)
+            location_text = ', '.join(filter(None, location_parts))
             
             provider_details.append(f"""
 Provider {idx}: {provider_name}
@@ -485,10 +498,15 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             else:
                 specialty_text = specialties
             
-            # Location context
-            location_text = f"{city}"
+            # Location context (include district if available)
+            district = provider_data.get('district', '')
+            location_parts = []
+            if district:
+                location_parts.append(district)
+            location_parts.append(city)
             if prefecture and prefecture != city:
-                location_text += f", {prefecture}"
+                location_parts.append(prefecture)
+            location_text = ', '.join(filter(None, location_parts))
             
             provider_details.append(f"""
 Provider {idx}: {provider_name}

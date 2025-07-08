@@ -87,15 +87,17 @@ class GooglePlacesHealthcareCollector:
         
         cities = []
         if initial_cities:
-            for prefecture in prefectures:
-                for city in prefecture["cities"]:
-                    if city["name"] in initial_cities:
-                        cities.append(city["name"])
+            # Use all requested cities directly for searches (Google Places API handles them)
+            cities = initial_cities.copy()
+            print(f"🏙️ Using cities for search: {cities}")
         else:
             cities = [city["name"] for prefecture in prefectures for city in prefecture["cities"]]
         
         base_terms = [
             "English speaking {specialty} {city}",
+            "International {specialty} {city}",
+            "Foreign friendly {specialty} {city}",
+            "Bilingual {specialty} {city}",
             "doctor {city}",
             "clinic {city}"
         ]
@@ -414,7 +416,7 @@ class GooglePlacesHealthcareCollector:
             return self._basic_specialty_extraction(place_data)
         
         if not isinstance(place_data, dict):
-            return ['general_practitioner']
+            return ['General Medicine']
         
         # Use comprehensive specialty extraction
         provider_data = {
@@ -428,7 +430,7 @@ class GooglePlacesHealthcareCollector:
         
         # Ensure we always have at least one specialty
         if not comprehensive_specialties:
-            comprehensive_specialties = ['general_practitioner']
+            comprehensive_specialties = ['General Medicine']
         
         print(f"🎯 Extracted {len(comprehensive_specialties)} specialties: {comprehensive_specialties}")
         return comprehensive_specialties
@@ -438,21 +440,21 @@ class GooglePlacesHealthcareCollector:
         specialties = []
         
         if not isinstance(place_data, dict):
-            return ['general_practitioner']
+            return ['General Medicine']
         
         # Get types from the place data
         types = place_data.get('types', [])
         if not isinstance(types, list):
-            return ['general_practitioner']
+            return ['General Medicine']
         
         # Map Google Places types to medical specialties
         specialty_mapping = {
-            'dentist': 'dentistry',
-            'doctor': 'general_practitioner',
-            'hospital': 'general_medicine',
-            'pharmacy': 'pharmacy',
-            'physiotherapist': 'physical_therapy',
-            'veterinary_care': 'veterinary_medicine'
+            'dentist': 'Dentistry',
+            'doctor': 'General Medicine',
+            'hospital': 'General Medicine',
+            'pharmacy': 'Pharmacy',
+            'physiotherapist': 'Physical Therapy',
+            'veterinary_care': 'Veterinary Medicine'
         }
         
         # Check place types
@@ -464,15 +466,15 @@ class GooglePlacesHealthcareCollector:
         if not specialties:
             name = place_data.get('name', '').lower()
             if any(keyword in name for keyword in ['dental', 'tooth', 'orthodont']):
-                specialties.append('dentistry')
+                specialties.append('Dentistry')
             elif any(keyword in name for keyword in ['clinic', 'hospital', 'medical']):
-                specialties.append('general_practitioner')
+                specialties.append('General Medicine')
             elif any(keyword in name for keyword in ['pharmacy', 'drug']):
-                specialties.append('pharmacy')
+                specialties.append('Pharmacy')
         
-        # Default to general practitioner if no specific specialty found
+        # Default to General Medicine if no specific specialty found
         if not specialties:
-            specialties.append('general_practitioner')
+            specialties.append('General Medicine')
             
         return specialties
     
@@ -685,6 +687,22 @@ class GooglePlacesHealthcareCollector:
                 print(f"⚠️ Prefecture detection error for {prefecture}: {str(e)}")
                 prefecture = prefecture  # Fallback to original
 
+        # Extract area/district (sublocality_level_1 - ward/district within city)
+        area = next((comp['long_name'] for comp in address_components if 'sublocality_level_1' in comp['types']), '') if isinstance(address_components, list) else ''
+        if area:
+            try:
+                lang = detect(area)
+                if lang == 'ja' and area in self.city_translations:
+                    translated_area = self.city_translations[area]
+                    print(f"ℹ️ Translated area '{area}' to '{translated_area}'")
+                    area = translated_area
+                elif lang == 'ja' and area not in self.city_translations:
+                    print(f"ℹ️ Area in Japanese: '{area}', keeping original")
+                    # Keep original for now - area names are often kept in Japanese
+            except Exception as e:
+                print(f"⚠️ Area detection error for {area}: {str(e)}")
+                area = area  # Fallback to original
+
         postal_code = next((comp['long_name'] for comp in address_components if 'postal_code' in comp['types']), '') if isinstance(address_components, list) else ''
 
         record = {
@@ -692,6 +710,7 @@ class GooglePlacesHealthcareCollector:
             'address': self.clean_address(place_data.get('formatted_address', '')),
             'city': city,
             'prefecture': prefecture,
+            'district': area,  # Add district from sublocality_level_1
             'phone': place_data.get('formatted_phone_number', ''),
             'website': self.clean_website_url(place_data.get('website', '')),
             'specialties': self.determine_medical_specialties(place_data) if isinstance(place_data, dict) else [],
@@ -784,6 +803,7 @@ class GooglePlacesHealthcareCollector:
                         address=provider.get('address', ''),
                         city=provider.get('city', ''),
                         prefecture=provider.get('prefecture', ''),
+                        district=provider.get('district', ''),
                         phone=provider.get('phone', ''),
                         website=provider.get('website', ''),
                         specialties=provider.get('specialties', []),

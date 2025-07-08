@@ -74,6 +74,12 @@ class MedicalSpecialtyFilter:
             'nursing', 'nurse', 'nurse practitioner',
             'midwifery', 'midwife',
             
+            # Properly formatted display versions
+            'General Medicine', 'Internal Medicine', 'Gynecology', 'Dentistry',
+            'Pharmacy', 'Emergency Medicine', 'ENT (Ear, Nose & Throat)',
+            'Cardiology', 'Dermatology', 'Neurology', 'Orthopedics',
+            'Pediatrics', 'Psychiatry', 'Ophthalmology', 'Oncology',
+            
             # Medical Services (specific procedures/treatments)
             'vaccination', 'immunization',
             'health screening', 'health checkup', 'physical exam',
@@ -134,31 +140,31 @@ class MedicalSpecialtyFilter:
             'medical', 'healthcare', 'health', 'wellness', 'life', 'care'
         }
         
-        # Medical specialty groupings for better organization
+        # Medical specialty groupings for better organization (using proper display format)
         self.specialty_groups = {
             'Primary Care': [
-                'general_practitioner', 'family_medicine', 'internal_medicine'
+                'General Medicine', 'Family Medicine', 'Internal Medicine'
             ],
             'Pediatrics': [
-                'pediatrics', 'pediatrician', 'childrens_doctor'
+                'Pediatrics', 'Pediatrician', 'Children\'s Doctor'
             ],
             'Women\'s Health': [
-                'gynecology', 'obstetrics', 'womens_health', 'fertility'
+                'Gynecology', 'Obstetrics', 'Women\'s Health', 'Fertility'
             ],
             'Mental Health': [
-                'psychiatry', 'psychology', 'mental_health', 'therapy'
+                'Psychiatry', 'Psychology', 'Mental Health', 'Therapy'
             ],
             'Surgical': [
-                'surgery', 'orthopedic_surgery', 'plastic_surgery', 'cardiac_surgery'
+                'Surgery', 'Orthopedic Surgery', 'Plastic Surgery', 'Cardiac Surgery'
             ],
             'Dental': [
-                'dentistry', 'orthodontics', 'oral_surgery', 'periodontics'
+                'Dentistry', 'Orthodontics', 'Oral Surgery', 'Periodontics'
             ],
             'Diagnostic': [
-                'radiology', 'pathology', 'laboratory', 'imaging'
+                'Radiology', 'Pathology', 'Laboratory', 'Imaging'
             ],
             'Therapeutic': [
-                'physical_therapy', 'occupational_therapy', 'rehabilitation'
+                'Physical Therapy', 'Occupational Therapy', 'Rehabilitation'
             ]
         }
     
@@ -180,26 +186,42 @@ class MedicalSpecialtyFilter:
         # Remove extra whitespace
         normalized = re.sub(r'\s+', ' ', normalized).strip()
         
-        # Handle common variations
+        # Handle common variations and normalize to proper display format
         specialty_normalizations = {
-            'gyno': 'gynecology',
-            'cardio': 'cardiology',
-            'derm': 'dermatology', 
-            'neuro': 'neurology',
-            'ortho': 'orthopedics',
-            'peds': 'pediatrics',
-            'psych': 'psychiatry',
-            'ent': 'otolaryngology',
-            'gp': 'general_practitioner',
-            'obgyn': 'gynecology',
-            'ob gyn': 'gynecology',
-            'eye doctor': 'ophthalmology',
-            'heart doctor': 'cardiology',
-            'skin doctor': 'dermatology',
-            'bone doctor': 'orthopedics',
-            'brain doctor': 'neurology',
-            'kidney doctor': 'nephrology',
-            'lung doctor': 'pulmonology'
+            'gyno': 'Gynecology',
+            'cardio': 'Cardiology',
+            'derm': 'Dermatology', 
+            'neuro': 'Neurology',
+            'ortho': 'Orthopedics',
+            'peds': 'Pediatrics',
+            'psych': 'Psychiatry',
+            'ent': 'ENT (Ear, Nose & Throat)',
+            'ear nose throat': 'ENT (Ear, Nose & Throat)',
+            'otolaryngology': 'ENT (Ear, Nose & Throat)',
+            'gp': 'General Medicine',
+            'general_practitioner': 'General Medicine',
+            'general practitioner': 'General Medicine',
+            'general medicine': 'General Medicine',
+            'internal medicine': 'Internal Medicine',
+            'internal_medicine': 'Internal Medicine',
+            'family medicine': 'General Medicine',
+            'obgyn': 'Gynecology',
+            'ob gyn': 'Gynecology',
+            'gynecology': 'Gynecology',
+            'dentistry': 'Dentistry',
+            'dental': 'Dentistry',
+            'pharmacy': 'Pharmacy',
+            'pharmacist': 'Pharmacy',
+            'emergency medicine': 'Emergency Medicine',
+            'emergency_medicine': 'Emergency Medicine',
+            'hospital': 'General Medicine',
+            'eye doctor': 'Ophthalmology',
+            'heart doctor': 'Cardiology',
+            'skin doctor': 'Dermatology',
+            'bone doctor': 'Orthopedics',
+            'brain doctor': 'Neurology',
+            'kidney doctor': 'Nephrology',
+            'lung doctor': 'Pulmonology'
         }
         
         return specialty_normalizations.get(normalized, normalized)
@@ -262,14 +284,14 @@ class MedicalSpecialtyFilter:
         if not types:
             return []
         
-        # Google Places API type mapping
+        # Google Places API type mapping to proper display format
         google_type_mapping = {
-            'dentist': 'dentistry',
-            'doctor': 'general_practitioner', 
-            'hospital': 'general_medicine',
-            'pharmacy': 'pharmacy',
-            'physiotherapist': 'physical_therapy',
-            'veterinary_care': 'veterinary_medicine'
+            'dentist': 'Dentistry',
+            'doctor': 'General Medicine', 
+            'hospital': 'General Medicine',
+            'pharmacy': 'Pharmacy',
+            'physiotherapist': 'Physical Therapy',
+            'veterinary_care': 'Veterinary Medicine'
         }
         
         specialties = []
@@ -291,42 +313,50 @@ class MedicalSpecialtyFilter:
         
         # Look for medical specialty keywords in the name
         medical_keywords = {
-            'dental': 'dentistry',
-            'tooth': 'dentistry', 
-            'orthodont': 'orthodontics',
-            'oral': 'oral_surgery',
-            'eye': 'ophthalmology',
-            'vision': 'ophthalmology',
-            'heart': 'cardiology',
-            'cardiac': 'cardiology',
-            'skin': 'dermatology',
-            'beauty': 'cosmetic_surgery',
-            'cosmetic': 'cosmetic_surgery',
-            'plastic': 'plastic_surgery',
-            'bone': 'orthopedics',
-            'joint': 'orthopedics',
-            'women': 'gynecology',
-            'ladies': 'gynecology',
-            'pregnancy': 'obstetrics',
-            'maternity': 'obstetrics',
-            'child': 'pediatrics',
-            'kids': 'pediatrics',
-            'mental': 'psychiatry',
-            'cancer': 'oncology',
-            'tumor': 'oncology',
-            'kidney': 'nephrology',
-            'lung': 'pulmonology',
-            'respiratory': 'pulmonology',
-            'digestive': 'gastroenterology',
-            'stomach': 'gastroenterology',
-            'brain': 'neurology',
-            'nerve': 'neurology',
-            'emergency': 'emergency_medicine',
-            'urgent': 'emergency_medicine'
+            'dental': 'Dentistry',
+            'tooth': 'Dentistry', 
+            'orthodont': 'Orthodontics',
+            'oral': 'Oral Surgery',
+            'ent': 'ENT (Ear, Nose & Throat)',
+            'ear nose throat': 'ENT (Ear, Nose & Throat)',
+            'otolaryngology': 'ENT (Ear, Nose & Throat)',
+            'eye': 'Ophthalmology',
+            'vision': 'Ophthalmology',
+            'heart': 'Cardiology',
+            'cardiac': 'Cardiology',
+            'skin': 'Dermatology',
+            'beauty': 'Cosmetic Surgery',
+            'cosmetic': 'Cosmetic Surgery',
+            'plastic': 'Plastic Surgery',
+            'bone': 'Orthopedics',
+            'joint': 'Orthopedics',
+            'women': 'Gynecology',
+            'ladies': 'Gynecology',
+            'pregnancy': 'Obstetrics',
+            'maternity': 'Obstetrics',
+            'child': 'Pediatrics',
+            'kids': 'Pediatrics',
+            'mental': 'Psychiatry',
+            'cancer': 'Oncology',
+            'tumor': 'Oncology',
+            'kidney': 'Nephrology',
+            'lung': 'Pulmonology',
+            'respiratory': 'Pulmonology',
+            'digestive': 'Gastroenterology',
+            'stomach': 'Gastroenterology',
+            'brain': 'Neurology',
+            'nerve': 'Neurology',
+            'emergency': 'Emergency Medicine',
+            'urgent': 'Emergency Medicine',
+            'pharmacy': 'Pharmacy',
+            'drug': 'Pharmacy'
         }
         
         for keyword, specialty in medical_keywords.items():
-            if keyword in name_lower:
+            # Check for word boundaries to avoid false matches
+            import re
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if re.search(pattern, name_lower):
                 specialties.add(specialty)
         
         return list(specialties)
@@ -359,9 +389,9 @@ class MedicalSpecialtyFilter:
             desc_specialties = self.extract_specialties_from_text(description)
             all_specialties.update(desc_specialties)
         
-        # Default to general practitioner if no specialties found
+        # Default to General Medicine if no specialties found
         if not all_specialties:
-            all_specialties.add('general_practitioner')
+            all_specialties.add('General Medicine')
         
         return sorted(list(all_specialties))
     
@@ -383,13 +413,13 @@ class MedicalSpecialtyFilter:
                 else:
                     invalid_specialties.append(specialty)
             
-            # Add commonly needed specialties that might be missing
+            # Add commonly needed specialties that might be missing (using proper display format)
             essential_specialties = [
-                'general_practitioner', 'family_medicine', 'internal_medicine',
-                'pediatrics', 'gynecology', 'obstetrics', 'dermatology',
-                'cardiology', 'neurology', 'orthopedics', 'ophthalmology',
-                'dentistry', 'psychiatry', 'oncology', 'emergency_medicine',
-                'physical_therapy', 'radiology', 'surgery'
+                'General Medicine', 'Family Medicine', 'Internal Medicine',
+                'Pediatrics', 'Gynecology', 'Obstetrics', 'Dermatology',
+                'Cardiology', 'Neurology', 'Orthopedics', 'Ophthalmology',
+                'Dentistry', 'Psychiatry', 'Oncology', 'Emergency Medicine',
+                'Physical Therapy', 'Radiology', 'Surgery'
             ]
             
             for essential in essential_specialties:
