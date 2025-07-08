@@ -363,6 +363,60 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
         # If we got too many, trim to expected count
         return descriptions[:expected_count]
 
+def filter_providers_needing_descriptions(providers):
+    """Filter providers to only include those that need AI descriptions generated.
+    
+    Prevents API costs by excluding providers that already have:
+    - AI descriptions generated
+    - WordPress post IDs (already published)
+    - Status of 'published' or 'description_generated'
+    
+    Args:
+        providers: List of provider dictionaries or Provider objects
+        
+    Returns:
+        List of providers that need descriptions generated
+    """
+    filtered_providers = []
+    skipped_count = 0
+    
+    for provider in providers:
+        # Handle both dictionary and Provider object inputs
+        if hasattr(provider, '__dict__'):
+            # Provider object from database
+            provider_name = getattr(provider, 'provider_name', 'Unknown Provider')
+            ai_description = getattr(provider, 'ai_description', None)
+            wordpress_post_id = getattr(provider, 'wordpress_post_id', None)
+            status = getattr(provider, 'status', 'pending')
+        else:
+            # Dictionary input
+            provider_name = provider.get('provider_name', 'Unknown Provider')
+            ai_description = provider.get('ai_description', None)
+            wordpress_post_id = provider.get('wordpress_post_id', None)
+            status = provider.get('status', 'pending')
+        
+        # Skip if already has description or is published
+        if ai_description and ai_description.strip():
+            logger.info(f"⏭️ Skipping {provider_name}: Already has AI description")
+            skipped_count += 1
+            continue
+            
+        if wordpress_post_id:
+            logger.info(f"⏭️ Skipping {provider_name}: Already published to WordPress (ID: {wordpress_post_id})")
+            skipped_count += 1
+            continue
+            
+        if status in ['published', 'description_generated']:
+            logger.info(f"⏭️ Skipping {provider_name}: Status is {status}")
+            skipped_count += 1
+            continue
+        
+        # Provider needs description
+        filtered_providers.append(provider)
+    
+    logger.info(f"🔍 Filtering complete: {len(filtered_providers)} need descriptions, {skipped_count} skipped")
+    return filtered_providers
+
 def run_ai_description_generation(providers):
     """Generate enhanced descriptions for a list of provider dictionaries (single provider mode)."""
     generator = ClaudeDescriptionGenerator()
@@ -428,6 +482,13 @@ def run_batch_ai_description_generation(providers, batch_size=5):
     if not providers:
         logger.info("No providers to process")
         return
+    
+    # Filter out providers that don't need descriptions (prevents API costs)
+    filtered_providers = filter_providers_needing_descriptions(providers)
+    
+    if not filtered_providers:
+        logger.info("✅ All providers already have descriptions or are published")
+        return
         
     generator = ClaudeDescriptionGenerator()
     collector = GooglePlacesHealthcareCollector()
@@ -435,7 +496,7 @@ def run_batch_ai_description_generation(providers, batch_size=5):
     
     # Prepare comprehensive provider data for enhanced batch processing
     provider_data_list = []
-    for provider in providers:
+    for provider in filtered_providers:
         # Handle both dictionary and Provider object inputs
         if hasattr(provider, '__dict__'):
             # Provider object from database

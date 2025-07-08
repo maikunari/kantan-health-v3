@@ -689,8 +689,10 @@ class GooglePlacesHealthcareCollector:
         return record
 
     def save_to_postgres(self, providers):
-        """Save comprehensive provider data to PostgreSQL with duplicate checking by Google Place ID"""
+        """Save comprehensive provider data to PostgreSQL with advanced fingerprint-based duplicate checking"""
         try:
+            from provider_fingerprinting import ProviderFingerprinter
+            
             postgres = PostgresIntegration()
             is_connected, message = postgres.test_connection()
             if not is_connected:
@@ -698,24 +700,47 @@ class GooglePlacesHealthcareCollector:
                 return 0
             saved_count, error_count, skipped_count = 0, 0, 0
             session = postgres.Session()
+            fingerprinter = ProviderFingerprinter()
             
-            # Get existing Google Place IDs to prevent duplicates
-            existing_place_ids = set()
+            # Get existing fingerprints to prevent duplicates
+            existing_fingerprints = set()
+            
+            # Get Google Place IDs
             existing_providers = session.query(Provider.google_place_id).filter(Provider.google_place_id.isnot(None)).all()
             for provider in existing_providers:
                 if provider.google_place_id:
-                    existing_place_ids.add(provider.google_place_id)
+                    existing_fingerprints.add(provider.google_place_id)
             
-            print(f"📊 Found {len(existing_place_ids)} existing Google Place IDs in database")
+            # Get all fingerprint types  
+            fingerprint_results = session.query(
+                Provider.primary_fingerprint,
+                Provider.secondary_fingerprint, 
+                Provider.fuzzy_fingerprint
+            ).filter(Provider.primary_fingerprint.isnot(None)).all()
+            
+            for fp_result in fingerprint_results:
+                if fp_result.primary_fingerprint:
+                    existing_fingerprints.add(fp_result.primary_fingerprint)
+                if fp_result.secondary_fingerprint:
+                    existing_fingerprints.add(fp_result.secondary_fingerprint)
+                if fp_result.fuzzy_fingerprint:
+                    existing_fingerprints.add(fp_result.fuzzy_fingerprint)
+            
+            print(f"📊 Found {len(existing_fingerprints)} existing fingerprints in database")
             
             for provider in providers:
                 try:
                     google_place_id = provider.get('google_place_id', '')
                     provider_name = provider.get('provider_name', 'Unknown')
                     
-                    # Check for duplicate by Google Place ID
-                    if google_place_id and google_place_id in existing_place_ids:
-                        print(f"⏭️ Skipping duplicate provider: {provider_name} (Google Place ID: {google_place_id})")
+                    # Generate fingerprints for duplicate checking
+                    fingerprints = fingerprinter.generate_all_fingerprints(provider)
+                    
+                    # Check for duplicates using comprehensive fingerprinting
+                    is_duplicate, match_type = fingerprinter.check_duplicate(provider, existing_fingerprints)
+                    
+                    if is_duplicate:
+                        print(f"⏭️ Skipping duplicate provider: {provider_name} (matched on: {match_type})")
                         skipped_count += 1
                         continue
                     
@@ -742,15 +767,23 @@ class GooglePlacesHealthcareCollector:
                         ai_description=provider.get('ai_description', ''),
                         business_hours=provider.get('business_hours', {}),
                         wheelchair_accessible=provider.get('wheelchair_accessible', False),
-                        parking_available=provider.get('parking_available', False)
+                        parking_available=provider.get('parking_available', False),
+                        # Add fingerprints for deduplication
+                        primary_fingerprint=fingerprints.primary,
+                        secondary_fingerprint=fingerprints.secondary if fingerprints.secondary else None,
+                        fuzzy_fingerprint=fingerprints.fuzzy
                     )
                     session.add(provider_obj)
                     session.commit()
                     saved_count += 1
                     
-                    # Add to existing set to prevent duplicates within this batch
+                    # Add to existing fingerprints to prevent duplicates within this batch
+                    existing_fingerprints.add(fingerprints.primary)
+                    if fingerprints.secondary:
+                        existing_fingerprints.add(fingerprints.secondary)
+                    existing_fingerprints.add(fingerprints.fuzzy)
                     if google_place_id:
-                        existing_place_ids.add(google_place_id)
+                        existing_fingerprints.add(google_place_id)
                     
                     print(f"✅ Saved {provider_name} with status {provider_obj.status}")
                 except Exception as e:

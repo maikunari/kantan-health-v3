@@ -41,6 +41,10 @@ class Provider(Base):
     business_hours = Column(JSON)  # Store business hours data
     wheelchair_accessible = Column(String(50))  # Store wheelchair accessibility status
     parking_available = Column(String(50))  # Store parking availability status
+    # Fingerprint columns for deduplication
+    primary_fingerprint = Column(String(32))      # name + address + city hash
+    secondary_fingerprint = Column(String(32))    # name + phone + city hash  
+    fuzzy_fingerprint = Column(String(32))        # fuzzy matching fingerprint
 
 class Metric(Base):
     __tablename__ = "metrics"
