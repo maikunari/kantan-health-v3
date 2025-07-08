@@ -482,7 +482,7 @@ class GooglePlacesHealthcareCollector:
         return processed_reviews
 
     def get_photo_urls(self, photos, max_photos=5):
-        """Get photo URLs from Google Places photos, strictly limited to 5"""
+        """Get photo URLs from Google Places API"""
         photo_urls = []
         for photo in photos[:max_photos]:
             photo_reference = photo.get('photo_reference')
@@ -491,6 +491,78 @@ class GooglePlacesHealthcareCollector:
                 photo_urls.append(photo_url)
                 self.log_api_usage("photo", 1)
         return photo_urls
+
+    def process_opening_hours(self, place_data):
+        """Process opening hours data from Google Places API"""
+        opening_hours = place_data.get('opening_hours', {})
+        
+        if not opening_hours:
+            return {}
+        
+        # Extract weekly opening hours
+        weekday_text = opening_hours.get('weekday_text', [])
+        periods = opening_hours.get('periods', [])
+        
+        processed_hours = {
+            'weekday_text': weekday_text,
+            'periods': periods,
+            'open_now': opening_hours.get('open_now', False),
+            'formatted_hours': {}
+        }
+        
+        # Format hours for easier display
+        days_mapping = {
+            0: 'Sunday',
+            1: 'Monday', 
+            2: 'Tuesday',
+            3: 'Wednesday',
+            4: 'Thursday',
+            5: 'Friday',
+            6: 'Saturday'
+        }
+        
+        for period in periods:
+            if 'open' in period:
+                day = period['open'].get('day', 0)
+                day_name = days_mapping.get(day, f'Day {day}')
+                open_time = period['open'].get('time', '')
+                close_time = period.get('close', {}).get('time', '')
+                
+                # Format time from 24-hour to 12-hour format
+                if open_time and len(open_time) == 4:
+                    open_hour = int(open_time[:2])
+                    open_min = open_time[2:]
+                    open_formatted = f"{open_hour if open_hour <= 12 else open_hour - 12}:{open_min} {'AM' if open_hour < 12 else 'PM'}"
+                    if open_hour == 0:
+                        open_formatted = f"12:{open_min} AM"
+                    elif open_hour == 12:
+                        open_formatted = f"12:{open_min} PM"
+                else:
+                    open_formatted = open_time
+                
+                if close_time and len(close_time) == 4:
+                    close_hour = int(close_time[:2])
+                    close_min = close_time[2:]
+                    close_formatted = f"{close_hour if close_hour <= 12 else close_hour - 12}:{close_min} {'AM' if close_hour < 12 else 'PM'}"
+                    if close_hour == 0:
+                        close_formatted = f"12:{close_min} AM"
+                    elif close_hour == 12:
+                        close_formatted = f"12:{close_min} PM"
+                else:
+                    close_formatted = close_time
+                
+                processed_hours['formatted_hours'][day_name] = {
+                    'open': open_formatted,
+                    'close': close_formatted,
+                    'raw_open': open_time,
+                    'raw_close': close_time
+                }
+        
+        # Add status indicators
+        if weekday_text:
+            processed_hours['display_text'] = weekday_text
+        
+        return processed_hours
 
     def create_comprehensive_provider_record(self, place_data):
         """Create a comprehensive provider record with all available data, handling invalid data"""
@@ -569,7 +641,8 @@ class GooglePlacesHealthcareCollector:
             'business_status': place_data.get('business_status', 'UNKNOWN'),
             'service_categories': self._categorize_services(place_data.get('types', [])) if isinstance(place_data, dict) else [],
             'wheelchair_accessible': place_data.get('wheelchair_accessible_entrance', False),
-            'parking_available': 'parking' in str(place_data.get('types', [])).lower() if isinstance(place_data.get('types', []), list) else False
+            'parking_available': 'parking' in str(place_data.get('types', [])).lower() if isinstance(place_data.get('types', []), list) else False,
+            'business_hours': self.process_opening_hours(place_data) if isinstance(place_data, dict) else {}
         }
         return record
 
@@ -624,7 +697,8 @@ class GooglePlacesHealthcareCollector:
                         status=provider.get('status', 'pending'),
                         created_at=provider.get('created_at', datetime.now().strftime('%Y-%m-%d')),
                         google_place_id=google_place_id,
-                        ai_description=provider.get('ai_description', '')
+                        ai_description=provider.get('ai_description', ''),
+                        business_hours=provider.get('business_hours', {})
                     )
                     session.add(provider_obj)
                     session.commit()

@@ -183,6 +183,17 @@ class WordPressIntegration:
                     "business_status": self.normalize_business_status(getattr(provider, 'business_status', 'Unknown')),
                     "prefecture": getattr(provider, 'prefecture', ''),
                     
+                    # Business Hours Field Group
+                    "business_hours": self.format_business_hours(getattr(provider, 'business_hours', {})),
+                    "hours_monday": self.get_day_hours(getattr(provider, 'business_hours', {}), 'Monday'),
+                    "hours_tuesday": self.get_day_hours(getattr(provider, 'business_hours', {}), 'Tuesday'),
+                    "hours_wednesday": self.get_day_hours(getattr(provider, 'business_hours', {}), 'Wednesday'),
+                    "hours_thursday": self.get_day_hours(getattr(provider, 'business_hours', {}), 'Thursday'),
+                    "hours_friday": self.get_day_hours(getattr(provider, 'business_hours', {}), 'Friday'),
+                    "hours_saturday": self.get_day_hours(getattr(provider, 'business_hours', {}), 'Saturday'),
+                    "hours_sunday": self.get_day_hours(getattr(provider, 'business_hours', {}), 'Sunday'),
+                    "open_now": self.get_open_now_status(getattr(provider, 'business_hours', {})),
+                    
                     # Location & Navigation Field Group
                     "latitude": float(getattr(provider, 'latitude', 0)) if getattr(provider, 'latitude', None) else None,
                     "longitude": float(getattr(provider, 'longitude', 0)) if getattr(provider, 'longitude', None) else None,
@@ -224,6 +235,7 @@ class WordPressIntegration:
                     "google_place_id": getattr(provider, 'google_place_id', ''),
                     "specialties_list": json.dumps(getattr(provider, 'specialties', []) if hasattr(provider, 'specialties') else provider_specialties),
                     "amenities": json.dumps(getattr(provider, 'amenities', [])) if hasattr(provider, 'amenities') else '[]',
+                    "business_hours_raw": json.dumps(getattr(provider, 'business_hours', {})) if hasattr(provider, 'business_hours') else '{}',
                     "last_verified": getattr(provider, 'last_verified', ''),
                     "data_source": 'Google Places API',
                     "last_updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -325,6 +337,8 @@ class WordPressIntegration:
         <p><strong>Website:</strong> {self.clean_website_url(provider.website) or 'Not available'}</p>
         <p><strong>Specialties:</strong> {specialty_display}</p>
         <p><strong>English Proficiency:</strong> {provider.english_proficiency or 'Unknown'}</p>
+        <p><strong>Business Hours:</strong></p>
+        <pre>{self.format_business_hours(getattr(provider, 'business_hours', {}))}</pre>
         <p><strong>Description:</strong> {getattr(provider, 'ai_description', 'Professional healthcare provider offering quality medical services.')}</p>
         <p><strong>Rating:</strong> {provider.rating or 0}/5 ({provider.total_reviews or 0} reviews)</p>
         """
@@ -1028,3 +1042,56 @@ class WordPressIntegration:
             return "not_available"
         else:
             return "unknown"
+
+    def format_business_hours(self, business_hours):
+        """Format business hours for display in ACF field"""
+        if not business_hours or not isinstance(business_hours, dict):
+            return ""
+        
+        # If we have display_text from Google Places, use that
+        if 'display_text' in business_hours:
+            return "\n".join(business_hours['display_text'])
+        
+        # Otherwise, format from formatted_hours
+        if 'formatted_hours' in business_hours:
+            formatted_lines = []
+            days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            for day in days_order:
+                if day in business_hours['formatted_hours']:
+                    hours = business_hours['formatted_hours'][day]
+                    if hours.get('open') and hours.get('close'):
+                        formatted_lines.append(f"{day}: {hours['open']} - {hours['close']}")
+                    else:
+                        formatted_lines.append(f"{day}: Closed")
+                else:
+                    formatted_lines.append(f"{day}: Hours not available")
+            
+            return "\n".join(formatted_lines)
+        
+        return "Hours not available"
+
+    def get_day_hours(self, business_hours, day):
+        """Get hours for a specific day"""
+        if not business_hours or not isinstance(business_hours, dict):
+            return "Hours not available"
+        
+        if 'formatted_hours' in business_hours and day in business_hours['formatted_hours']:
+            hours = business_hours['formatted_hours'][day]
+            if hours.get('open') and hours.get('close'):
+                return f"{hours['open']} - {hours['close']}"
+            else:
+                return "Closed"
+        
+        return "Hours not available"
+
+    def get_open_now_status(self, business_hours):
+        """Get open now status from Google Places data"""
+        if not business_hours or not isinstance(business_hours, dict):
+            return "Status unknown"
+        
+        # Use the open_now status from Google Places if available
+        if 'open_now' in business_hours:
+            return "Open Now" if business_hours['open_now'] else "Closed"
+        
+        return "Status unknown"
