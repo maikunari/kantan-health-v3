@@ -200,13 +200,19 @@ FACILITY INFORMATION:
 - Website: {'Available' if website else 'Not available'}
 
 INSTRUCTIONS:
-Write 2-3 sentences that sound natural and helpful. Include:
-1. What medical services they provide and their specialty focus
-2. Their English language capabilities for international patients  
-3. Key patient experience highlights (if available)
-4. Practical details (location, accessibility) that help patients
+Write a comprehensive 150-160 word description in TWO paragraphs that flow naturally together:
 
-Make it sound like a knowledgeable local would describe this provider to a friend. Avoid generic phrases like "quality care" unless backed by specific patient feedback.
+PARAGRAPH 1 (75-80 words): Focus on core medical services and specialty expertise
+- What medical services they provide and their specialty focus
+- Their English language capabilities for international patients
+- Key professional strengths or unique features that set them apart
+
+PARAGRAPH 2 (75-80 words): Focus on patient experience and practical information  
+- Patient experience highlights from reviews (specific feedback when available)
+- Practical details (location, accessibility, parking) that help patients decide
+- Contact information and convenience factors that matter to patients
+
+Make it sound like a knowledgeable local would describe this provider to a friend. Use specific patient feedback when available, avoid generic phrases. Ensure the two paragraphs flow naturally together with smooth transitions - the second paragraph should build upon the first to create one cohesive story about the provider's complete offering.
 """
         
         return prompt
@@ -222,7 +228,7 @@ Make it sound like a knowledgeable local would describe this provider to a frien
             logger.info(f"Generating enhanced description for {provider_name}")
             response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=300,  # Increased for more detailed descriptions
+                max_tokens=450,  # Increased for 150-160 word two-paragraph descriptions
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -298,23 +304,30 @@ Provider {idx}: {provider_name}
 - Accessibility: {'Wheelchair accessible' if wheelchair_accessible else 'Not specified'}""")
 
         batch_prompt = f"""
-Write natural, informative descriptions for these {len(provider_batch)} healthcare providers. Each description should be 2-3 sentences that sound helpful and specific to potential patients.
+Write comprehensive 150-160 word descriptions for these {len(provider_batch)} healthcare providers. Each description should be formatted in TWO paragraphs that flow naturally together.
 
 {chr(10).join(provider_details)}
 
 INSTRUCTIONS FOR EACH DESCRIPTION:
-1. Mention their medical specialty and location naturally
-2. Include English language capabilities for international patients
-3. Reference specific patient feedback when available (not generic "quality care")
-4. Add practical details that help patients choose
+Format each as TWO paragraphs (150-160 words total):
 
-Make each description sound like a knowledgeable local recommending the provider. Avoid vague terms unless backed by specific evidence.
+PARAGRAPH 1 (75-80 words): Core medical services and expertise
+- Medical specialty and location
+- English language capabilities for international patients
+- Key professional strengths or unique features that set them apart
+
+PARAGRAPH 2 (75-80 words): Patient experience and practical information
+- Patient experience highlights from reviews (specific feedback when available)
+- Practical details (accessibility, parking, location convenience)
+- Contact information and convenience factors that matter to patients
+
+Make each description sound like a knowledgeable local recommending the provider. Use specific patient feedback when available, avoid generic phrases. Ensure the two paragraphs flow naturally together with smooth transitions - the second paragraph should build upon the first to create one cohesive story about each provider's complete offering.
 
 Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provider_batch)}:
 
-1. [Natural description for Provider 1]
-2. [Natural description for Provider 2]
-3. [Natural description for Provider 3]
+1. [Two-paragraph description for Provider 1]
+2. [Two-paragraph description for Provider 2]
+3. [Two-paragraph description for Provider 3]
 ...and so on.
 """
 
@@ -322,7 +335,7 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             logger.info(f"Generating enhanced batch descriptions for {len(provider_batch)} providers")
             response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=400 * len(provider_batch),  # Increased for enhanced descriptions
+                max_tokens=550 * len(provider_batch),  # Increased for 150-160 word two-paragraph descriptions
                 temperature=0.7,
                 messages=[{"role": "user", "content": batch_prompt}]
             )
