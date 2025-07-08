@@ -698,7 +698,9 @@ class GooglePlacesHealthcareCollector:
                         created_at=provider.get('created_at', datetime.now().strftime('%Y-%m-%d')),
                         google_place_id=google_place_id,
                         ai_description=provider.get('ai_description', ''),
-                        business_hours=provider.get('business_hours', {})
+                        business_hours=provider.get('business_hours', {}),
+                        wheelchair_accessible=provider.get('wheelchair_accessible', False),
+                        parking_available=provider.get('parking_available', False)
                     )
                     session.add(provider_obj)
                     session.commit()

@@ -39,6 +39,8 @@ class Provider(Base):
     ai_description = Column(Text)
     google_place_id = Column(String(255))
     business_hours = Column(JSON)  # Store business hours data
+    wheelchair_accessible = Column(String(50))  # Store wheelchair accessibility status
+    parking_available = Column(String(50))  # Store parking availability status
 
 class Metric(Base):
     __tablename__ = "metrics"
@@ -75,7 +77,8 @@ class PostgresIntegration:
                 "specialties", "english_proficiency", "rating", "total_reviews",
                 "review_content", "review_keywords", "review_highlights", "photo_urls",
                 "nearest_station", "status", "created_at", "wordpress_post_id", 
-                "ai_description", "google_place_id", "business_hours"
+                "ai_description", "google_place_id", "business_hours", "wheelchair_accessible",
+                "parking_available"
             }
             current_fields = set(Provider.__table__.columns.keys())
             missing_fields = expected_fields - current_fields
