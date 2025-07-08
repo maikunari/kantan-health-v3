@@ -388,30 +388,84 @@ class GooglePlacesHealthcareCollector:
         return categories
 
     def determine_medical_specialties(self, place_data):
-        """Intelligently determine medical specialties and parent category from provider data"""
-        name = place_data.get('name', '').lower()
+        """Determine medical specialties from place data."""
         specialties = []
-        with open("specialties.json", "r") as f:
-            specialties_data = json.load(f)["specialties"]
-        with open("specialty_frequency.json", "r") as f:
-            frequency = json.load(f)
         
-        for term in place_data.get('types', []) + name.split():
-            term = term.lower().strip()
-            if term in [s.lower() for s in specialties_data]:
-                specialties.append(next(s for s in specialties_data if s.lower() == term))
-            else:
-                frequency[term] = frequency.get(term, 0) + 1
-                if frequency[term] >= 5 and term not in ["doctor", "specialist"]:  # Threshold
-                    specialties_data.append(term.capitalize())
-                    with open("specialties.json", "w") as f:
-                        json.dump({"specialties": specialties_data}, f, indent=4)
-                    frequency[term] = 0  # Reset after addition
-                with open("specialty_frequency.json", "w") as f:
-                    json.dump(frequency, f, indent=4)
+        if not isinstance(place_data, dict):
+            return specialties
+        
+        # Get types from the place data
+        types = place_data.get('types', [])
+        if not isinstance(types, list):
+            return specialties
+        
+        # Map Google Places types to medical specialties
+        specialty_mapping = {
+            'dentist': 'dentist',
+            'doctor': 'general_practitioner',
+            'hospital': 'general_practitioner',
+            'pharmacy': 'pharmacy',
+            'physiotherapist': 'physiotherapist',
+            'veterinary_care': 'veterinary'
+        }
+        
+        # Check place types
+        for place_type in types:
+            if place_type in specialty_mapping:
+                specialties.append(specialty_mapping[place_type])
+        
+        # If no specific type found, check name for indicators
         if not specialties:
-            specialties.append("general_practitioner")
-        return list(dict.fromkeys(specialties))[:2]
+            name = place_data.get('name', '').lower()
+            if any(keyword in name for keyword in ['dental', 'tooth', 'orthodont']):
+                specialties.append('dentist')
+            elif any(keyword in name for keyword in ['clinic', 'hospital', 'medical']):
+                specialties.append('general_practitioner')
+            elif any(keyword in name for keyword in ['pharmacy', 'drug']):
+                specialties.append('pharmacy')
+        
+        # Default to general practitioner if no specific specialty found
+        if not specialties:
+            specialties.append('general_practitioner')
+            
+        return specialties
+    
+    def clean_website_url(self, url):
+        """Clean website URL by removing query parameters (utm_source, etc.)"""
+        if not url:
+            return ""
+        
+        try:
+            # Remove everything after the first '?' character
+            if '?' in url:
+                url = url.split('?')[0]
+            
+            # Remove trailing slashes
+            url = url.rstrip('/')
+            
+            return url
+        except Exception as e:
+            print(f"Error cleaning website URL: {str(e)}")
+            return url
+    
+    def clean_address(self, address):
+        """Clean address by removing 'Japan' and extra whitespace"""
+        if not address:
+            return ""
+        
+        try:
+            # Remove 'Japan' from the address (case-insensitive)
+            cleaned_address = address.replace(', Japan', '').replace(',Japan', '')
+            cleaned_address = cleaned_address.replace(' Japan', '').replace('Japan', '')
+            
+            # Clean up extra whitespace and commas
+            cleaned_address = ' '.join(cleaned_address.split())
+            cleaned_address = cleaned_address.strip(' ,')
+            
+            return cleaned_address
+        except Exception as e:
+            print(f"Error cleaning address: {str(e)}")
+            return address
 
     def process_reviews(self, reviews):
         """Process and structure review data"""
@@ -488,11 +542,11 @@ class GooglePlacesHealthcareCollector:
 
         record = {
             'provider_name': name,
-            'address': place_data.get('formatted_address', ''),
+            'address': self.clean_address(place_data.get('formatted_address', '')),
             'city': city,
             'prefecture': prefecture,
             'phone': place_data.get('formatted_phone_number', ''),
-            'website': place_data.get('website', ''),
+            'website': self.clean_website_url(place_data.get('website', '')),
             'specialties': self.determine_medical_specialties(place_data) if isinstance(place_data, dict) else [],
             'english_proficiency': english_proficiency,
             'created_at': datetime.now().strftime('%Y-%m-%d'),

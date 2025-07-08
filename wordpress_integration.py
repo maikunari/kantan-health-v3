@@ -178,8 +178,8 @@ class WordPressIntegration:
                 "acf": {
                     # Provider Details Field Group
                     "provider_phone": getattr(provider, 'phone', ''),
-                    "wheelchair_accessible": bool(getattr(provider, 'wheelchair_accessible', False)),
-                    "parking_available": bool(getattr(provider, 'parking_available', False)),
+                    "wheelchair_accessible": self.format_wheelchair_accessibility(getattr(provider, 'wheelchair_accessible', False)),
+                    "parking_available": self.format_parking_availability(getattr(provider, 'parking_available', False)),
                     "business_status": self.normalize_business_status(getattr(provider, 'business_status', 'Unknown')),
                     "prefecture": getattr(provider, 'prefecture', ''),
                     
@@ -206,8 +206,8 @@ class WordPressIntegration:
                     "patient_highlights": self.generate_patient_highlights(getattr(provider, 'review_content', '')),
                     
                     # Additional essential fields
-                    "provider_website": getattr(provider, 'website', ''),
-                    "provider_address": getattr(provider, 'address', ''),
+                    "provider_website": self.clean_website_url(getattr(provider, 'website', '')),
+                    "provider_address": self.clean_address(getattr(provider, 'address', '')),
                     "provider_rating": str(getattr(provider, 'rating', 0)),
                     "provider_reviews": str(getattr(provider, 'total_reviews', 0)),
                     "postal_code": getattr(provider, 'postal_code', ''),
@@ -228,9 +228,9 @@ class WordPressIntegration:
                     "data_source": 'Google Places API',
                     "last_updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     "provider_city": provider.city,
-                    "provider_address": provider.address or "",
+                    "provider_address": self.clean_address(provider.address or ""),
                     "provider_phone": provider.phone or "",
-                    "provider_website": provider.website or "",
+                    "provider_website": self.clean_website_url(provider.website or ""),
                     "provider_rating": provider.rating or 0,
                     "total_reviews": provider.total_reviews or 0,
                     "english_proficiency": provider.english_proficiency or "Unknown"
@@ -320,9 +320,9 @@ class WordPressIntegration:
         content = f"""
         <h2>{provider.provider_name}</h2>
         <p><strong>Location:</strong> {provider.city}, {getattr(provider, 'prefecture', 'Unknown Prefecture')}</p>
-        <p><strong>Address:</strong> {provider.address or 'Not available'}</p>
+        <p><strong>Address:</strong> {self.clean_address(provider.address) or 'Not available'}</p>
         <p><strong>Phone:</strong> {provider.phone or 'Not available'}</p>
-        <p><strong>Website:</strong> {provider.website or 'Not available'}</p>
+        <p><strong>Website:</strong> {self.clean_website_url(provider.website) or 'Not available'}</p>
         <p><strong>Specialties:</strong> {specialty_display}</p>
         <p><strong>English Proficiency:</strong> {provider.english_proficiency or 'Unknown'}</p>
         <p><strong>Description:</strong> {getattr(provider, 'ai_description', 'Professional healthcare provider offering quality medical services.')}</p>
@@ -973,3 +973,58 @@ class WordPressIntegration:
         except Exception as e:
             print(f"Error extracting English indicators: {str(e)}")
             return ""
+    
+    def clean_website_url(self, url):
+        """Clean website URL by removing query parameters (utm_source, etc.)"""
+        if not url:
+            return ""
+        
+        try:
+            # Remove everything after the first '?' character
+            if '?' in url:
+                url = url.split('?')[0]
+            
+            # Remove trailing slashes
+            url = url.rstrip('/')
+            
+            return url
+        except Exception as e:
+            print(f"Error cleaning website URL: {str(e)}")
+            return url
+    
+    def clean_address(self, address):
+        """Clean address by removing 'Japan' and extra whitespace"""
+        if not address:
+            return ""
+        
+        try:
+            # Remove 'Japan' from the address (case-insensitive)
+            cleaned_address = address.replace(', Japan', '').replace(',Japan', '')
+            cleaned_address = cleaned_address.replace(' Japan', '').replace('Japan', '')
+            
+            # Clean up extra whitespace and commas
+            cleaned_address = ' '.join(cleaned_address.split())
+            cleaned_address = cleaned_address.strip(' ,')
+            
+            return cleaned_address
+        except Exception as e:
+            print(f"Error cleaning address: {str(e)}")
+            return address
+    
+    def format_wheelchair_accessibility(self, wheelchair_accessible):
+        """Format wheelchair accessibility for ACF dropdown field"""
+        if wheelchair_accessible is True:
+            return "accessible"
+        elif wheelchair_accessible is False:
+            return "not_accessible"
+        else:
+            return "unknown"
+    
+    def format_parking_availability(self, parking_available):
+        """Format parking availability for ACF dropdown field"""
+        if parking_available is True:
+            return "available"
+        elif parking_available is False:
+            return "not_available"
+        else:
+            return "unknown"
