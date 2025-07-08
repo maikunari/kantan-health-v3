@@ -400,25 +400,55 @@ class GooglePlacesHealthcareCollector:
         return categories
 
     def determine_medical_specialties(self, place_data):
-        """Determine medical specialties from place data."""
+        """Determine medical specialties from place data using comprehensive filtering."""
+        # Import the medical specialty filter (lazy import to avoid circular deps)
+        try:
+            from medical_specialty_filter import MedicalSpecialtyFilter
+            specialty_filter = MedicalSpecialtyFilter()
+        except ImportError:
+            print("⚠️ Medical specialty filter not available, using basic extraction")
+            return self._basic_specialty_extraction(place_data)
+        
+        if not isinstance(place_data, dict):
+            return ['general_practitioner']
+        
+        # Use comprehensive specialty extraction
+        provider_data = {
+            'provider_name': place_data.get('name', ''),
+            'types': place_data.get('types', []),
+            'specialties': [],  # No existing specialties
+            'ai_description': ''  # No description yet
+        }
+        
+        comprehensive_specialties = specialty_filter.get_comprehensive_specialties(provider_data)
+        
+        # Ensure we always have at least one specialty
+        if not comprehensive_specialties:
+            comprehensive_specialties = ['general_practitioner']
+        
+        print(f"🎯 Extracted {len(comprehensive_specialties)} specialties: {comprehensive_specialties}")
+        return comprehensive_specialties
+    
+    def _basic_specialty_extraction(self, place_data):
+        """Fallback basic specialty extraction if filter system unavailable"""
         specialties = []
         
         if not isinstance(place_data, dict):
-            return specialties
+            return ['general_practitioner']
         
         # Get types from the place data
         types = place_data.get('types', [])
         if not isinstance(types, list):
-            return specialties
+            return ['general_practitioner']
         
         # Map Google Places types to medical specialties
         specialty_mapping = {
-            'dentist': 'dentist',
+            'dentist': 'dentistry',
             'doctor': 'general_practitioner',
-            'hospital': 'general_practitioner',
+            'hospital': 'general_medicine',
             'pharmacy': 'pharmacy',
-            'physiotherapist': 'physiotherapist',
-            'veterinary_care': 'veterinary'
+            'physiotherapist': 'physical_therapy',
+            'veterinary_care': 'veterinary_medicine'
         }
         
         # Check place types
@@ -430,7 +460,7 @@ class GooglePlacesHealthcareCollector:
         if not specialties:
             name = place_data.get('name', '').lower()
             if any(keyword in name for keyword in ['dental', 'tooth', 'orthodont']):
-                specialties.append('dentist')
+                specialties.append('dentistry')
             elif any(keyword in name for keyword in ['clinic', 'hospital', 'medical']):
                 specialties.append('general_practitioner')
             elif any(keyword in name for keyword in ['pharmacy', 'drug']):
