@@ -623,6 +623,7 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         'business_status' => 'business_status',
         'prefecture' => 'prefecture',
         'ai_description' => 'ai_description',
+        'ai_excerpt' => 'ai_excerpt',
         
         // Location & Navigation Field Group
         'nearest_station' => 'nearest_station',
@@ -663,6 +664,62 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
 }
 
 
+
+/**
+ * Sync ACF excerpt field to native WordPress excerpt
+ */
+add_action('acf/save_post', 'healthcare_sync_excerpt_to_native', 20);
+function healthcare_sync_excerpt_to_native($post_id) {
+    // Only for healthcare_provider posts
+    if (get_post_type($post_id) !== 'healthcare_provider') {
+        return;
+    }
+    
+    // Get the ACF excerpt field value
+    $acf_excerpt = get_field('ai_excerpt', $post_id);
+    
+    // If ACF excerpt exists, sync it to native WordPress excerpt
+    if (!empty($acf_excerpt)) {
+        // Remove this hook temporarily to prevent infinite loop
+        remove_action('acf/save_post', 'healthcare_sync_excerpt_to_native', 20);
+        
+        // Update the native WordPress excerpt
+        wp_update_post(array(
+            'ID' => $post_id,
+            'post_excerpt' => $acf_excerpt
+        ));
+        
+        // Re-add the hook
+        add_action('acf/save_post', 'healthcare_sync_excerpt_to_native', 20);
+    }
+}
+
+/**
+ * Sync native WordPress excerpt to ACF excerpt field
+ */
+add_action('save_post', 'healthcare_sync_native_to_excerpt', 20);
+function healthcare_sync_native_to_excerpt($post_id) {
+    // Only for healthcare_provider posts
+    if (get_post_type($post_id) !== 'healthcare_provider') {
+        return;
+    }
+    
+    // Skip if this is an autosave
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    
+    // Get the native WordPress excerpt
+    $native_excerpt = get_post_field('post_excerpt', $post_id);
+    
+    // If native excerpt exists and ACF excerpt is empty, sync it
+    if (!empty($native_excerpt)) {
+        $acf_excerpt = get_field('ai_excerpt', $post_id);
+        if (empty($acf_excerpt)) {
+            update_field('ai_excerpt', $native_excerpt, $post_id);
+        }
+    }
+}
 
 /**
  * Remove automatic featured image display for healthcare providers
@@ -708,6 +765,21 @@ add_action('do_meta_boxes', 'healthcare_remove_featured_image_metabox');
 function healthcare_remove_featured_image_metabox() {
     $post_type = 'healthcare_provider';
     remove_meta_box('postimagediv', $post_type, 'side');
+}
+
+/**
+ * Ensure excerpt metabox is visible for healthcare providers
+ */
+add_action('add_meta_boxes', 'healthcare_add_excerpt_metabox');
+function healthcare_add_excerpt_metabox() {
+    add_meta_box(
+        'postexcerpt',
+        __('Excerpt'),
+        'post_excerpt_meta_box',
+        'healthcare_provider',
+        'normal',
+        'core'
+    );
 }
 
 /**

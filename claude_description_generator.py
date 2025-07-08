@@ -734,14 +734,15 @@ def run_batch_ai_description_generation(providers, batch_size=5):
     logger.info(f"🚀 Starting batch description generation for {len(provider_data_list)} providers")
     logger.info(f"📦 Using batch size: {batch_size}")
     
-    # Generate descriptions in batches
+    # Generate descriptions and excerpts in batches
     descriptions = generator.generate_batch_descriptions(provider_data_list, batch_size)
+    excerpts = generator.generate_batch_excerpts(provider_data_list, batch_size)
     
-    # Update database records with generated descriptions
+    # Update database records with generated descriptions and excerpts
     successful_updates = 0
     failed_updates = 0
     
-    for provider_data, description in zip(provider_data_list, descriptions):
+    for provider_data, description, excerpt in zip(provider_data_list, descriptions, excerpts):
         try:
             # Find the corresponding database record
             db_provider = session.query(Provider).filter_by(
@@ -751,10 +752,11 @@ def run_batch_ai_description_generation(providers, batch_size=5):
             
             if db_provider:
                 db_provider.ai_description = description
+                db_provider.ai_excerpt = excerpt
                 db_provider.status = 'description_generated'
                 session.commit()
                 successful_updates += 1
-                logger.info(f"✅ Updated {provider_data['provider_name']} with batch-generated description")
+                logger.info(f"✅ Updated {provider_data['provider_name']} with batch-generated description and excerpt")
             else:
                 logger.warning(f"⚠️ Provider not found in database: {provider_data['provider_name']} in {provider_data['city']}")
                 failed_updates += 1

@@ -33,6 +33,8 @@ class Provider(Base):
     review_highlights = Column(JSON)
     photo_urls = Column(JSON)
     nearest_station = Column(Text)
+    latitude = Column(Float)  # Store latitude for Google Maps
+    longitude = Column(Float)  # Store longitude for Google Maps  
     status = Column(String(50), default="pending")
     created_at = Column(String)
     # New columns for WordPress integration
@@ -82,7 +84,7 @@ class PostgresIntegration:
                 "provider_name", "address", "city", "prefecture", "district", "phone", "website",
                 "specialties", "english_proficiency", "rating", "total_reviews",
                 "review_content", "review_keywords", "review_highlights", "photo_urls",
-                "nearest_station", "status", "created_at", "wordpress_post_id", 
+                "nearest_station", "latitude", "longitude", "status", "created_at", "wordpress_post_id", 
                 "ai_description", "ai_excerpt", "google_place_id", "business_hours", "wheelchair_accessible",
                 "parking_available"
             }
