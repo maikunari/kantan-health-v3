@@ -163,20 +163,17 @@ class DuplicateCleanup:
             print(f"   - {provider_name}: {duplicate_count} duplicates")
         
         # Step 3: Cleanup WordPress
-        confirm = input(f"\n🚨 Delete {sum(len(d['remove']) for d in duplicates.values())} duplicate posts? (y/N): ")
-        if confirm.lower() == 'y':
-            print("\n🗑️ Removing duplicate WordPress posts...")
-            removed_count = self.cleanup_wordpress_duplicates(duplicates)
-            print(f"✅ Removed {removed_count} duplicate posts")
-            
-            # Step 4: Update database
-            print("\n📄 Updating database records...")
-            updated_count = self.update_database_records(duplicates)
-            print(f"✅ Updated {updated_count} database records")
-            
-            print("\n🎉 Cleanup complete!")
-        else:
-            print("❌ Cleanup cancelled")
+        print(f"\n🚨 Auto-cleaning {sum(len(d['remove']) for d in duplicates.values())} duplicate posts...")
+        print("\n🗑️ Removing duplicate WordPress posts...")
+        removed_count = self.cleanup_wordpress_duplicates(duplicates)
+        print(f"✅ Removed {removed_count} duplicate posts")
+        
+        # Step 4: Update database
+        print("\n📄 Updating database records...")
+        updated_count = self.update_database_records(duplicates)
+        print(f"✅ Updated {updated_count} database records")
+        
+        print("\n🎉 Cleanup complete!")
 
 if __name__ == "__main__":
     cleanup = DuplicateCleanup()

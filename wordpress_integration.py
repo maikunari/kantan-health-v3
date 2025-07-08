@@ -187,11 +187,12 @@ class WordPressIntegration:
                     "latitude": float(getattr(provider, 'latitude', 0)) if getattr(provider, 'latitude', None) else None,
                     "longitude": float(getattr(provider, 'longitude', 0)) if getattr(provider, 'longitude', None) else None,
                     "nearest_station": getattr(provider, 'nearest_station', ''),
+                    "google_maps_embed": self.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name),
                     
                     # Language Support Field Group
-                    "english_proficiency": getattr(provider, 'english_proficiency', ''),
-                    "proficiency_score": int(getattr(provider, 'proficiency_score', 0)) if getattr(provider, 'proficiency_score', None) else None,
-                    "english_indicators": self.format_english_indicators(getattr(provider, 'english_indicators', [])),
+                    "english_proficiency": self.determine_english_proficiency(provider),
+                    "proficiency_score": self.calculate_proficiency_score(provider),
+                    "english_indicators": self.extract_english_indicators(provider),
                     
                     # Photo Gallery Field Group
                     "photo_urls": self.convert_photo_urls_for_greenshift(getattr(provider, 'photo_urls', '')),
@@ -201,7 +202,8 @@ class WordPressIntegration:
                     "parking_status": self.format_parking_status(getattr(provider, 'parking_available', False)),
                     
                     # Patient Insights Field Group
-                    "review_keywords": json.dumps(getattr(provider, 'review_keywords', {})) if getattr(provider, 'review_keywords', None) else '',
+                    "review_keywords": self.extract_patient_feedback_themes(getattr(provider, 'review_content', '')),
+                    "patient_highlights": self.generate_patient_highlights(getattr(provider, 'review_content', '')),
                     
                     # Additional essential fields
                     "provider_website": getattr(provider, 'website', ''),
@@ -659,6 +661,165 @@ class WordPressIntegration:
         else:
             return "Parking availability unknown"
     
+    def generate_google_maps_embed(self, latitude, longitude, provider_name):
+        """Generate Google Maps embed code from coordinates"""
+        if not latitude or not longitude or latitude == 0 or longitude == 0:
+            return ""
+        
+        # Use Google Maps embed without API key (using query parameter)
+        embed_code = f'''<iframe 
+            width="100%" 
+            height="300" 
+            frameborder="0" 
+            style="border:0" 
+            src="https://maps.google.com/maps?q={latitude},{longitude}&hl=en&z=15&output=embed" 
+            allowfullscreen>
+        </iframe>'''
+        
+        return embed_code
+
+    def extract_patient_feedback_themes(self, review_content):
+        """Extract key patient feedback themes from review content"""
+        if not review_content:
+            return "No patient feedback available"
+        
+        try:
+            # Parse review content JSON
+            if isinstance(review_content, str):
+                reviews = json.loads(review_content)
+            else:
+                reviews = review_content
+            
+            if not reviews or not isinstance(reviews, list):
+                return "No patient feedback available"
+            
+            # Extract common themes from reviews
+            positive_themes = []
+            service_themes = []
+            
+            for review in reviews:
+                text = review.get('text', '').lower()
+                if not text:
+                    continue
+                
+                # Positive themes
+                if any(word in text for word in ['friendly', 'kind', 'helpful', 'professional', 'gentle']):
+                    positive_themes.append('Staff praised for friendliness and professionalism')
+                if any(word in text for word in ['clean', 'modern', 'comfortable', 'nice facilities']):
+                    positive_themes.append('Clean and modern facilities')
+                if any(word in text for word in ['quick', 'efficient', 'no wait', 'on time']):
+                    positive_themes.append('Efficient service and minimal waiting')
+                if any(word in text for word in ['english', 'bilingual', 'communication']):
+                    positive_themes.append('Good English communication')
+                
+                # Service themes
+                if any(word in text for word in ['treatment', 'care', 'thorough', 'detailed']):
+                    service_themes.append('Thorough medical care and treatment')
+                if any(word in text for word in ['affordable', 'reasonable price', 'good value']):
+                    service_themes.append('Reasonable pricing')
+                if any(word in text for word in ['convenient', 'location', 'easy access']):
+                    service_themes.append('Convenient location and access')
+            
+            # Combine unique themes
+            all_themes = list(set(positive_themes + service_themes))
+            
+            if all_themes:
+                return "; ".join(all_themes[:5])  # Limit to top 5 themes
+            else:
+                return "General healthcare services with positive patient feedback"
+                
+        except Exception as e:
+            print(f"Error extracting feedback themes: {str(e)}")
+            return "Patient feedback analysis unavailable"
+
+    def generate_patient_highlights(self, review_content):
+        """Generate patient experience highlights as ACF repeater field array"""
+        if not review_content:
+            return []
+        
+        try:
+            # Parse review content JSON
+            if isinstance(review_content, str):
+                reviews = json.loads(review_content)
+            else:
+                reviews = review_content
+            
+            if not reviews or not isinstance(reviews, list):
+                return []
+            
+            highlights = []
+            
+            # Analyze reviews for common positive highlights
+            has_english_support = False
+            has_clean_facilities = False
+            has_friendly_staff = False
+            has_professional_care = False
+            has_convenient_location = False
+            
+            for review in reviews:
+                text = review.get('text', '').lower()
+                rating = review.get('rating', 0)
+                
+                # Only consider reviews with 4+ stars for highlights
+                if rating >= 4:
+                    if any(word in text for word in ['english', 'bilingual', 'speaks english']):
+                        has_english_support = True
+                    if any(word in text for word in ['clean', 'modern', 'nice facilities']):
+                        has_clean_facilities = True
+                    if any(word in text for word in ['friendly', 'kind', 'helpful']):
+                        has_friendly_staff = True
+                    if any(word in text for word in ['professional', 'experienced', 'skilled']):
+                        has_professional_care = True
+                    if any(word in text for word in ['convenient', 'easy access', 'near station']):
+                        has_convenient_location = True
+            
+            # Create highlights based on findings - ACF repeater format
+            if has_english_support:
+                highlights.append({
+                    "highlight_text": "English-speaking staff available",
+                    "highlight_icon": "🗣️"
+                })
+            
+            if has_clean_facilities:
+                highlights.append({
+                    "highlight_text": "Clean and modern facilities", 
+                    "highlight_icon": "✨"
+                })
+            
+            if has_friendly_staff:
+                highlights.append({
+                    "highlight_text": "Friendly and helpful staff",
+                    "highlight_icon": "😊"
+                })
+            
+            if has_professional_care:
+                highlights.append({
+                    "highlight_text": "Professional medical care",
+                    "highlight_icon": "👩‍⚕️"
+                })
+            
+            if has_convenient_location:
+                highlights.append({
+                    "highlight_text": "Convenient location",
+                    "highlight_icon": "📍"
+                })
+            
+            # If no specific highlights found, add generic ones
+            if not highlights:
+                highlights.append({
+                    "highlight_text": "Quality healthcare services",
+                    "highlight_icon": "🏥"
+                })
+            
+            return highlights[:4]  # Limit to 4 highlights
+            
+        except Exception as e:
+            print(f"Error generating patient highlights: {str(e)}")
+            return [{
+                "highlight_text": "Professional healthcare provider",
+                "highlight_icon": "🏥"
+            }]
+
     def upload_featured_image(self, image_url, post_title):
         """Upload image from URL as WordPress featured image"""
         try:
@@ -691,3 +852,124 @@ class WordPressIntegration:
         except Exception as e:
             print(f"⚠️ Error uploading featured image: {str(e)}")
             return None
+    
+    def determine_english_proficiency(self, provider):
+        """Determine English proficiency level from review content and provider data"""
+        try:
+            # Check if provider has explicit proficiency data
+            explicit_proficiency = getattr(provider, 'english_proficiency', 'Unknown')
+            if explicit_proficiency and explicit_proficiency != 'Unknown':
+                return explicit_proficiency
+            
+            # Analyze review content for English indicators
+            review_content = getattr(provider, 'review_content', '')
+            if not review_content:
+                return 'Unknown'
+            
+            # Parse reviews
+            if isinstance(review_content, str):
+                reviews = json.loads(review_content)
+            else:
+                reviews = review_content
+            
+            if not reviews or not isinstance(reviews, list):
+                return 'Unknown'
+            
+            # Collect all review text
+            all_text = " ".join([review.get('text', '') for review in reviews if review.get('text')]).lower()
+            
+            # Strong English indicators
+            strong_indicators = [
+                "excellent english", "great english", "perfect english", "fluent english",
+                "english communication skills", "speaks english well", "english speaking"
+            ]
+            
+            # Good English indicators
+            good_indicators = [
+                "english", "communicate in english", "english doctor", "english speaking staff"
+            ]
+            
+            # Poor English indicators
+            poor_indicators = [
+                "no english", "poor english", "limited english", "not good at english",
+                "don't speak english", "cannot speak english"
+            ]
+            
+            # Check for strong indicators - map to WordPress values
+            for indicator in strong_indicators:
+                if indicator in all_text:
+                    return "Fluent"
+            
+            # Check for poor indicators
+            for indicator in poor_indicators:
+                if indicator in all_text:
+                    return "Basic"
+            
+            # Check for general English mentions
+            for indicator in good_indicators:
+                if indicator in all_text:
+                    return "Conversational"
+            
+            return "Unknown"
+            
+        except Exception as e:
+            print(f"Error determining English proficiency: {str(e)}")
+            return "Unknown"
+    
+    def calculate_proficiency_score(self, provider):
+        """Calculate numeric proficiency score from review analysis"""
+        try:
+            proficiency_level = self.determine_english_proficiency(provider)
+            
+            score_mapping = {
+                "Fluent": 5,
+                "Conversational": 4,
+                "Basic": 3,
+                "Unknown": 0
+            }
+            
+            return score_mapping.get(proficiency_level, 0)
+            
+        except Exception as e:
+            print(f"Error calculating proficiency score: {str(e)}")
+            return 0
+    
+    def extract_english_indicators(self, provider):
+        """Extract English language indicators from review content"""
+        try:
+            review_content = getattr(provider, 'review_content', '')
+            if not review_content:
+                return ""
+            
+            # Parse reviews
+            if isinstance(review_content, str):
+                reviews = json.loads(review_content)
+            else:
+                reviews = review_content
+            
+            if not reviews or not isinstance(reviews, list):
+                return ""
+            
+            # Collect all review text
+            all_text = " ".join([review.get('text', '') for review in reviews if review.get('text')])
+            
+            # Extract English-related sentences
+            english_indicators = []
+            sentences = all_text.split('. ')
+            
+            for sentence in sentences:
+                if 'english' in sentence.lower():
+                    # Clean up the sentence
+                    clean_sentence = sentence.strip()
+                    if clean_sentence and len(clean_sentence) > 10:
+                        english_indicators.append(clean_sentence)
+            
+            # Return formatted indicators
+            if english_indicators:
+                return "• " + "\n• ".join(english_indicators[:3])  # Limit to 3 key indicators
+            else:
+                return ""
+            
+        except Exception as e:
+            print(f"Error extracting English indicators: {str(e)}")
+            return ""
