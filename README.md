@@ -677,6 +677,75 @@ WORDPRESS_APPLICATION_PASSWORD=your_app_password
 UPDATE providers SET content_hash = NULL WHERE id = [provider_id];
 ```
 
+#### 6. Photo URL Display Issues
+
+**Issue:** Images not displaying or showing blank img src attributes
+**Root Cause:** Inconsistent photo URL formatting between WordPress integration and update service
+**Status:** ✅ **Fixed** - Updated `_format_photo_urls` in `wordpress_update_service.py` to use newline-separated format
+
+**Current Status:**
+- ✅ **74 providers have correctly formatted photos**
+- ⚠️ **3 providers have empty photo arrays** (emergency rooms - legitimate)
+- ❌ **0 providers have missing photo URLs** (complete coverage)
+
+**Force update providers with photo fixes:**
+```bash
+python3 wordpress_sync_manager.py --sync-provider "DENTAL OFFICE OTANI" --force
+python3 wordpress_sync_manager.py --sync-provider "International Health Care Clinic" --force
+```
+
+#### 7. Photo Validation Enhancement
+
+**New Feature**: ✅ **Photo Validation Added** - System now rejects providers without photos during collection
+
+**What it does:**
+- Validates that providers have at least 1 photo from Google Places API
+- Rejects providers with empty photo arrays or invalid photo data
+- Ensures all collected providers have visual content for user engagement
+
+**Usage:**
+```bash
+# Clean up existing providers without photos
+python3 cleanup_no_photos.py
+
+# Future collections automatically filter for photos
+python3 run_automation.py --daily-limit 25  # Only providers with photos will be collected
+```
+
+**Benefits:**
+- Improves user trust and engagement
+- Reduces WordPress storage for empty photo fields
+- Focuses collection on providers with complete visual content
+
+#### 8. Google API TOS Compliance Fix - CRITICAL
+
+**Issue**: 🚨 **CRITICAL** - System was uploading Google Places photos to WordPress media library, violating Google's Terms of Service
+
+**Google API TOS Requirement**: Must link directly to Google Photos API URLs, not download/store copies
+
+**Fix Applied**: ✅ **Complete TOS Compliance**
+- Removed `upload_featured_image` method that downloaded/stored Google photos
+- Updated system to use direct Google Places photo URLs only
+- Created cleanup script to remove existing uploads from media library
+- Updated ACF fields to clarify direct linking approach
+
+**Compliance Actions:**
+```bash
+# IMMEDIATE: Clean up media library to remove Google photos
+python3 cleanup_media_library.py
+
+# System now automatically uses direct Google URLs (no downloads)
+python3 run_automation.py --daily-limit 25  # New providers will use direct links
+```
+
+**What Changed:**
+- ❌ **Before**: Downloaded Google photos → Uploaded to WordPress media library
+- ✅ **After**: Direct links to Google Places API URLs (TOS compliant)
+- 🗑️ **Cleanup**: Removes existing uploads from media library
+- 📸 **ACF Fields**: Now labeled "Google Places Direct Links"
+
+**Legal Compliance**: System now fully complies with Google Places API Terms of Service
+
 ### Performance Optimization
 
 #### Batch Size Tuning

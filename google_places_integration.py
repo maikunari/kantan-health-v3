@@ -288,6 +288,30 @@ class GooglePlacesHealthcareCollector:
                 # Create comprehensive record
                 try:
                     comprehensive_record = self.create_comprehensive_provider_record(detailed_data)
+                    
+                    # PHOTO VALIDATION: Reject providers without photos
+                    photo_urls = comprehensive_record.get('photo_urls', '')
+                    if not photo_urls or photo_urls == '[]':
+                        print(f"📸 REJECTED: {comprehensive_record['provider_name']} - No photos available")
+                        continue
+                    
+                    # Parse photo URLs to check if they're actually empty
+                    try:
+                        import json
+                        if isinstance(photo_urls, str):
+                            photo_list = json.loads(photo_urls)
+                        else:
+                            photo_list = photo_urls
+                            
+                        if not photo_list or len(photo_list) == 0:
+                            print(f"📸 REJECTED: {comprehensive_record['provider_name']} - Empty photo array")
+                            continue
+                        
+                        print(f"📸 VALIDATED: {comprehensive_record['provider_name']} - {len(photo_list)} photos available")
+                    except json.JSONDecodeError:
+                        print(f"📸 REJECTED: {comprehensive_record['provider_name']} - Invalid photo data")
+                        continue
+                    
                     all_providers.append(comprehensive_record)
                     processed_place_ids.add(place_id)
                     providers_collected += 1

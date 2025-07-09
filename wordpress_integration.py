@@ -253,31 +253,9 @@ class WordPressIntegration:
                 }
             }
             
-            # Handle featured image
-            photo_urls = getattr(provider, 'photo_urls', '')
-            if photo_urls:
-                try:
-                    # Parse JSON string to get list of URLs
-                    if isinstance(photo_urls, str) and photo_urls.strip():
-                        photo_urls_list = json.loads(photo_urls)
-                    else:
-                        photo_urls_list = photo_urls
-                    
-                    if photo_urls_list and isinstance(photo_urls_list, list) and len(photo_urls_list) > 0:
-                        first_photo_url = photo_urls_list[0]
-                        print(f"🖼️  Setting featured image from Photo URLs...")
-                        media_id = self.upload_featured_image(first_photo_url, provider.provider_name)
-                        if media_id:
-                            post_data['featured_media'] = media_id
-                            print(f"✅ Featured image set (Media ID: {media_id})")
-                        else:
-                            print(f"⚠️  Failed to set featured image")
-                except json.JSONDecodeError:
-                    print(f"⚠️  Could not parse Photo URLs JSON")
-                except Exception as e:
-                    print(f"⚠️  Error processing Photo URLs: {str(e)}")
-            else:
-                print(f"⚠️  No photo URLs available for featured image")
+            # NOTE: We do NOT upload photos to media library (Google API TOS compliance)
+            # Photos are linked directly via ACF photo_urls field
+            print(f"📸 Using direct Google Places photo URLs (TOS compliant)")
             
             # Create the post
             response = requests.post(
@@ -856,38 +834,8 @@ class WordPressIntegration:
                 "highlight_icon": "🏥"
             }]
 
-    def upload_featured_image(self, image_url, post_title):
-        """Upload image from URL as WordPress featured image"""
-        try:
-            # Download the image
-            response = requests.get(image_url, timeout=10)
-            if response.status_code != 200:
-                return None
-            
-            # Prepare the file data
-            filename = f"{post_title.replace(' ', '_')}_featured.jpg"
-            files = {
-                'file': (filename, response.content, 'image/jpeg')
-            }
-            
-            # Upload to WordPress
-            upload_response = requests.post(
-                f"{self.wordpress_url}/wp-json/wp/v2/media",
-                auth=(self.username, self.application_password),
-                files=files,
-                data={'title': f"{post_title} Featured Image"}
-            )
-            
-            if upload_response.status_code == 201:
-                media_data = upload_response.json()
-                return media_data['id']
-            else:
-                print(f"⚠️ Failed to upload featured image: {upload_response.status_code}")
-                return None
-                
-        except Exception as e:
-            print(f"⚠️ Error uploading featured image: {str(e)}")
-            return None
+    # NOTE: upload_featured_image method removed for Google API TOS compliance
+    # We link directly to Google Places photo URLs instead of downloading/storing them
     
 
     

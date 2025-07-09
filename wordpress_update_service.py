@@ -553,10 +553,26 @@ class WordPressUpdateService:
         </iframe>'''
     
     def _format_photo_urls(self, photo_urls) -> str:
-        """Format photo URLs for ACF"""
-        if isinstance(photo_urls, str):
-            return photo_urls
-        elif isinstance(photo_urls, list):
-            return json.dumps(photo_urls)
-        else:
-            return '[]' 
+        """Format photo URLs for ACF - convert to newline-separated format to match WordPress integration"""
+        if not photo_urls:
+            return ''
+        
+        try:
+            # Parse JSON string to get list of URLs
+            if isinstance(photo_urls, str):
+                photo_urls_list = json.loads(photo_urls)
+            else:
+                photo_urls_list = photo_urls
+            
+            if photo_urls_list and isinstance(photo_urls_list, list):
+                # Convert to newline-separated format (same as WordPress integration)
+                return '\n'.join(photo_urls_list)
+            else:
+                return str(photo_urls) if photo_urls else ''
+                
+        except json.JSONDecodeError:
+            # If it's not JSON, return as-is
+            return str(photo_urls) if photo_urls else ''
+        except Exception as e:
+            logger.error(f"❌ Error formatting photo URLs: {str(e)}")
+            return str(photo_urls) if photo_urls else '' 

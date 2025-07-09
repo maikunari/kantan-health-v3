@@ -369,29 +369,19 @@ function healthcare_register_acf_fields() {
         'show_in_rest' => 1,
     ));
 
-    // 5. PHOTO GALLERY FIELD GROUP
+    // 5. PHOTO GALLERY FIELD GROUP - Google Places API Direct Links (TOS Compliant)
     acf_add_local_field_group(array(
         'key' => 'group_photo_gallery',
-        'title' => 'Photo Gallery',
+        'title' => 'Photo Gallery (Google Places Direct Links)',
         'fields' => array(
             array(
-                'key' => 'field_photo_gallery',
-                'label' => 'Provider Photos',
-                'name' => 'photo_gallery',
-                'type' => 'gallery',
-                'instructions' => 'Photos of the healthcare facility',
-                'return_format' => 'array',
-                'preview_size' => 'thumbnail',
-                'library' => 'all',
-            ),
-            array(
                 'key' => 'field_photo_urls_raw',
-                'label' => 'Raw Photo URLs',
+                'label' => 'Google Places Photo URLs',
                 'name' => 'photo_urls',
                 'type' => 'textarea',
-                'instructions' => 'JSON array of photo URLs from Google Places',
+                'instructions' => 'Direct links to Google Places photos (TOS compliant - no downloads/storage)',
                 'readonly' => 1,
-                'rows' => 3,
+                'rows' => 5,
             ),
         ),
         'location' => array(
