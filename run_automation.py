@@ -80,17 +80,26 @@ def main():
         print("⏭️ Skipping data collection phase")
         providers = []
 
-    # Phase 2: AI Description Generation (Batch Processing)
+    # Phase 2: Location Population (if needed)
+    if not args.skip_collection:
+        print("🗺️ PHASE 2: Location Population")
+        print("=" * 50)
+        from populate_provider_locations import populate_missing_locations
+        populate_missing_locations()
+    else:
+        print("⏭️ Skipping location population phase")
+
+    # Phase 3: AI Description Generation (Batch Processing)
     if not args.skip_descriptions:
-        print("🤖 PHASE 2: AI Description Generation (Batch Processing)")
+        print("🤖 PHASE 3: AI Description Generation (Batch Processing)")
         print("=" * 50)
         run_batch_ai_description_generation(providers, batch_size=args.batch_size)
     else:
         print("⏭️ Skipping AI description generation phase")
 
-    # Phase 3: WordPress Publishing
+    # Phase 4: WordPress Publishing
     if not args.skip_publishing:
-        print("🌐 PHASE 3: WordPress Publishing")
+        print("🌐 PHASE 4: WordPress Publishing")
         print("=" * 50)
         run_wordpress_publishing()
     else:

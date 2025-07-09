@@ -340,7 +340,7 @@ class WordPressUpdateService:
             "latitude": provider.latitude or 0,
             "longitude": provider.longitude or 0,
             "nearest_station": provider.nearest_station or '',
-            "google_maps_embed": self._generate_google_maps_embed(provider.latitude, provider.longitude, provider.provider_name),
+            "google_maps_embed": self._generate_google_maps_embed(provider.latitude, provider.longitude, provider.provider_name, provider.address or ""),
             
             # Language Support
             "english_proficiency": provider.english_proficiency or 'Unknown',
@@ -528,17 +528,27 @@ class WordPressUpdateService:
         except Exception:
             return url
     
-    def _generate_google_maps_embed(self, latitude: float, longitude: float, provider_name: str) -> str:
-        """Generate Google Maps embed code"""
+    def _generate_google_maps_embed(self, latitude: float, longitude: float, provider_name: str, provider_address: str = "") -> str:
+        """Generate Google Maps embed code targeting the specific business"""
         if not latitude or not longitude:
             return ""
         
+        # Create a search query that targets the specific business
+        # This will show the business name and pin like Tokyo Medical University
+        if provider_address:
+            # Use business name + address for precise targeting
+            search_query = f"{provider_name} {provider_address}".replace(" ", "+")
+        else:
+            # Use business name + coordinates as fallback
+            search_query = f"{provider_name} {latitude},{longitude}".replace(" ", "+")
+        
+        # Use place search rather than raw coordinates for better targeting
         return f'''<iframe 
             width="100%" 
             height="300" 
             frameborder="0" 
             style="border:0" 
-            src="https://maps.google.com/maps?q={latitude},{longitude}&hl=en&z=15&output=embed" 
+            src="https://maps.google.com/maps?q={search_query}&hl=en&z=15&output=embed" 
             allowfullscreen>
         </iframe>'''
     

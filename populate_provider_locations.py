@@ -121,5 +121,51 @@ def main():
         print(f"❌ Error populating locations: {str(e)}")
         sys.exit(1)
 
+def populate_missing_locations():
+    """Populate missing locations for providers without coordinates (for automation pipeline)"""
+    try:
+        # Load API key
+        api_key = load_google_api_key()
+        if not api_key:
+            print("⚠️ Google API key not found, skipping location population")
+            return
+        
+        # Initialize database connection
+        collector = GooglePlacesHealthcareCollector()
+        session = collector.Session()
+        
+        # Get providers without location data
+        providers_without_location = session.query(Provider).filter(
+            Provider.latitude.is_(None)
+        ).limit(20).all()  # Limit to 20 for automation
+        
+        if not providers_without_location:
+            print("✅ All providers already have location data!")
+            session.close()
+            return
+        
+        print(f"📍 Populating coordinates for {len(providers_without_location)} providers...")
+        
+        updated_count = 0
+        for provider in providers_without_location:
+            lat, lng = geocode_provider(provider, api_key)
+            if lat and lng:
+                provider.latitude = lat
+                provider.longitude = lng
+                session.commit()
+                updated_count += 1
+                print(f"   ✅ Updated {provider.provider_name}")
+            else:
+                print(f"   ⚠️ Could not geocode {provider.provider_name}")
+            
+            # Rate limiting
+            time.sleep(0.2)
+        
+        print(f"✅ Updated coordinates for {updated_count} providers")
+        session.close()
+        
+    except Exception as e:
+        print(f"❌ Error populating locations: {str(e)}")
+
 if __name__ == "__main__":
     main() 

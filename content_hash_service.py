@@ -43,7 +43,8 @@ class ContentHashService:
                 'latitude': provider.latitude or 0,
                 'longitude': provider.longitude or 0,
                 'nearest_station': provider.nearest_station or '',
-                'photo_urls': provider.photo_urls or []
+                'photo_urls': provider.photo_urls or [],
+                'google_maps_embed': f"{provider.provider_name} {provider.address or ''} {provider.latitude or 0},{provider.longitude or 0}"
             }
             
             # Sort keys for consistent hashing

@@ -53,7 +53,7 @@ def test_acf_data_format():
         
         # Location & Navigation Field Group
         "nearest_station": getattr(provider, 'nearest_station', ''),
-        "google_maps_embed": wp.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name),
+        "google_maps_embed": wp.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name, getattr(provider, 'address', '')),
         
         # Language Support Field Group
         "english_proficiency": getattr(provider, 'english_proficiency', 'Unknown'),

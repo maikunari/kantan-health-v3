@@ -110,6 +110,21 @@ python3 run_automation.py --daily-limit 75 --batch-size 10
 python3 run_automation.py --daily-limit 5 --cities Tokyo --query-limit 50
 ```
 
+**WordPress sync commands:**
+```bash
+# Sync all providers needing updates
+python3 wordpress_sync_manager.py --sync-all --limit 20
+
+# Sync specific provider
+python3 wordpress_sync_manager.py --sync-provider "DENTAL OFFICE OTANI"
+
+# Dry run to preview changes
+python3 wordpress_sync_manager.py --sync-all --dry-run --limit 10
+
+# Check sync status
+python3 wordpress_sync_manager.py --status
+```
+
 ## Optimization Strategies
 
 ### For Maximum Provider Discovery

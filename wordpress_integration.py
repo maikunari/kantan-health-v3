@@ -200,7 +200,7 @@ class WordPressIntegration:
                     "latitude": getattr(provider, 'latitude', 0),
                     "longitude": getattr(provider, 'longitude', 0),
                     "nearest_station": getattr(provider, 'nearest_station', ''),
-                    "google_maps_embed": self.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name),
+                    "google_maps_embed": self.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name, self.clean_address(getattr(provider, 'address', ''))),
                     
                     # Language Support Field Group
                     "english_proficiency": getattr(provider, 'english_proficiency', 'Unknown'),
@@ -688,18 +688,27 @@ class WordPressIntegration:
         else:
             return "Parking availability unknown"
     
-    def generate_google_maps_embed(self, latitude, longitude, provider_name):
-        """Generate Google Maps embed code from coordinates"""
+    def generate_google_maps_embed(self, latitude, longitude, provider_name, provider_address=""):
+        """Generate Google Maps embed code targeting the specific business"""
         if not latitude or not longitude or latitude == 0 or longitude == 0:
             return ""
         
-        # Use Google Maps embed without API key (using query parameter)
+        # Create a search query that targets the specific business
+        # This will show the business name and pin like Tokyo Medical University
+        if provider_address:
+            # Use business name + address for precise targeting
+            search_query = f"{provider_name} {provider_address}".replace(" ", "+")
+        else:
+            # Use business name + coordinates as fallback
+            search_query = f"{provider_name} {latitude},{longitude}".replace(" ", "+")
+        
+        # Use place search rather than raw coordinates for better targeting
         embed_code = f'''<iframe 
             width="100%" 
             height="300" 
             frameborder="0" 
             style="border:0" 
-            src="https://maps.google.com/maps?q={latitude},{longitude}&hl=en&z=15&output=embed" 
+            src="https://maps.google.com/maps?q={search_query}&hl=en&z=15&output=embed" 
             allowfullscreen>
         </iframe>'''
         
