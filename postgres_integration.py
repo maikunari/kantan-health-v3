@@ -9,7 +9,7 @@ import os
 import time
 from typing import List, Dict, Tuple, Set, Any
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, text
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, text, TIMESTAMP
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 Base = declarative_base()
@@ -49,6 +49,10 @@ class Provider(Base):
     primary_fingerprint = Column(String(32))      # name + address + city hash
     secondary_fingerprint = Column(String(32))    # name + phone + city hash  
     fuzzy_fingerprint = Column(String(32))        # fuzzy matching fingerprint
+    # WordPress sync tracking columns
+    last_wordpress_sync = Column(TIMESTAMP)       # Last sync timestamp
+    content_hash = Column(String(64))             # SHA256 hash of content
+    wordpress_status = Column(String(20), default="pending")  # Sync status
 
 class Metric(Base):
     __tablename__ = "metrics"
@@ -86,7 +90,8 @@ class PostgresIntegration:
                 "review_content", "review_keywords", "review_highlights", "photo_urls",
                 "nearest_station", "latitude", "longitude", "status", "created_at", "wordpress_post_id", 
                 "ai_description", "ai_excerpt", "google_place_id", "business_hours", "wheelchair_accessible",
-                "parking_available"
+                "parking_available", "primary_fingerprint", "secondary_fingerprint", "fuzzy_fingerprint",
+                "last_wordpress_sync", "content_hash", "wordpress_status"
             }
             current_fields = set(Provider.__table__.columns.keys())
             missing_fields = expected_fields - current_fields

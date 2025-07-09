@@ -453,12 +453,18 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             )
             
             response_text = response.content[0].text.strip()
+            logger.info(f"Raw Claude response received ({len(response_text)} chars):")
+            logger.info(f"First 500 chars: {response_text[:500]}")
             descriptions = self._parse_batch_response(response_text, len(provider_batch))
             
-            # Log results
+            # Log results with paragraph structure analysis
             for provider_data, description in zip(provider_batch, descriptions):
                 provider_name = provider_data.get('provider_name', 'Unknown Provider')
-                logger.info(f"✅ Generated enhanced description for {provider_name}: {description[:50]}...")
+                word_count = len(description.split())
+                paragraph_count = len([p for p in description.split('\n\n') if p.strip()])
+                line_count = len([line for line in description.split('\n') if line.strip()])
+                
+                logger.info(f"✅ Generated enhanced description for {provider_name}: {word_count} words, {paragraph_count} paragraphs, {line_count} lines")
                 
             return descriptions
             
@@ -471,30 +477,39 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
         """Parse the batch response and extract individual multi-paragraph descriptions."""
         descriptions = []
         
-        # Method 1: Try regex split on numbered items
+        # Method 1: Try regex split on numbered items while preserving paragraph structure
         import re
+        
+        logger.info(f"Starting batch response parsing for {expected_count} descriptions")
         
         # Look for numbered items at the start of lines
         lines = response_text.split('\n')
-        current_description = ""
+        current_description_lines = []
         
         for line in lines:
+            original_line = line
             line = line.strip()
             
             # Check if line starts with a number followed by a dot (like "1. " or "2. ")
             if re.match(r'^\d+\.\s+', line):
                 # Save previous description if we have one
-                if current_description:
-                    descriptions.append(current_description.strip())
+                if current_description_lines:
+                    # Join with newlines to preserve paragraph structure
+                    description = '\n'.join(current_description_lines).strip()
+                    descriptions.append(description)
+                    logger.info(f"Parsed description {len(descriptions)}: {len(description.split())} words, {len(description.split(chr(10)+chr(10)))} paragraphs")
                 # Start new description (remove the number and dot)
-                current_description = re.sub(r'^\d+\.\s+', '', line)
-            elif current_description and line:
-                # Continue building current description
-                current_description += " " + line
+                first_line = re.sub(r'^\d+\.\s+', '', line)
+                current_description_lines = [first_line] if first_line else []
+            elif current_description_lines is not None:
+                # Add line preserving original formatting (including empty lines for paragraph breaks)
+                current_description_lines.append(original_line.rstrip())
         
         # Add the last description
-        if current_description:
-            descriptions.append(current_description.strip())
+        if current_description_lines:
+            description = '\n'.join(current_description_lines).strip()
+            descriptions.append(description)
+            logger.info(f"Parsed description {len(descriptions)}: {len(description.split())} words, {len(description.split(chr(10)+chr(10)))} paragraphs")
         
         # Method 2: If we don't have enough descriptions, try alternative parsing
         if len(descriptions) < expected_count:
@@ -509,7 +524,7 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
                 if i + 1 < len(sections):
                     description = sections[i + 1].strip()
                     if description:
-                        # Clean up any trailing numbering or extra content
+                        # Clean up any trailing numbering or extra content but preserve paragraph structure
                         description = re.sub(r'\n\d+\.\s+.*$', '', description, flags=re.DOTALL)
                         descriptions.append(description.strip())
         
@@ -525,7 +540,7 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
                 if i < len(parts):
                     description = parts[i].strip()
                     if description and len(description) > 50:  # Must be substantial
-                        # Clean up - remove any subsequent numbered items
+                        # Clean up - remove any subsequent numbered items but preserve paragraph structure
                         description = re.sub(r'\n\d+\.\s+.*$', '', description, flags=re.DOTALL)
                         descriptions.append(description.strip())
         
