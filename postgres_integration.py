@@ -32,6 +32,7 @@ class Provider(Base):
     review_content = Column(JSON)
     review_keywords = Column(JSON)
     review_highlights = Column(JSON)
+    review_summary = Column(Text)  # Narrative paragraph summary of reviews (80-100 words)
     photo_urls = Column(JSON)
     nearest_station = Column(Text)
     latitude = Column(Float)  # Store latitude for Google Maps

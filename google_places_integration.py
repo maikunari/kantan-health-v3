@@ -656,9 +656,38 @@ class GooglePlacesHealthcareCollector:
         # Use original provider name
         name = place_data.get('name', 'Unknown Provider')
 
-        # Translate city name using predefined list with fallback
+        # Enhanced city/district parsing to handle Tokyo's special ward structure
         address_components = place_data.get('address_components', [])
-        city = next((comp['long_name'] for comp in address_components if 'locality' in comp['types']), '')
+        
+        # Extract components
+        locality = next((comp['long_name'] for comp in address_components if 'locality' in comp['types']), '')
+        sublocality_level_1 = next((comp['long_name'] for comp in address_components if 'sublocality_level_1' in comp['types']), '')
+        administrative_area_level_1 = next((comp['long_name'] for comp in address_components if 'administrative_area_level_1' in comp['types']), '')
+        
+        # Smart city/district parsing
+        city = ''
+        district = ''
+        
+        if locality:
+            # Normal case: locality exists (e.g., "Osaka", "Yokohama")
+            city = locality
+            district = sublocality_level_1
+        elif not locality and administrative_area_level_1 in ['Tokyo', '東京都', 'Tokyo Metropolis'] and sublocality_level_1:
+            # Tokyo special case: no locality but prefecture is Tokyo and has sublocality_level_1
+            city = 'Tokyo'
+            # Clean up district name - remove "City" suffix for consistency
+            district = sublocality_level_1.replace(' City', '') if sublocality_level_1.endswith(' City') else sublocality_level_1
+            print(f"🏢 Tokyo address detected: City='{city}', District='{district}'")
+        elif locality:
+            # Fallback to locality
+            city = locality
+            district = sublocality_level_1
+        else:
+            # Last resort: try administrative_area_level_1 or sublocality_level_1
+            city = administrative_area_level_1 or sublocality_level_1
+            district = ''
+        
+        # Apply city translations
         if city:
             try:
                 lang = detect(city)
@@ -711,21 +740,20 @@ class GooglePlacesHealthcareCollector:
                 print(f"⚠️ Prefecture detection error for {prefecture}: {str(e)}")
                 prefecture = prefecture  # Fallback to original
 
-        # Extract area/district (sublocality_level_1 - ward/district within city)
-        area = next((comp['long_name'] for comp in address_components if 'sublocality_level_1' in comp['types']), '') if isinstance(address_components, list) else ''
-        if area:
+        # Apply district translations if needed
+        if district:
             try:
-                lang = detect(area)
-                if lang == 'ja' and area in self.city_translations:
-                    translated_area = self.city_translations[area]
-                    print(f"ℹ️ Translated area '{area}' to '{translated_area}'")
-                    area = translated_area
-                elif lang == 'ja' and area not in self.city_translations:
-                    print(f"ℹ️ Area in Japanese: '{area}', keeping original")
+                lang = detect(district)
+                if lang == 'ja' and district in self.city_translations:
+                    translated_district = self.city_translations[district]
+                    print(f"ℹ️ Translated district '{district}' to '{translated_district}'")
+                    district = translated_district
+                elif lang == 'ja' and district not in self.city_translations:
+                    print(f"ℹ️ District in Japanese: '{district}', keeping original")
                     # Keep original for now - area names are often kept in Japanese
             except Exception as e:
-                print(f"⚠️ Area detection error for {area}: {str(e)}")
-                area = area  # Fallback to original
+                print(f"⚠️ District detection error for {district}: {str(e)}")
+                district = district  # Fallback to original
 
         postal_code = next((comp['long_name'] for comp in address_components if 'postal_code' in comp['types']), '') if isinstance(address_components, list) else ''
 
@@ -734,7 +762,7 @@ class GooglePlacesHealthcareCollector:
             'address': self.clean_address(place_data.get('formatted_address', '')),
             'city': city,
             'prefecture': prefecture,
-            'district': area,  # Add district from sublocality_level_1
+            'district': district,  # Now correctly parsed
             'phone': place_data.get('formatted_phone_number', ''),
             'website': self.clean_website_url(place_data.get('website', '')),
             'specialties': self.determine_medical_specialties(place_data) if isinstance(place_data, dict) else [],

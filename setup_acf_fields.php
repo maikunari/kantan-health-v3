@@ -183,6 +183,14 @@ function healthcare_register_acf_fields() {
                 'wrapper' => array('width' => '33'),
             ),
             array(
+                'key' => 'field_district',
+                'label' => 'District/Ward',
+                'name' => 'district',
+                'type' => 'text',
+                'instructions' => 'District or ward within the city (e.g., Shibuya, Minato)',
+                'wrapper' => array('width' => '33'),
+            ),
+            array(
                 'key' => 'field_nearest_station',
                 'label' => 'Nearest Station',
                 'name' => 'nearest_station',
@@ -414,6 +422,15 @@ function healthcare_register_acf_fields() {
                 'rows' => 3,
             ),
             array(
+                'key' => 'field_review_summary',
+                'label' => 'Patient Review Summary',
+                'name' => 'review_summary',
+                'type' => 'textarea',
+                'instructions' => 'AI-generated narrative summary of patient reviews (80-100 words)',
+                'readonly' => 1,
+                'rows' => 5,
+            ),
+            array(
                 'key' => 'field_patient_highlights',
                 'label' => 'Patient Experience Highlights',
                 'name' => 'patient_highlights',
@@ -634,7 +651,8 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         
         // Location & Navigation Field Group
         'latitude' => 'latitude',
-        'longitude' => 'longitude', 
+        'longitude' => 'longitude',
+        'district' => 'district',
         'nearest_station' => 'nearest_station',
         
         // Language Support Field Group
