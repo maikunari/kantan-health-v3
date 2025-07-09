@@ -180,7 +180,7 @@ healthcare_directory_v2/
 ### Environment Setup
 Create `config/.env` with:
 ```
-GOOGLE_API_KEY=your_google_places_api_key
+GOOGLE_PLACES_API_KEY=your_google_places_api_key
 ANTHROPIC_API_KEY=your_claude_api_key
 POSTGRES_USER=your_db_user
 POSTGRES_PASSWORD=your_db_password
@@ -226,6 +226,218 @@ WORDPRESS_APP_PASSWORD=your_wp_app_password
 - **Cause**: Too many requests too quickly
 - **Solution**: Lower daily-limit or use built-in rate limiting
 
+## Updating Existing Providers
+
+When you implement fixes or improvements, you can update existing providers in the database without re-collecting data. The system provides several methods for updating providers with new AI descriptions, location data, and other enhancements.
+
+### Available Update Scripts
+
+| Script | Purpose | Use Case |
+|--------|---------|----------|
+| `update_existing_providers.py` | Comprehensive updates | Most flexible, full control |
+| `force_update_all.py` | Quick updates | Simple, fast updates |
+| `populate_provider_locations.py` | Location data only | Google Maps coordinates |
+
+### Comprehensive Update Script (`update_existing_providers.py`)
+
+This is the most powerful script for updating existing providers. It bypasses the normal filtering logic and gives you complete control.
+
+#### Update Enhanced Descriptions & Excerpts
+
+```bash
+# Update descriptions for specific city (recommended for testing)
+python3 update_existing_providers.py --descriptions --city "Yokohama" --limit 10
+
+# Update descriptions for all providers (use with caution)
+python3 update_existing_providers.py --descriptions --limit 50
+
+# Force update even if descriptions already exist
+python3 update_existing_providers.py --descriptions --force --limit 20
+
+# Update only published providers
+python3 update_existing_providers.py --descriptions --status "published" --limit 15
+
+# Custom batch size for AI generation
+python3 update_existing_providers.py --descriptions --batch-size 3 --limit 15
+```
+
+#### Update Location Data (Google Maps)
+
+```bash
+# Add latitude/longitude for providers missing location data
+python3 update_existing_providers.py --locations --limit 20
+
+# Update specific city
+python3 update_existing_providers.py --locations --city "Tokyo" --limit 25
+
+# Update all providers in a city
+python3 update_existing_providers.py --locations --city "Osaka" --limit 100
+```
+
+#### Clear and Regenerate Content
+
+```bash
+# Clear existing descriptions to force regeneration
+python3 update_existing_providers.py --clear --city "Yokohama" --limit 10
+
+# Then regenerate with enhanced format
+python3 update_existing_providers.py --descriptions --city "Yokohama" --limit 10
+```
+
+#### Update Everything
+
+```bash
+# Update both descriptions and locations
+python3 update_existing_providers.py --all --city "Yokohama" --limit 10
+
+# Update everything with custom settings
+python3 update_existing_providers.py --all --limit 25 --batch-size 3 --force
+```
+
+### Quick Update Script (`force_update_all.py`)
+
+For simple, fast updates without command line arguments:
+
+```bash
+# Update all providers (50 limit)
+python3 force_update_all.py
+
+# Update specific city
+python3 force_update_all.py "Yokohama"
+
+# Update specific city with custom limit
+python3 force_update_all.py "Tokyo" 25
+```
+
+### Location Population Script (`populate_provider_locations.py`)
+
+Specifically for adding Google Maps coordinates:
+
+```bash
+# Add coordinates for providers missing location data
+python3 populate_provider_locations.py
+```
+
+### Command Line Parameters
+
+#### `update_existing_providers.py` Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--descriptions` | flag | Update AI descriptions and excerpts |
+| `--locations` | flag | Update latitude/longitude for Google Maps |
+| `--clear` | flag | Clear existing descriptions for regeneration |
+| `--all` | flag | Update everything (descriptions + locations) |
+| `--city` | string | Filter by specific city |
+| `--limit` | int | Limit number of providers to process |
+| `--status` | string | Filter by status (pending, description_generated, published) |
+| `--force` | flag | Force update even if content exists |
+| `--batch-size` | int | Batch size for AI generation (default: 5) |
+
+### Recommended Update Workflow
+
+When implementing fixes like enhanced descriptions or location data:
+
+#### 1. Test with Small Batch First
+```bash
+python3 update_existing_providers.py --descriptions --city "Yokohama" --limit 5
+```
+
+#### 2. Check Results and Scale Up
+```bash
+python3 update_existing_providers.py --descriptions --city "Yokohama" --limit 20
+```
+
+#### 3. Add Location Data
+```bash
+python3 update_existing_providers.py --locations --city "Yokohama" --limit 20
+```
+
+#### 4. Sync to WordPress
+```bash
+python3 wordpress_integration.py
+```
+
+### Update Strategies
+
+#### For Description Quality Improvements
+```bash
+# Clear old descriptions and regenerate with latest prompts
+python3 update_existing_providers.py --clear --limit 30
+python3 update_existing_providers.py --descriptions --limit 30
+```
+
+#### For Google Maps Fix
+```bash
+# Add coordinates to enable maps
+python3 update_existing_providers.py --locations --limit 50
+```
+
+#### For Complete Refresh
+```bash
+# Clear and update everything
+python3 update_existing_providers.py --clear --limit 20
+python3 update_existing_providers.py --all --limit 20
+```
+
+### Filtering Logic
+
+The update scripts bypass the normal filtering in `run_automation.py` that prevents updating providers with existing content. This allows you to:
+
+- Update providers that already have AI descriptions
+- Force regeneration with improved prompts
+- Add missing data like location coordinates
+- Update published providers in WordPress
+
+### Cost Considerations
+
+#### Description Updates
+- **Claude AI**: ~$0.01 per provider for descriptions + excerpts
+- **Batch processing**: Reduces costs by ~40%
+
+#### Location Updates
+- **Google Geocoding API**: ~$0.005 per provider
+- **Rate limiting**: 200ms delay between requests
+
+#### Example Costs
+| Update Type | 20 Providers | 50 Providers | 100 Providers |
+|-------------|--------------|--------------|---------------|
+| Descriptions | $0.12 | $0.30 | $0.60 |
+| Locations | $0.10 | $0.25 | $0.50 |
+| Both | $0.22 | $0.55 | $1.10 |
+
+### WordPress Integration
+
+After updating providers, sync changes to WordPress:
+
+```bash
+# Sync all providers ready for publishing
+python3 wordpress_integration.py
+
+# Check WordPress posts to verify updates
+# - Enhanced descriptions appear in ACF wysiwyg field
+# - Excerpts sync to both ACF and native WordPress excerpt
+# - Google Maps display with latitude/longitude coordinates
+```
+
+### Troubleshooting Updates
+
+#### API Key Issues
+- **Error**: "❌ Google API key required for location updates"
+- **Fix**: Check `config/.env` has `GOOGLE_PLACES_API_KEY=your_key`
+
+#### Rate Limiting
+- **Error**: 429 Too Many Requests
+- **Fix**: Built-in rate limiting included (200ms delays)
+
+#### Memory Issues
+- **Error**: Large batch processing fails
+- **Fix**: Reduce `--batch-size` to 3 or lower
+
+#### Mixed Results
+- **Issue**: Some providers update, others don't
+- **Fix**: Check database constraints and API responses in logs
+
 ## Recent Improvements
 
 ### Fixed Issues
@@ -233,12 +445,15 @@ WORDPRESS_APP_PASSWORD=your_wp_app_password
 - ✅ **Specialty formatting** standardized to proper display format
 - ✅ **Description quality** improved with 140-150 word structured format
 - ✅ **Batch processing** implemented for cost efficiency
+- ✅ **Location data** added for Google Maps integration
+- ✅ **Update scripts** created for existing provider maintenance
 
 ### Enhanced Features
 - ✅ **Flexible command line options** for different use cases
 - ✅ **Smart deduplication** using multiple fingerprinting methods
 - ✅ **Comprehensive logging** for debugging and monitoring
 - ✅ **Phase skipping** for partial runs
+- ✅ **Provider update tools** for maintenance and improvements
 
 ## Support
 

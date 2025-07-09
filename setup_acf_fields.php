@@ -164,7 +164,24 @@ function healthcare_register_acf_fields() {
         'key' => 'group_location_navigation',
         'title' => 'Location & Navigation',
         'fields' => array(
-
+            array(
+                'key' => 'field_latitude',
+                'label' => 'Latitude',
+                'name' => 'latitude',
+                'type' => 'number',
+                'instructions' => 'Geographic latitude coordinate',
+                'step' => 0.000001,
+                'wrapper' => array('width' => '33'),
+            ),
+            array(
+                'key' => 'field_longitude',
+                'label' => 'Longitude',
+                'name' => 'longitude',
+                'type' => 'number',
+                'instructions' => 'Geographic longitude coordinate',
+                'step' => 0.000001,
+                'wrapper' => array('width' => '33'),
+            ),
             array(
                 'key' => 'field_nearest_station',
                 'label' => 'Nearest Station',
@@ -626,6 +643,8 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         'ai_excerpt' => 'ai_excerpt',
         
         // Location & Navigation Field Group
+        'latitude' => 'latitude',
+        'longitude' => 'longitude', 
         'nearest_station' => 'nearest_station',
         
         // Language Support Field Group

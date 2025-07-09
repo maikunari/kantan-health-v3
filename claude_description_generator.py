@@ -203,19 +203,19 @@ FACILITY INFORMATION:
 - Parking Available: {'Yes' if parking_available else 'Not specified'}
 
 INSTRUCTIONS:
-Write a comprehensive 140-150 word description in TWO paragraphs that flow naturally together:
+Write a comprehensive 150-175 word description in TWO paragraphs that flow naturally together:
 
-PARAGRAPH 1 (75-80 words): Focus on core medical services and specialty expertise
+PARAGRAPH 1 (80-90 words): Focus on core medical services and specialty expertise
 - What medical services they provide and their specialty focus
 - Their English language capabilities for international patients
 - Key professional strengths or unique features that set them apart
 
-PARAGRAPH 2 (65-70 words): Focus on patient experience and practical information  
+PARAGRAPH 2 (70-85 words): Focus on patient experience and practical information  
 - Patient experience highlights from reviews (specific feedback when available)
 - Practical details (location, accessibility, parking) that help patients decide
 - Convenience factors that matter to patients (NO phone numbers or website mentions)
 
-WORD COUNT REQUIREMENT: Keep total description between 140-150 words exactly. Count carefully to stay within this range.
+WORD COUNT REQUIREMENT: Keep total description between 150-175 words exactly. Count carefully to stay within this range.
 
 Make it sound like a knowledgeable local would describe this provider to a friend. Use specific patient feedback when available, avoid generic phrases. Ensure the two paragraphs flow naturally together with smooth transitions - the second paragraph should build upon the first to create one cohesive story about the provider's complete offering.
 """
@@ -282,8 +282,8 @@ Keep it conversational and informative - like explaining to a friend why this pr
             # Generate description
             description_response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=400,  # Adjusted for 140-150 word descriptions
-                temperature=0.7,
+                max_tokens=500,  # Adjusted for 150-175 word descriptions
+                temperature=0.6,  # More consistent formatting
                 messages=[{"role": "user", "content": description_prompt}]
             )
             description = description_response.content[0].text.strip()
@@ -311,7 +311,7 @@ Keep it conversational and informative - like explaining to a friend why this pr
         description, _ = self.generate_description_and_excerpt(provider_data)
         return description
 
-    def generate_batch_descriptions(self, provider_data_list, batch_size=5):
+    def generate_batch_descriptions(self, provider_data_list, batch_size=3):
         """Generate descriptions for a batch of providers in a single API call.
         
         Args:
@@ -334,7 +334,7 @@ Keep it conversational and informative - like explaining to a friend why this pr
             
         return all_descriptions
 
-    def generate_batch_excerpts(self, provider_data_list, batch_size=5):
+    def generate_batch_excerpts(self, provider_data_list, batch_size=3):
         """Generate excerpts for a batch of providers in a single API call.
         
         Args:
@@ -404,41 +404,51 @@ Provider {idx}: {provider_name}
 - Accessibility: {'Wheelchair accessible' if wheelchair_accessible else 'Not specified'}""")
 
         batch_prompt = f"""
-Write comprehensive 140-150 word descriptions for these {len(provider_batch)} healthcare providers. Each description should be formatted in TWO paragraphs that flow naturally together.
+Write comprehensive 150-175 word descriptions for these {len(provider_batch)} healthcare providers. Each description MUST be formatted in EXACTLY TWO paragraphs separated by a line break.
 
 {chr(10).join(provider_details)}
 
-INSTRUCTIONS FOR EACH DESCRIPTION:
-Format each as TWO paragraphs (140-150 words total):
+CRITICAL FORMATTING REQUIREMENTS:
+Each description MUST have EXACTLY TWO paragraphs (150-175 words total):
 
-PARAGRAPH 1 (75-80 words): Core medical services and expertise
-- Medical specialty and location
-- English language capabilities for international patients
+PARAGRAPH 1 (80-90 words): Core medical services and expertise
+- Medical specialty and location details
+- English language capabilities for international patients  
 - Key professional strengths or unique features that set them apart
+- Medical credentials or specialized services offered
 
-PARAGRAPH 2 (65-70 words): Patient experience and practical information
+PARAGRAPH 2 (70-85 words): Patient experience and practical information
 - Patient experience highlights from reviews (specific feedback when available)
 - Practical details (accessibility, parking, location convenience)
 - Convenience factors that matter to patients (NO phone numbers or website mentions)
+- Overall patient satisfaction and facility quality
 
-WORD COUNT REQUIREMENT: Keep each description between 140-150 words exactly. Count carefully to stay within this range for ALL descriptions.
+WORD COUNT REQUIREMENT: Keep each description between 150-175 words exactly. Use EXACTLY TWO paragraphs separated by a blank line.
 
 Make each description sound like a knowledgeable local recommending the provider. Use specific patient feedback when available, avoid generic phrases. Ensure the two paragraphs flow naturally together with smooth transitions - the second paragraph should build upon the first to create one cohesive story about each provider's complete offering.
 
-Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provider_batch)}:
+FORMATTING EXAMPLE:
+1. Provider Name specializes in [specialty] and offers [services]. With [English support details], they cater to international patients. [More details about medical expertise and unique features].
 
-1. [Two-paragraph description for Provider 1]
-2. [Two-paragraph description for Provider 2]
-3. [Two-paragraph description for Provider 3]
-...and so on.
+[Patient experience details]. [Practical information about accessibility, location, convenience]. [Overall assessment of quality and why patients choose this provider].
+
+Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provider_batch)} with this EXACT format:
+
+1. [First paragraph]
+
+[Second paragraph]
+
+2. [First paragraph]
+
+[Second paragraph]
 """
 
         try:
             logger.info(f"Generating enhanced batch descriptions for {len(provider_batch)} providers")
             response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=550 * len(provider_batch),  # Increased for 150-160 word two-paragraph descriptions
-                temperature=0.7,
+                max_tokens=700 * len(provider_batch),  # Optimized for 150-175 word two-paragraph descriptions
+                temperature=0.6,  # More consistent formatting and word counts
                 messages=[{"role": "user", "content": batch_prompt}]
             )
             
@@ -458,23 +468,78 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             return fallback_descriptions
 
     def _parse_batch_response(self, response_text, expected_count):
-        """Parse the batch response and extract individual descriptions."""
+        """Parse the batch response and extract individual multi-paragraph descriptions."""
         descriptions = []
+        
+        # Method 1: Try regex split on numbered items
+        import re
+        
+        # Look for numbered items at the start of lines
         lines = response_text.split('\n')
+        current_description = ""
         
         for line in lines:
             line = line.strip()
-            # Look for numbered items (1. 2. 3. etc.)
-            if line and len(line) > 3 and line[0].isdigit() and line[1:3] in ['. ', ') ']:
-                # Extract description after the number
-                description = line[3:].strip()
-                if description:
-                    descriptions.append(description)
+            
+            # Check if line starts with a number followed by a dot (like "1. " or "2. ")
+            if re.match(r'^\d+\.\s+', line):
+                # Save previous description if we have one
+                if current_description:
+                    descriptions.append(current_description.strip())
+                # Start new description (remove the number and dot)
+                current_description = re.sub(r'^\d+\.\s+', '', line)
+            elif current_description and line:
+                # Continue building current description
+                current_description += " " + line
         
-        # If parsing fails or we don't get enough descriptions, fill with fallbacks
+        # Add the last description
+        if current_description:
+            descriptions.append(current_description.strip())
+        
+        # Method 2: If we don't have enough descriptions, try alternative parsing
+        if len(descriptions) < expected_count:
+            logger.warning(f"First parsing method got {len(descriptions)} descriptions, trying alternative method")
+            
+            # Try splitting on numbered patterns in the middle of text
+            pattern = r'\n(\d+)\.\s+'
+            sections = re.split(pattern, response_text)
+            
+            descriptions = []
+            for i in range(1, len(sections), 2):
+                if i + 1 < len(sections):
+                    description = sections[i + 1].strip()
+                    if description:
+                        # Clean up any trailing numbering or extra content
+                        description = re.sub(r'\n\d+\.\s+.*$', '', description, flags=re.DOTALL)
+                        descriptions.append(description.strip())
+        
+        # Method 3: Last resort - split on any numbered pattern and clean up
+        if len(descriptions) < expected_count:
+            logger.warning(f"Second parsing method got {len(descriptions)} descriptions, trying final method")
+            
+            # Split on any occurrence of number followed by period
+            parts = re.split(r'\b(\d+)\.\s+', response_text)
+            
+            descriptions = []
+            for i in range(2, len(parts), 2):  # Skip first empty part and first number
+                if i < len(parts):
+                    description = parts[i].strip()
+                    if description and len(description) > 50:  # Must be substantial
+                        # Clean up - remove any subsequent numbered items
+                        description = re.sub(r'\n\d+\.\s+.*$', '', description, flags=re.DOTALL)
+                        descriptions.append(description.strip())
+        
+        # Log parsing results
+        logger.info(f"Parsed {len(descriptions)} descriptions from response")
+        for i, desc in enumerate(descriptions):
+            word_count = len(desc.split())
+            logger.info(f"  Description {i+1}: {word_count} words")
+        
+        # Fill with fallbacks if we still don't have enough
         while len(descriptions) < expected_count:
             descriptions.append("Professional healthcare provider offering quality medical services.")
-            
+            logger.warning(f"Added fallback description for provider {len(descriptions)}")
+        
         # If we got too many, trim to expected count
         return descriptions[:expected_count]
 
@@ -669,7 +734,7 @@ def run_ai_description_generation(providers):
     
     session.close()
 
-def run_batch_ai_description_generation(providers, batch_size=5):
+def run_batch_ai_description_generation(providers, batch_size=3):
     """Generate descriptions for a list of providers using batch processing for efficiency.
     
     Args:
