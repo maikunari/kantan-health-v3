@@ -334,6 +334,7 @@ class WordPressUpdateService:
             "hours_friday": self._get_day_hours(provider.business_hours or {}, 'Friday'),
             "hours_saturday": self._get_day_hours(provider.business_hours or {}, 'Saturday'),
             "hours_sunday": self._get_day_hours(provider.business_hours or {}, 'Sunday'),
+            "open_now": self._get_open_now_status(provider.business_hours or {}),
             
             # Location & Navigation
             "latitude": provider.latitude or 0,
@@ -370,10 +371,19 @@ class WordPressUpdateService:
                 INSERT INTO wordpress_sync_log 
                 (provider_id, wordpress_post_id, sync_type, sync_status, content_hash, 
                  sync_duration_ms, error_message, sync_metadata)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (:provider_id, :wordpress_post_id, :sync_type, :sync_status, :content_hash, 
+                 :sync_duration_ms, :error_message, :sync_metadata)
                 """),
-                (provider_id, wordpress_post_id, sync_type, sync_status, content_hash, 
-                 duration_ms, error_message, json.dumps({'timestamp': datetime.now().isoformat()}))
+                {
+                    'provider_id': provider_id,
+                    'wordpress_post_id': wordpress_post_id,
+                    'sync_type': sync_type,
+                    'sync_status': sync_status,
+                    'content_hash': content_hash,
+                    'sync_duration_ms': duration_ms,
+                    'error_message': error_message,
+                    'sync_metadata': json.dumps({'timestamp': datetime.now().isoformat()})
+                }
             )
             
             session.commit()
@@ -385,43 +395,102 @@ class WordPressUpdateService:
     # Helper methods (simplified versions of wordpress_integration.py methods)
     def _format_business_hours_display(self, business_hours: dict) -> str:
         """Format business hours for display"""
-        if not business_hours:
+        if not business_hours or not isinstance(business_hours, dict):
             return "Hours not available"
         
-        formatted_hours = []
-        for day, hours in business_hours.items():
-            if hours and hours != "Closed":
-                formatted_hours.append(f"{day}: {hours}")
-            else:
-                formatted_hours.append(f"{day}: Closed")
+        # If we have display_text from Google Places, use that
+        if 'display_text' in business_hours:
+            return "\n".join(business_hours['display_text'])
         
-        return "\n".join(formatted_hours) if formatted_hours else "Hours not available"
+        # Otherwise, format from formatted_hours
+        if 'formatted_hours' in business_hours:
+            formatted_lines = []
+            days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            for day in days_order:
+                if day in business_hours['formatted_hours']:
+                    hours = business_hours['formatted_hours'][day]
+                    if hours.get('open') and hours.get('close'):
+                        formatted_lines.append(f"{day}: {hours['open']} - {hours['close']}")
+                    else:
+                        formatted_lines.append(f"{day}: Closed")
+                else:
+                    formatted_lines.append(f"{day}: Hours not available")
+            
+            return "\n".join(formatted_lines)
+        
+        return "Hours not available"
     
     def _format_business_hours_for_acf(self, business_hours: dict) -> str:
         """Format business hours for ACF field"""
-        return json.dumps(business_hours) if business_hours else '{}'
+        if not business_hours or not isinstance(business_hours, dict):
+            return ""
+        
+        # If we have display_text from Google Places, use that
+        if 'display_text' in business_hours:
+            return "\n".join(business_hours['display_text'])
+        
+        # Otherwise, format from formatted_hours
+        if 'formatted_hours' in business_hours:
+            formatted_lines = []
+            days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            for day in days_order:
+                if day in business_hours['formatted_hours']:
+                    hours = business_hours['formatted_hours'][day]
+                    if hours.get('open') and hours.get('close'):
+                        formatted_lines.append(f"{day}: {hours['open']} - {hours['close']}")
+                    else:
+                        formatted_lines.append(f"{day}: Closed")
+                else:
+                    formatted_lines.append(f"{day}: Hours not available")
+            
+            return "\n".join(formatted_lines)
+        
+        return ""
     
     def _get_day_hours(self, business_hours: dict, day: str) -> str:
         """Get hours for specific day"""
-        return business_hours.get(day, 'Closed') if business_hours else 'Closed'
+        if not business_hours or not isinstance(business_hours, dict):
+            return "Hours not available"
+        
+        if 'formatted_hours' in business_hours and day in business_hours['formatted_hours']:
+            hours = business_hours['formatted_hours'][day]
+            if hours.get('open') and hours.get('close'):
+                return f"{hours['open']} - {hours['close']}"
+            else:
+                return "Closed"
+        
+        return "Hours not available"
+    
+    def _get_open_now_status(self, business_hours: dict) -> str:
+        """Get open now status from Google Places data"""
+        if not business_hours or not isinstance(business_hours, dict):
+            return "Status unknown"
+        
+        # Use the open_now status from Google Places if available
+        if 'open_now' in business_hours:
+            return "Open Now" if business_hours['open_now'] else "Closed"
+        
+        return "Status unknown"
     
     def _format_wheelchair_accessibility(self, accessible) -> str:
         """Format wheelchair accessibility for ACF"""
         if accessible is True or accessible == "true":
-            return "Yes"
+            return "Wheelchair accessible"
         elif accessible is False or accessible == "false":
-            return "No"
+            return "Not wheelchair accessible"
         else:
-            return "Unknown"
+            return "Wheelchair accessibility unknown"
     
     def _format_parking_availability(self, available) -> str:
         """Format parking availability for ACF"""
         if available is True or available == "true":
-            return "Yes"
+            return "Parking is available"
         elif available is False or available == "false":
-            return "No"
+            return "Parking is not available"
         else:
-            return "Unknown"
+            return "Parking unknown"
     
     def _format_accessibility(self, accessible) -> str:
         """Format accessibility for display"""

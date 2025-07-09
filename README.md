@@ -455,9 +455,382 @@ python3 wordpress_integration.py
 - ✅ **Phase skipping** for partial runs
 - ✅ **Provider update tools** for maintenance and improvements
 
+---
+
+# WordPress Sync Enhancement System
+
+## Overview
+
+The WordPress Sync Enhancement system provides **bidirectional content synchronization** between the PostgreSQL database and WordPress CMS. This solves the critical gap where the healthcare directory could create new WordPress posts but couldn't update existing ones when database descriptions were enhanced.
+
+### Key Features
+
+- **Bidirectional Sync**: Update existing WordPress posts with current database content
+- **Change Detection**: SHA256-based content hashing for precise change identification
+- **Selective Operations**: Sync by provider, city, specialty, or status
+- **Batch Processing**: Efficient handling of 100+ providers with rate limiting
+- **Dry-run Mode**: Preview changes without executing them
+- **Comprehensive Logging**: Complete audit trail of all operations
+- **Error Recovery**: Robust error handling and retry mechanisms
+- **Performance Monitoring**: Detailed statistics and success rate tracking
+
+### Database Schema
+
+The system adds these tables and columns:
+
+**New Table: `wordpress_sync_log`**
+- Comprehensive audit trail of all sync operations
+- Tracks success/failure rates, duration, and errors
+- Links to provider records for complete history
+
+**Enhanced `providers` table:**
+- `last_wordpress_sync`: Timestamp of last sync operation
+- `content_hash`: SHA256 hash for change detection
+- `wordpress_status`: Current sync status (pending, synced, failed)
+
+## WordPress Sync Commands
+
+### Connection Testing
+
+Test WordPress API connectivity:
+```bash
+python3 wordpress_sync_manager.py --test-connection
+```
+
+### Status Checking
+
+View current sync status:
+```bash
+# Show overall sync status and statistics
+python3 wordpress_sync_manager.py --status
+
+# Check specific provider sync status
+python3 wordpress_sync_manager.py --check-provider "PROVIDER_NAME"
+
+# View sync operation history
+python3 wordpress_sync_manager.py --history
+```
+
+### Individual Provider Sync
+
+Sync a specific provider:
+```bash
+# Dry-run to preview changes
+python3 wordpress_sync_manager.py --sync-provider "DENTAL OFFICE OTANI" --dry-run
+
+# Execute the sync
+python3 wordpress_sync_manager.py --sync-provider "DENTAL OFFICE OTANI"
+
+# Force sync even if content appears unchanged
+python3 wordpress_sync_manager.py --sync-provider "DENTAL OFFICE OTANI" --force
+```
+
+### Bulk Sync Operations
+
+Sync multiple providers:
+```bash
+# Sync all providers needing updates (dry-run)
+python3 wordpress_sync_manager.py --sync-all --dry-run
+
+# Sync all with custom limit
+python3 wordpress_sync_manager.py --sync-all --limit 20
+
+# Sync providers in specific city
+python3 wordpress_sync_manager.py --sync-city "Tokyo" --dry-run
+python3 wordpress_sync_manager.py --sync-city "Osaka" --limit 15
+
+# Sync providers by specialty
+python3 wordpress_sync_manager.py --sync-specialty "Dentistry" --dry-run
+```
+
+### Command Line Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--sync-provider NAME` | string | Sync specific provider by name |
+| `--sync-all` | flag | Sync all providers needing updates |
+| `--sync-city CITY` | string | Sync providers in specific city |
+| `--sync-specialty TYPE` | string | Sync providers with specific specialty |
+| `--dry-run` | flag | Preview changes without executing |
+| `--limit NUMBER` | int | Limit number of providers to process |
+| `--force` | flag | Force update even if content appears unchanged |
+| `--status` | flag | Show sync status for all providers |
+| `--check-provider NAME` | string | Check sync status for specific provider |
+| `--history` | flag | Show sync operation history |
+| `--test-connection` | flag | Test WordPress API connection |
+
+## Usage Examples
+
+### Safe Testing Workflow
+
+Always start with dry-runs to preview changes:
+
+```bash
+# 1. Test connection
+python3 wordpress_sync_manager.py --test-connection
+
+# 2. Check current status
+python3 wordpress_sync_manager.py --status
+
+# 3. Preview what would be updated
+python3 wordpress_sync_manager.py --sync-all --dry-run --limit 5
+
+# 4. Execute small batch
+python3 wordpress_sync_manager.py --sync-all --limit 5
+
+# 5. Check results
+python3 wordpress_sync_manager.py --history
+```
+
+### Production Sync Workflow
+
+For production updates:
+
+```bash
+# 1. Check system status
+python3 wordpress_sync_manager.py --status
+
+# 2. Sync high-priority providers first
+python3 wordpress_sync_manager.py --sync-city "Tokyo" --limit 10
+
+# 3. Sync remaining providers in batches
+python3 wordpress_sync_manager.py --sync-all --limit 25
+
+# 4. Monitor results
+python3 wordpress_sync_manager.py --status
+```
+
+### Targeted Updates
+
+For specific maintenance tasks:
+
+```bash
+# Update all providers in Osaka
+python3 wordpress_sync_manager.py --sync-city "Osaka"
+
+# Update all dental clinics
+python3 wordpress_sync_manager.py --sync-specialty "Dentistry" --limit 20
+
+# Force update specific provider
+python3 wordpress_sync_manager.py --sync-provider "St. Luke's International Hospital" --force
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. ACF Field Validation Errors
+
+**Error:** `acf[wheelchair_accessible] is not one of Wheelchair accessible, Not wheelchair accessible, Wheelchair accessibility unknown`
+
+**Solution:** The system now maps database values to WordPress ACF field values:
+- Database `true/false` → WordPress `"Wheelchair accessible"/"Not wheelchair accessible"`
+- Database `true/false` → WordPress `"Parking is available"/"Parking is not available"`
+
+#### 2. WordPress API Authentication
+
+**Error:** `403 Forbidden` or authentication failures
+
+**Solution:** Check WordPress credentials in `config/.env`:
+```bash
+WORDPRESS_URL=https://your-site.com
+WORDPRESS_USERNAME=your_username
+WORDPRESS_APPLICATION_PASSWORD=your_app_password
+```
+
+#### 3. Rate Limiting
+
+**Error:** `429 Too Many Requests`
+
+**Solution:** The system includes built-in rate limiting:
+- 2-second delays between batches
+- Batch size of 10 providers (adjustable)
+- Automatic retry mechanisms
+
+#### 4. Database Connection Issues
+
+**Error:** `Textual SQL expression should be explicitly declared as text()`
+
+**Solution:** All SQL queries are now properly wrapped with `text()` for SQLAlchemy compatibility.
+
+#### 5. Content Hash Mismatches
+
+**Issue:** Providers show as needing updates when they haven't changed
+
+**Solution:** Clear content hashes to force recalculation:
+```sql
+UPDATE providers SET content_hash = NULL WHERE id = [provider_id];
+```
+
+### Performance Optimization
+
+#### Batch Size Tuning
+
+For large sync operations:
+```bash
+# Smaller batches for stability
+python3 wordpress_sync_manager.py --sync-all --limit 50
+
+# Monitor system resources and adjust accordingly
+```
+
+#### Rate Limiting Configuration
+
+The system respects WordPress API limits:
+- **Batch size**: 10 providers per batch
+- **Delay**: 2 seconds between batches
+- **Timeout**: 30 seconds per request
+
+### Error Recovery
+
+#### Failed Sync Recovery
+
+Check sync history to identify failed operations:
+```bash
+python3 wordpress_sync_manager.py --history
+```
+
+Retry specific providers:
+```bash
+python3 wordpress_sync_manager.py --sync-provider "FAILED_PROVIDER_NAME" --force
+```
+
+#### Database Consistency
+
+Verify sync status:
+```bash
+python3 wordpress_sync_manager.py --status
+```
+
+Reset provider sync status if needed:
+```sql
+UPDATE providers SET wordpress_status = 'pending', content_hash = NULL 
+WHERE wordpress_status = 'failed';
+```
+
+## Configuration
+
+### Environment Variables
+
+Required in `config/.env`:
+```bash
+# WordPress API Configuration
+WORDPRESS_URL=https://care-compass.jp
+WORDPRESS_USERNAME=api_user
+WORDPRESS_APPLICATION_PASSWORD=wp_app_password_here
+
+# Database Configuration (shared with main system)
+POSTGRES_USER=your_db_user
+POSTGRES_PASSWORD=your_db_password
+POSTGRES_HOST=localhost
+POSTGRES_DB=directory
+
+# Optional: Sync Configuration
+WORDPRESS_SYNC_BATCH_SIZE=10
+WORDPRESS_SYNC_DELAY=2
+```
+
+### WordPress Setup Requirements
+
+Ensure WordPress has:
+1. **REST API enabled** (default in modern WordPress)
+2. **Application passwords enabled** for API authentication
+3. **ACF (Advanced Custom Fields) plugin** with proper field definitions
+4. **Custom post type** `healthcare_provider` configured
+
+### Database Migration
+
+The sync system requires database schema updates:
+```bash
+# Run migration to add sync tables and columns
+python3 migrate_wordpress_sync_tables.py
+```
+
+This adds:
+- `wordpress_sync_log` table for operation tracking
+- `last_wordpress_sync`, `content_hash`, `wordpress_status` columns to providers table
+- Proper indexes for performance
+
+## System Architecture
+
+### Components
+
+1. **ContentHashService**: SHA256-based change detection
+2. **WordPressUpdateService**: WordPress API integration
+3. **SyncManagementService**: High-level operation orchestration
+4. **WordPressSyncManager**: Command-line interface
+
+### Data Flow
+
+```
+Database Content → Content Hash → Change Detection → WordPress API → Sync Logging
+```
+
+### Content Mapping
+
+The system maps database fields to WordPress:
+- **Post content**: Formatted HTML with provider details
+- **ACF fields**: Structured data for all provider attributes
+- **Post title**: Provider name
+- **Post excerpt**: AI-generated excerpt
+
+### Sync Status Tracking
+
+Each provider has a sync status:
+- **pending**: Not yet synced or needs update
+- **synced**: Successfully synchronized
+- **failed**: Last sync attempt failed
+
+## Best Practices
+
+### Regular Maintenance
+
+1. **Monitor sync status weekly:**
+   ```bash
+   python3 wordpress_sync_manager.py --status
+   ```
+
+2. **Review sync history for errors:**
+   ```bash
+   python3 wordpress_sync_manager.py --history
+   ```
+
+3. **Test connection before bulk operations:**
+   ```bash
+   python3 wordpress_sync_manager.py --test-connection
+   ```
+
+### Safe Operation Guidelines
+
+1. **Always use dry-run first** for bulk operations
+2. **Start with small batches** (limit 5-10) for testing
+3. **Monitor WordPress site** during sync operations
+4. **Keep backups** of WordPress database before major syncs
+5. **Check error logs** for any API issues
+
+### Performance Guidelines
+
+1. **Batch size**: Keep at 10 providers for optimal performance
+2. **Rate limiting**: Don't modify the 2-second delays
+3. **Concurrent operations**: Run only one sync at a time
+4. **Peak hours**: Avoid large syncs during high WordPress traffic
+
 ## Support
 
-For issues or questions:
+For WordPress Sync Enhancement issues:
+
+1. **Check sync status:** `python3 wordpress_sync_manager.py --status`
+2. **Review history:** `python3 wordpress_sync_manager.py --history`
+3. **Test connection:** `python3 wordpress_sync_manager.py --test-connection`
+4. **Verify configuration:** Check `config/.env` credentials
+5. **Check logs:** Review error messages in terminal output
+6. **Database verification:** Ensure migration completed successfully
+
+---
+
+## General System Support
+
+For main healthcare directory issues:
 1. Check the logs for specific error messages
 2. Verify API keys in `config/.env`
 3. Test with lower daily limits first
