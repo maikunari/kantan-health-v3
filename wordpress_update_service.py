@@ -344,6 +344,7 @@ class WordPressUpdateService:
             
             # Language Support
             "english_proficiency": provider.english_proficiency or 'Unknown',
+            "proficiency_score": getattr(provider, 'proficiency_score', 0) or 0,
             
             # Photos
             "photo_urls": self._format_photo_urls(provider.photo_urls or []),

@@ -127,6 +127,7 @@ class ContentHashService:
             ('phone', provider.phone or ''),
             ('website', provider.website or ''),
             ('english_proficiency', provider.english_proficiency or 'Unknown'),
+            ('proficiency_score', str(provider.proficiency_score or 0)),
             ('rating', str(provider.rating or 0)),
             ('total_reviews', str(provider.total_reviews or 0)),
             ('business_hours', json.dumps(provider.business_hours or {}, sort_keys=True)),

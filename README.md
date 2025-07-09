@@ -746,6 +746,35 @@ python3 run_automation.py --daily-limit 25  # New providers will use direct link
 
 **Legal Compliance**: System now fully complies with Google Places API Terms of Service
 
+#### 9. English Proficiency Score Consistency Fix
+
+**Issue**: Providers with proficiency score 5 (perfect) showed "Unknown" instead of "Fluent" due to missing database field
+
+**Root Cause**: Database schema missing `proficiency_score` column, causing score/text mismatch
+
+**Fix Applied**: ✅ **Complete Consistency Achieved**
+- Added `proficiency_score` column to Provider model and database
+- Created migration script to sync existing data 
+- Updated WordPress sync to include both numeric score and text level
+- Fixed inconsistencies for all 46 providers with proficiency data
+
+**Migration Commands:**
+```bash
+# Add proficiency_score column and sync data
+python3 migrate_proficiency_score.py
+
+# Verify consistency
+python3 -c "from postgres_integration import *; session = PostgresIntegration().Session(); print('Score 5 providers:', [(p.provider_name, p.proficiency_score, p.english_proficiency) for p in session.query(Provider).filter(Provider.proficiency_score == 5).all()])"
+```
+
+**Proficiency Scale Mapping:**
+- **Score 5** → **Fluent** (9 providers)
+- **Score 4** → **Conversational** (29 providers) 
+- **Score 3** → **Basic** (8 providers)
+- **Score 0** → **Unknown** (remaining providers)
+
+**WordPress Sync**: All providers with score 5 successfully updated to show "Fluent" in WordPress ACF fields
+
 ### Performance Optimization
 
 #### Batch Size Tuning

@@ -832,6 +832,7 @@ class GooglePlacesHealthcareCollector:
                         website=provider.get('website', ''),
                         specialties=provider.get('specialties', []),
                         english_proficiency=provider.get('english_proficiency', 'Unknown'),
+                        proficiency_score=provider.get('proficiency_score', 0),
                         rating=provider.get('rating', 0),
                         total_reviews=provider.get('total_reviews', 0),
                         review_content=provider.get('review_content', ''),

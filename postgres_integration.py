@@ -26,6 +26,7 @@ class Provider(Base):
     website = Column(Text)
     specialties = Column(JSON)
     english_proficiency = Column(String(50))
+    proficiency_score = Column(Integer)  # 0-5 numerical proficiency score
     rating = Column(Float)
     total_reviews = Column(Integer)
     review_content = Column(JSON)
@@ -86,7 +87,7 @@ class PostgresIntegration:
         try:
             expected_fields = {
                 "provider_name", "address", "city", "prefecture", "district", "phone", "website",
-                "specialties", "english_proficiency", "rating", "total_reviews",
+                "specialties", "english_proficiency", "proficiency_score", "rating", "total_reviews",
                 "review_content", "review_keywords", "review_highlights", "photo_urls",
                 "nearest_station", "latitude", "longitude", "status", "created_at", "wordpress_post_id", 
                 "ai_description", "ai_excerpt", "google_place_id", "business_hours", "wheelchair_accessible",
