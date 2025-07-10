@@ -143,11 +143,35 @@ class WordPressIntegration:
             
             print(f"🏥 Processing {len(provider_specialties)} specialties: {provider_specialties}")
             
-            # Find or create location
+            # Find or create location(s) - enhanced for Tokyo wards
+            location_ids = []
+            
+            # Always create/find the main city location
             location_id = self.find_or_create_location(provider.city)
             if not location_id:
                 print(f"❌ Failed to create/find location for {provider.city}")
                 return None
+            location_ids.append(location_id)
+            
+            # Tokyo Ward Enhancement: For Tokyo's 23 wards, also add ward as location term
+            tokyo_wards = [
+                "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+                "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+                "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+                "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+            ]
+            
+            ward_name = getattr(provider, 'district', '')
+            if (provider.city == 'Tokyo' and ward_name in tokyo_wards):
+                print(f"🏢 Tokyo ward detected: Adding {ward_name} as additional location term")
+                ward_location_id = self.find_or_create_tokyo_ward_location(ward_name)
+                if ward_location_id:
+                    location_ids.append(ward_location_id)
+                    print(f"✅ Added ward location: {ward_name} (ID: {ward_location_id})")
+                else:
+                    print(f"⚠️ Failed to create/find ward location: {ward_name}")
+            
+            print(f"📍 Final location assignment: {len(location_ids)} location terms")
             
             # Find or create ALL specialty terms
             specialty_ids = []
@@ -174,7 +198,7 @@ class WordPressIntegration:
                 "excerpt": getattr(provider, 'ai_excerpt', ''),  # Add excerpt for WordPress preview
                 "status": "publish",
                 "type": "healthcare_provider",
-                "location": [location_id],
+                "location": location_ids,
                 "specialties": specialty_ids,
                 "acf": {
                     # Provider Details Field Group
@@ -572,6 +596,94 @@ class WordPressIntegration:
             print(f"❌ Creation request failed: {str(e)}")
         
         print(f"❌ Complete failure to find/create location: {city_name}")
+        return None
+    
+    def find_or_create_tokyo_ward_location(self, ward_name):
+        """Find or create Tokyo ward location with normalized naming (no 'City' suffix)"""
+        print(f"🏢 Looking for Tokyo ward location: {ward_name}")
+        
+        # Tokyo ward names should never have "City" suffix
+        clean_ward_name = ward_name
+        ward_with_city = f"{ward_name} City"
+        
+        # Method 1: Try to find clean ward name first (preferred)
+        search_results = self.search_wordpress_terms('location', clean_ward_name)
+        for term in search_results:
+            if term["name"].lower() == clean_ward_name.lower():
+                print(f"✅ Found clean ward name: {clean_ward_name} (ID: {term['id']})")
+                return term['id']
+        
+        # Method 2: Check if ward exists with "City" suffix (legacy inconsistent naming)
+        search_results_city = self.search_wordpress_terms('location', ward_with_city)
+        for term in search_results_city:
+            if term["name"].lower() == ward_with_city.lower():
+                print(f"⚠️ Found ward with 'City' suffix (inconsistent): {ward_with_city} (ID: {term['id']})")
+                print(f"   NOTE: This should be renamed to '{clean_ward_name}' for consistency")
+                return term['id']
+        
+        # Method 3: Get all location terms and search manually
+        location_terms = self.get_all_wordpress_terms('location')
+        
+        # Try exact match for clean name
+        for term in location_terms:
+            if term["name"].lower() == clean_ward_name.lower():
+                print(f"✅ Found clean ward name (manual search): {clean_ward_name} (ID: {term['id']})")
+                return term['id']
+        
+        # Try exact match for ward with "City" suffix
+        for term in location_terms:
+            if term["name"].lower() == ward_with_city.lower():
+                print(f"⚠️ Found ward with 'City' suffix (manual search): {ward_with_city} (ID: {term['id']})")
+                print(f"   NOTE: This should be renamed to '{clean_ward_name}' for consistency")
+                return term['id']
+        
+        # Method 4: Create new ward location with clean name (no "City" suffix)
+        print(f"🆕 Creating Tokyo ward location: {clean_ward_name} (normalized, no 'City' suffix)")
+        
+        create_data = {"name": clean_ward_name, "slug": clean_ward_name.lower().replace(' ', '-')}
+        
+        try:
+            response = requests.post(
+                f"{self.wordpress_url}/wp-json/wp/v2/location",
+                auth=(self.username, self.application_password),
+                json=create_data
+            )
+            
+            if response.status_code == 201:
+                new_id = response.json()["id"]
+                print(f"✅ Created normalized ward location: {clean_ward_name} (ID: {new_id})")
+                return new_id
+            elif response.status_code == 400:
+                error_data = response.json()
+                print(f"⚠️ Creation failed: {response.status_code} - {error_data}")
+                
+                if "term_exists" in response.text or "already exists" in response.text:
+                    print(f"🔄 Term exists but not found, forcing refresh...")
+                    time.sleep(2)
+                    
+                    # Try to get existing term ID from error response
+                    try:
+                        if "term_id" in error_data:
+                            existing_id = error_data.get("term_id")
+                            print(f"✅ Retrieved existing ward ID from error: {clean_ward_name} (ID: {existing_id})")
+                            return existing_id
+                    except:
+                        pass
+                    
+                    # Final attempt: re-fetch all terms
+                    print(f"🔄 Final attempt: re-fetching all locations for {clean_ward_name}...")
+                    final_terms = self.get_all_wordpress_terms('location')
+                    for term in final_terms:
+                        if term["name"].lower() == clean_ward_name.lower():
+                            print(f"✅ Found on final attempt: {clean_ward_name} (ID: {term['id']})")
+                            return term['id']
+            else:
+                print(f"❌ Unexpected creation error: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            print(f"❌ Creation request failed: {str(e)}")
+        
+        print(f"❌ Complete failure to find/create Tokyo ward location: {clean_ward_name}")
         return None
     
     def normalize_business_status(self, status):
