@@ -429,6 +429,83 @@ python3 migrate_accessibility_parking.py
 - ACF Pro plugin with field groups configured
 - Custom post type: `healthcare_provider`
 
+## ✏️ Manual Database Editing
+
+### Quick psql Method (Recommended)
+The simplest way to manually edit provider data is using psql directly:
+
+```bash
+# 1. Connect to database
+psql -d directory
+
+# 2. Find your provider (use expanded display for readability)
+\x
+SELECT id, provider_name, ai_description FROM providers 
+WHERE provider_name ILIKE '%daikanyama%women%';
+
+# 3. Edit using psql's built-in editor
+\e
+```
+
+When you run `\e`, psql opens your default editor. Type your UPDATE statement:
+
+```sql
+UPDATE providers 
+SET ai_description = 'Your updated description here...' 
+WHERE id = 292;
+```
+
+Save and exit - the command runs immediately!
+
+### Common Edit Examples
+```sql
+-- Update AI description
+UPDATE providers SET ai_description = 'New description...' WHERE id = 292;
+
+-- Update AI excerpt  
+UPDATE providers SET ai_excerpt = 'New excerpt...' WHERE provider_name ILIKE '%clinic name%';
+
+-- Update English proficiency
+UPDATE providers SET english_proficiency = 'Fluent', proficiency_score = 5 WHERE id = 292;
+
+-- Update multiple fields
+UPDATE providers SET 
+    ai_description = 'New description...',
+    ai_excerpt = 'New excerpt...',
+    proficiency_score = 4,
+    english_proficiency = 'Conversational'
+WHERE provider_name ILIKE '%daikanyama%women%';
+```
+
+### Sync Changes to WordPress
+After making manual edits, sync to WordPress:
+
+```bash
+# Sync specific provider
+python3 wordpress_sync_manager.py --sync-provider "Daikanyama"
+
+# Or sync all changes
+python3 wordpress_sync_manager.py --sync-all --limit 10
+```
+
+### Useful psql Commands
+```sql
+-- Find providers by name
+SELECT id, provider_name, city FROM providers WHERE provider_name ILIKE '%search_term%';
+
+-- View all AI content for a provider
+\x
+SELECT provider_name, ai_description, ai_excerpt, review_summary, english_experience_summary 
+FROM providers WHERE id = 292;
+
+-- Count providers by completion status
+SELECT 
+    COUNT(*) as total,
+    COUNT(ai_description) as has_description,
+    COUNT(ai_excerpt) as has_excerpt
+FROM providers;
+```
+
 ## 🎯 Optimization Strategies
 
 ### For Maximum Provider Discovery
