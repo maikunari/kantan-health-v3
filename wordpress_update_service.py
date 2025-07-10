@@ -69,20 +69,21 @@ class WordPressUpdateService:
                 'message': 'Content is up to date'
             }
         
-        # Generate current content
-        post_content = self._generate_post_content(provider)
+        # Generate ACF fields - primary data source for provider display
         acf_fields = self._generate_acf_fields(provider)
         
-        # Prepare update payload
+        # Prepare update payload - ACF fields only approach
+        # Minimal post content since ACF fields handle all data display
         update_data = {
-            'content': post_content,
+            'content': self._generate_minimal_post_content(provider),  # Minimal placeholder content
             'title': provider.provider_name,
             'excerpt': provider.ai_excerpt or '',
             'acf': acf_fields,
             'meta': {
                 'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'sync_source': 'WordPress Sync Enhancement',
-                'content_hash': content_comparison.new_hash
+                'sync_source': 'WordPress Sync Enhancement - ACF Only',
+                'content_hash': content_comparison.new_hash,
+                'data_display_method': 'acf_fields_only'
             }
         }
         
@@ -265,54 +266,24 @@ class WordPressUpdateService:
         
         return results
     
-    def _generate_post_content(self, provider: Provider) -> str:
-        """Generate WordPress post content from provider data"""
-        # Get specialty display
-        specialties = provider.specialties or []
-        if isinstance(specialties, str):
-            specialties = [specialties]
-        specialty_display = ", ".join(specialties) if specialties else "General Practice"
-        
-        # Get location display
-        location_parts = [part for part in [provider.city, provider.prefecture] if part]
-        location_display = ", ".join(location_parts) if location_parts else "Location not specified"
-        
-        # Format business hours
-        business_hours_display = self._format_business_hours_display(provider.business_hours or {})
-        
-        content = f"""
-        <div class="provider-content">
-            <h2>{provider.provider_name}</h2>
-            
-            <div class="provider-details">
-                <p><strong>📍 Location:</strong> {location_display}</p>
-                <p><strong>📫 Address:</strong> {self._clean_address(provider.address) or 'Not available'}</p>
-                <p><strong>📞 Phone:</strong> {provider.phone or 'Not available'}</p>
-                <p><strong>🌐 Website:</strong> {self._clean_website_url(provider.website) or 'Not available'}</p>
-                <p><strong>🏥 Specialties:</strong> {specialty_display}</p>
-                <p><strong>🗣️ English Support:</strong> {provider.english_proficiency or 'Unknown'}</p>
-                <p><strong>⭐ Rating:</strong> {provider.rating or 0}/5 ({provider.total_reviews or 0} reviews)</p>
-            </div>
-            
-            <div class="business-hours">
-                <h3>🕒 Business Hours</h3>
-                <pre>{business_hours_display}</pre>
-            </div>
-            
-            <div class="provider-description">
-                <h3>ℹ️ About This Provider</h3>
-                <p>{provider.ai_description or 'Professional healthcare provider offering quality medical services.'}</p>
-            </div>
-            
-            <div class="accessibility-info">
-                <h3>♿ Accessibility</h3>
-                <p><strong>Wheelchair Access:</strong> {self._format_accessibility(provider.wheelchair_accessible)}</p>
-                <p><strong>Parking:</strong> {self._format_parking(provider.parking_available)}</p>
-            </div>
+    def _generate_minimal_post_content(self, provider: Provider) -> str:
+        """Generate minimal WordPress post content - ACF fields handle all data display"""
+        return f"""
+        <!-- Provider data is displayed via ACF fields -->
+        <div class="provider-acf-content">
+            <p><em>This provider's information is displayed using ACF fields. 
+            If you're seeing this message, please check your theme's ACF field display configuration.</em></p>
         </div>
         """
+    
+    def _generate_post_content(self, provider: Provider) -> str:
+        """DEPRECATED: Generate WordPress post content from provider data
         
-        return content.strip()
+        This method is deprecated in favor of ACF-only data display.
+        Use _generate_minimal_post_content() instead.
+        """
+        logger.warning("⚠️  _generate_post_content is deprecated. Using ACF fields only for data display.")
+        return self._generate_minimal_post_content(provider)
     
     def _generate_acf_fields(self, provider: Provider) -> Dict[str, Any]:
         """Generate ACF (Advanced Custom Fields) data for WordPress"""

@@ -291,6 +291,13 @@ The system generates **150+ search queries** using:
 
 ## 🌐 WordPress Integration
 
+### **ACF Fields Only Architecture** 📋
+The system uses **ACF fields exclusively** for all provider data display. WordPress post content is minimal placeholder text, with all provider information rendered via ACF fields for:
+- **Single Source of Truth**: All data in ACF fields
+- **Faster Sync**: Reduced payload size (no HTML content duplication)
+- **Theme Flexibility**: Complete control over data presentation
+- **Maintainability**: Simplified content management
+
 ### ACF Field Mapping
 The system maps **35+ database fields** to WordPress ACF fields:
 
@@ -322,6 +329,7 @@ The system maps **35+ database fields** to WordPress ACF fields:
 - **Batch Processing**: Optimized API usage
 - **Error Handling**: Comprehensive logging and recovery
 - **Status Tracking**: Complete operation audit trail
+- **ACF-First Approach**: Minimal post content, comprehensive ACF data
 
 ## 📁 File Structure
 

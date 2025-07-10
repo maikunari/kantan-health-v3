@@ -1,10 +1,48 @@
 # PRD: WordPress Sync Enhancement - Bidirectional Content Management
 
 ## Document Info
-- **Version**: 1.0
-- **Date**: 2024-07-09
+- **Version**: 1.1
+- **Date**: 2024-07-09 (Updated: 2024-12-19)
 - **Author**: System Architecture Team
 - **Status**: Approved
+
+## 🆕 Architecture Update: ACF Fields Only (v1.1)
+
+### Enhancement Summary
+**Date**: December 19, 2024  
+**Impact**: Major architectural simplification
+
+The system has been updated to use **ACF fields exclusively** for all provider data display, eliminating WordPress post content duplication.
+
+### Changes Made
+- **WordPress Post Content**: Now minimal placeholder text only
+- **Data Display**: 100% via ACF fields (35+ mapped fields)
+- **Sync Payload**: Reduced size due to eliminated HTML content duplication
+- **Performance**: Faster sync operations with streamlined data flow
+- **Maintainability**: Single source of truth for provider data
+
+### Technical Implementation
+```python
+# Before: Dual content approach
+update_data = {
+    'content': self._generate_post_content(provider),  # Full HTML content
+    'acf': self._generate_acf_fields(provider)         # Duplicate data
+}
+
+# After: ACF-only approach  
+update_data = {
+    'content': self._generate_minimal_post_content(provider),  # Minimal placeholder
+    'acf': self._generate_acf_fields(provider)                 # Primary data source
+}
+```
+
+### Benefits Achieved
+- **Eliminated Redundancy**: No more duplicate data in post content and ACF fields
+- **Faster Sync**: Reduced payload size improves WordPress API performance
+- **Theme Flexibility**: Complete control over data presentation via ACF fields
+- **Single Source**: All provider data managed through structured ACF fields
+
+---
 
 ## Executive Summary
 
@@ -222,15 +260,19 @@ class WordPressUpdateService:
         if not provider.wordpress_post_id:
             raise ValueError(f"Provider {provider.provider_name} has no WordPress post ID")
         
-        # Generate current content
-        post_content = self._generate_post_content(provider)
+        # Generate ACF fields - primary data source (ACF-only approach)
+        acf_fields = self._generate_acf_fields(provider)
         
-        # Prepare update payload
+        # Prepare update payload - ACF fields only approach
         update_data = {
-            'content': post_content,
+            'content': self._generate_minimal_post_content(provider),  # Minimal placeholder
             'title': provider.provider_name,
             'excerpt': provider.ai_excerpt or '',
-            'meta': self._generate_acf_fields(provider)
+            'acf': acf_fields,  # Primary data source
+            'meta': {
+                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'data_display_method': 'acf_fields_only'
+            }
         }
         
         if dry_run:

@@ -269,14 +269,29 @@ class TestWordPressUpdateService(unittest.TestCase):
         self.assertIn('error', result)
     
     def test_generate_post_content(self):
-        """Test WordPress post content generation"""
+        """Test WordPress post content generation - ACF-only approach"""
         content = self.wp_service._generate_post_content(self.mock_provider)
         
         self.assertIsInstance(content, str)
-        self.assertIn('Test Provider', content)
-        self.assertIn('Tokyo', content)
-        self.assertIn('Test description', content)
-        self.assertIn('Internal Medicine', content)
+        # Updated for ACF-only approach - content should be minimal placeholder
+        self.assertIn('provider-acf-content', content)
+        self.assertIn('ACF fields', content)
+        # Content should NOT contain provider data (that's handled by ACF fields)
+        self.assertNotIn('Test Provider', content)
+        self.assertNotIn('Tokyo', content)
+        self.assertNotIn('Test description', content)
+        self.assertNotIn('Internal Medicine', content)
+    
+    def test_generate_minimal_post_content(self):
+        """Test minimal WordPress post content generation for ACF-only approach"""
+        content = self.wp_service._generate_minimal_post_content(self.mock_provider)
+        
+        self.assertIsInstance(content, str)
+        self.assertIn('provider-acf-content', content)
+        self.assertIn('ACF fields', content)
+        self.assertIn('theme\'s ACF field display configuration', content)
+        # Should be minimal placeholder content only
+        self.assertLess(len(content), 500)  # Should be short placeholder text
     
     def test_generate_acf_fields(self):
         """Test ACF fields generation"""

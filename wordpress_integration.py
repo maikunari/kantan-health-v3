@@ -167,10 +167,10 @@ class WordPressIntegration:
             
             print(f"🎯 Final specialty assignment: {len(specialty_ids)} specialties")
             
-            # Prepare post data with comprehensive ACF fields
+            # Prepare post data with comprehensive ACF fields - ACF Only Approach
             post_data = {
                 "title": provider.provider_name,
-                "content": self.generate_provider_content(provider),
+                "content": self.generate_minimal_provider_content(provider),  # Minimal placeholder content
                 "excerpt": getattr(provider, 'ai_excerpt', ''),  # Add excerpt for WordPress preview
                 "status": "publish",
                 "type": "healthcare_provider",
@@ -244,6 +244,7 @@ class WordPressIntegration:
                     "last_verified": getattr(provider, 'last_verified', ''),
                     "data_source": 'Google Places API',
                     "last_updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "data_display_method": "acf_fields_only",  # Track ACF-only architecture
                     "provider_city": provider.city,
                     "provider_district": getattr(provider, 'district', ''),
                     "provider_address": self.clean_address(provider.address or ""),
@@ -287,55 +288,24 @@ class WordPressIntegration:
             print(f"❌ Error creating WordPress post: {str(e)}")
             return None
     
-    def generate_provider_content(self, provider):
-        """Generate content for a WordPress post based on provider data."""
-        # Extract and format all specialties
-        specialty_display = "General Practitioner"
-        if provider.specialties:
-            if isinstance(provider.specialties, list) and provider.specialties:
-                # Clean and format specialty names for display
-                cleaned_specialties = []
-                for specialty in provider.specialties:
-                    # Convert common technical terms to readable names
-                    specialty_mapping = {
-                        "general_practitioner": "General Medicine",
-                        "oncologist": "Oncology", 
-                        "ent": "ENT (Ear, Nose & Throat)",
-                        "Point_of_interest": "General Healthcare",
-                        "Health": "General Healthcare",
-                        "Establishment": "Medical Facility"
-                    }
-                    clean_specialty = specialty_mapping.get(specialty.lower(), specialty.title())
-                    if clean_specialty not in cleaned_specialties:
-                        cleaned_specialties.append(clean_specialty)
-                
-                specialty_display = ", ".join(cleaned_specialties) if cleaned_specialties else "General Practitioner"
-            elif isinstance(provider.specialties, str):
-                specialty_display = provider.specialties
-        
-        # Format location display with district if available
-        location_parts = []
-        if getattr(provider, 'district', ''):
-            location_parts.append(getattr(provider, 'district'))
-        location_parts.append(provider.city)
-        if getattr(provider, 'prefecture', ''):
-            location_parts.append(getattr(provider, 'prefecture'))
-        location_display = ', '.join(filter(None, location_parts))
-        
-        content = f"""
-        <h2>{provider.provider_name}</h2>
-        <p><strong>Location:</strong> {location_display}</p>
-        <p><strong>Address:</strong> {self.clean_address(provider.address) or 'Not available'}</p>
-        <p><strong>Phone:</strong> {provider.phone or 'Not available'}</p>
-        <p><strong>Website:</strong> {self.clean_website_url(provider.website) or 'Not available'}</p>
-        <p><strong>Specialties:</strong> {specialty_display}</p>
-        <p><strong>English Proficiency:</strong> {provider.english_proficiency or 'Unknown'}</p>
-        <p><strong>Business Hours:</strong></p>
-        <pre>{self.format_business_hours(getattr(provider, 'business_hours', {}))}</pre>
-        <p><strong>Description:</strong> {getattr(provider, 'ai_description', 'Professional healthcare provider offering quality medical services.')}</p>
-        <p><strong>Rating:</strong> {provider.rating or 0}/5 ({provider.total_reviews or 0} reviews)</p>
+    def generate_minimal_provider_content(self, provider):
+        """Generate minimal WordPress post content - ACF fields handle all data display"""
+        return f"""
+        <!-- Provider data is displayed via ACF fields -->
+        <div class="provider-acf-content">
+            <p><em>This provider's information is displayed using ACF fields. 
+            If you're seeing this message, please check your theme's ACF field display configuration.</em></p>
+        </div>
         """
-        return content
+    
+    def generate_provider_content(self, provider):
+        """DEPRECATED: Generate content for a WordPress post based on provider data.
+        
+        This method is deprecated in favor of ACF-only data display.
+        Use generate_minimal_provider_content() instead.
+        """
+        print("⚠️  generate_provider_content is deprecated. Using ACF fields only for data display.")
+        return self.generate_minimal_provider_content(provider)
 
     def check_duplicate_post(self, provider_name, provider_city):
         """Check for existing WordPress post by name and city"""
