@@ -506,6 +506,79 @@ SELECT
 FROM providers;
 ```
 
+## 🎯 **Targeted Provider Addition**
+
+### **Add Specific Provider** 🏥
+Add individual healthcare providers by name or Google Place ID:
+
+```bash
+# Add by Google Place ID (most reliable)
+python3 add_specific_provider.py --place-id "ChIJN1t_tDeuEmsRUsoyG83frY4"
+
+# Add by provider name and location
+python3 add_specific_provider.py --name "Daikanyama Women's Clinic" --location "Tokyo"
+
+# Add by name with specialty context (improves search accuracy)
+python3 add_specific_provider.py --name "Tokyo ENT Clinic" --specialty "ENT" --location "Tokyo"
+
+# Add by name only (searches Japan-wide)
+python3 add_specific_provider.py --name "Tokyo Medical University Hospital"
+
+# Dry run to check before adding
+python3 add_specific_provider.py --name "Clinic Name" --specialty "cardiology" --dry-run
+
+# Complete workflow: Add + AI content + WordPress sync
+python3 add_specific_provider.py --place-id "ChIJ..." --generate-content --sync-wordpress
+```
+
+**Key Features**:
+- **Google Place ID**: Most reliable identification method
+- **Name Search**: Intelligent matching with location context
+- **Duplicate Detection**: Advanced fingerprinting prevents duplicates
+- **Full Pipeline**: Integrates with AI content generation and WordPress sync
+- **Validation**: Ensures providers meet photo requirements
+
+### **Geographic Bulk Addition** 🗺️
+Add multiple providers by targeting specific geographic areas:
+
+```bash
+# Add 10 providers from Tokyo (all areas)
+python3 add_geographic_providers.py --city "Tokyo" --limit 10
+
+# Add 10 ENT specialists from Tokyo, Setagaya (your exact example!)
+python3 add_geographic_providers.py --city "Tokyo" --wards "Setagaya" --specialty "ENT" --limit 10
+
+# Add 5 cardiologists from specific Tokyo wards
+python3 add_geographic_providers.py --city "Tokyo" --wards "Shibuya,Minato,Shinjuku" --specialty "cardiology" --limit 5
+
+# Add 15 dermatologists from multiple cities  
+python3 add_geographic_providers.py --cities "Tokyo,Osaka,Yokohama" --specialty "dermatology" --limit 15
+
+# Dry run to preview what ENT providers would be found
+python3 add_geographic_providers.py --city "Tokyo" --specialty "ENT" --limit 5 --dry-run
+
+# Complete workflow with content generation
+python3 add_geographic_providers.py --city "Tokyo" --specialty "gynecology" --limit 10 --generate-content --sync-wordpress
+```
+
+**Tokyo Ward Support** (All 23 Special Wards):
+```bash
+# Target specific wards
+--wards "Shibuya,Minato,Shinjuku,Harajuku,Roppongi"
+
+# Available wards:
+# Adachi, Arakawa, Bunkyo, Chiyoda, Chuo, Edogawa, Itabashi, 
+# Katsushika, Kita, Koto, Meguro, Minato, Nakano, Nerima, 
+# Ota, Setagaya, Shibuya, Shinagawa, Shinjuku, Suginami, 
+# Sumida, Taito, Toshima
+```
+
+**Smart Query Generation**:
+- **Healthcare Terms**: clinic, hospital, medical center, doctor, specialist
+- **English Focus**: "english speaking", "international", "foreign friendly"
+- **Geographic Context**: City + ward combinations for precise targeting
+- **Quality Filtering**: Medical specialty validation and photo requirements
+
 ## 🎯 Optimization Strategies
 
 ### For Maximum Provider Discovery
