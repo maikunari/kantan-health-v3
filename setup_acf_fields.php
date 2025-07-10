@@ -431,6 +431,15 @@ function healthcare_register_acf_fields() {
                 'rows' => 5,
             ),
             array(
+                'key' => 'field_english_experience_summary',
+                'label' => 'English Language Experience',
+                'name' => 'english_experience_summary',
+                'type' => 'textarea',
+                'instructions' => 'AI-generated summary of English language support and communication experience (80-100 words)',
+                'readonly' => 1,
+                'rows' => 5,
+            ),
+            array(
                 'key' => 'field_patient_highlights',
                 'label' => 'Patient Experience Highlights',
                 'name' => 'patient_highlights',

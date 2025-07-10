@@ -33,6 +33,7 @@ class Provider(Base):
     review_keywords = Column(JSON)
     review_highlights = Column(JSON)
     review_summary = Column(Text)  # Narrative paragraph summary of reviews (80-100 words)
+    english_experience_summary = Column(Text)  # AI summary of English language experience from reviews (80-100 words)
     photo_urls = Column(JSON)
     nearest_station = Column(Text)
     latitude = Column(Float)  # Store latitude for Google Maps
@@ -89,7 +90,7 @@ class PostgresIntegration:
             expected_fields = {
                 "provider_name", "address", "city", "prefecture", "district", "phone", "website",
                 "specialties", "english_proficiency", "proficiency_score", "rating", "total_reviews",
-                "review_content", "review_keywords", "review_highlights", "photo_urls",
+                "review_content", "review_keywords", "review_highlights", "review_summary", "english_experience_summary", "photo_urls",
                 "nearest_station", "latitude", "longitude", "status", "created_at", "wordpress_post_id", 
                 "ai_description", "ai_excerpt", "google_place_id", "business_hours", "wheelchair_accessible",
                 "parking_available", "primary_fingerprint", "secondary_fingerprint", "fuzzy_fingerprint",

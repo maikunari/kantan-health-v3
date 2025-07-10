@@ -98,7 +98,7 @@ Example style: "Patients consistently praise [Provider] for its comprehensive ap
         try:
             response = self.claude.messages.create(
                 model="claude-3-haiku-20240307",
-                max_tokens=150,
+                max_tokens=200,
                 system="You are a healthcare marketing expert specializing in patient review analysis. Create concise, professional summaries that highlight key patient feedback themes for SEO and marketing purposes.",
                 messages=[{
                     "role": "user", 
@@ -113,10 +113,17 @@ Example style: "Patients consistently praise [Provider] for its comprehensive ap
             if summary.startswith('Summary:') or summary.startswith('summary:'):
                 summary = summary.split(':', 1)[1].strip()
             
-            # Ensure it's within word count
+            # Ensure it's within word count (allow up to 100 words as intended)
             words = summary.split()
-            if len(words) > 80:
-                summary = ' '.join(words[:80])
+            if len(words) > 100:
+                # Try to end on a complete sentence within 100 words
+                truncated = ' '.join(words[:100])
+                # Find the last sentence ending
+                last_period = truncated.rfind('.')
+                if last_period > len(truncated) * 0.7:  # Only if we're not cutting too much
+                    summary = truncated[:last_period + 1]
+                else:
+                    summary = truncated
             
             logger.info(f"Generated summary for {provider.provider_name}: {len(words)} words")
             return summary

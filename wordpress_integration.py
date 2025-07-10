@@ -216,7 +216,8 @@ class WordPressIntegration:
                     
                     # Patient Insights Field Group
                     "review_keywords": self.extract_patient_feedback_themes(getattr(provider, 'review_content', '')),
-            "review_summary": getattr(provider, 'review_summary', ''),
+                    "review_summary": getattr(provider, 'review_summary', ''),
+            "english_experience_summary": getattr(provider, 'english_experience_summary', ''),
                     "patient_highlights": self.generate_patient_highlights(getattr(provider, 'review_content', '')),
                     
                     # Additional essential fields

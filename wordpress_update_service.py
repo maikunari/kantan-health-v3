@@ -349,6 +349,10 @@ class WordPressUpdateService:
             # Photos
             "photo_urls": self._format_photo_urls(provider.photo_urls or []),
             
+            # Patient Insights  
+            "review_summary": getattr(provider, 'review_summary', '') or '',
+            "english_experience_summary": getattr(provider, 'english_experience_summary', '') or '',
+            
             # Additional fields
             "provider_website": self._clean_website_url(provider.website or ''),
             "provider_address": self._clean_address(provider.address or ''),

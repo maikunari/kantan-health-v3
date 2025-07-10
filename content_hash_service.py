@@ -45,6 +45,7 @@ class ContentHashService:
                 'nearest_station': provider.nearest_station or '',
                 'photo_urls': provider.photo_urls or [],
                 'review_summary': provider.review_summary or '',
+            'english_experience_summary': provider.english_experience_summary or '',
                 'google_maps_embed': f"{provider.provider_name} {provider.address or ''} {provider.latitude or 0},{provider.longitude or 0}"
             }
             
@@ -138,7 +139,8 @@ class ContentHashService:
             ('longitude', str(provider.longitude or 0)),
             ('nearest_station', provider.nearest_station or ''),
             ('photo_urls', json.dumps(provider.photo_urls or [], sort_keys=True)),
-            ('review_summary', provider.review_summary or '')
+                            ('review_summary', provider.review_summary or ''),
+                ('english_experience_summary', provider.english_experience_summary or '')
         ]
         
         try:
