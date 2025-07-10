@@ -282,7 +282,7 @@ Keep it conversational and informative - like explaining to a friend why this pr
             # Generate description
             description_response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=500,  # Adjusted for 150-175 word descriptions
+                max_tokens=800,  # Premium allocation for comprehensive 150-175 word descriptions
                 temperature=0.6,  # More consistent formatting
                 messages=[{"role": "user", "content": description_prompt}]
             )
@@ -291,7 +291,7 @@ Keep it conversational and informative - like explaining to a friend why this pr
             # Generate excerpt
             excerpt_response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=200,  # For 50-100 word excerpts
+                max_tokens=300,  # Premium allocation for detailed 50-100 word excerpts
                 temperature=0.7,
                 messages=[{"role": "user", "content": excerpt_prompt}]
             )
@@ -447,7 +447,7 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             logger.info(f"Generating enhanced batch descriptions for {len(provider_batch)} providers")
             response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=700 * len(provider_batch),  # Optimized for 150-175 word two-paragraph descriptions
+                max_tokens=1000 * len(provider_batch),  # Premium allocation for comprehensive 150-175 word descriptions
                 temperature=0.6,  # More consistent formatting and word counts
                 messages=[{"role": "user", "content": batch_prompt}]
             )
@@ -619,7 +619,7 @@ Please provide exactly {len(provider_batch)} excerpts, numbered 1-{len(provider_
             logger.info(f"Generating excerpts for {len(provider_batch)} providers")
             response = self.claude.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=250 * len(provider_batch),  # For 50-100 word excerpts
+                max_tokens=400 * len(provider_batch),  # Premium allocation for detailed 50-100 word excerpts
                 temperature=0.7,
                 messages=[{"role": "user", "content": excerpt_batch_prompt}]
             )

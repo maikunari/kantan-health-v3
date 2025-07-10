@@ -138,7 +138,7 @@ Focus only on English language and communication aspects from the reviews."""
         try:
             response = self.claude.messages.create(
                 model="claude-3-haiku-20240307",
-                max_tokens=200,
+                max_tokens=400,  # Premium allocation for detailed English experience summaries
                 system="You are a healthcare communication specialist focusing on English language support analysis. Create summaries that highlight language and communication experiences for international patients.",
                 messages=[{
                     "role": "user", 

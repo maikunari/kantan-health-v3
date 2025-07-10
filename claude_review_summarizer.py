@@ -98,7 +98,7 @@ Example style: "Patients consistently praise [Provider] for its comprehensive ap
         try:
             response = self.claude.messages.create(
                 model="claude-3-haiku-20240307",
-                max_tokens=200,
+                max_tokens=400,  # Premium allocation for comprehensive review summaries
                 system="You are a healthcare marketing expert specializing in patient review analysis. Create concise, professional summaries that highlight key patient feedback themes for SEO and marketing purposes.",
                 messages=[{
                     "role": "user", 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Automation Script for Healthcare Directory
-Orchestrates data collection, AI description generation, and WordPress publishing.
+Orchestrates data collection, AI description generation, AI summarization, and WordPress publishing.
 """
 
 import argparse
@@ -9,6 +9,8 @@ from google_places_integration import GooglePlacesHealthcareCollector
 from wordpress_integration import WordPressIntegration
 from flask import Flask, render_template
 from claude_description_generator import run_batch_ai_description_generation  # Updated to use batch processing
+from claude_english_experience_summarizer import main as run_english_experience_summarizer
+from claude_review_summarizer import main as run_review_summarizer
 
 app = Flask(__name__)
 duplicates_detected = []
@@ -45,7 +47,7 @@ def run_wordpress_publishing():
 
 def main():
     """Main function to parse arguments and run phases."""
-    parser = argparse.ArgumentParser(description="Automate healthcare directory data collection and description generation.")
+    parser = argparse.ArgumentParser(description="Automate healthcare directory data collection, AI content generation, and publishing.")
     parser.add_argument("--daily-limit", type=int, default=25, help="Daily limit for provider collection (default: 25)")
     parser.add_argument("--max-per-query", type=int, default=None, help="Maximum results per search query (auto-calculated if not specified)")
     parser.add_argument("--cities", nargs='+', default=None, help="Cities to search (default: Tokyo Yokohama Osaka Fukuoka Kyoto)")
@@ -53,6 +55,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=5, help="Batch size for AI description generation (default: 5)")
     parser.add_argument("--skip-collection", action='store_true', help="Skip data collection phase")
     parser.add_argument("--skip-descriptions", action='store_true', help="Skip AI description generation phase")
+    parser.add_argument("--skip-experience-summary", action='store_true', help="Skip English experience summarization phase")
+    parser.add_argument("--skip-review-summary", action='store_true', help="Skip review summarization phase")
     parser.add_argument("--skip-publishing", action='store_true', help="Skip WordPress publishing phase")
     args = parser.parse_args()
 
@@ -97,9 +101,27 @@ def main():
     else:
         print("⏭️ Skipping AI description generation phase")
 
-    # Phase 4: WordPress Publishing
+    # Phase 4: English Experience Summarization
+    if not args.skip_experience_summary:
+        print("📝 PHASE 4: English Experience Summarization")
+        print("=" * 50)
+        print("Generating AI-powered English experience summaries...")
+        run_english_experience_summarizer()
+    else:
+        print("⏭️ Skipping English experience summarization phase")
+
+    # Phase 5: Review Summarization
+    if not args.skip_review_summary:
+        print("⭐ PHASE 5: Review Summarization")
+        print("=" * 50)
+        print("Generating AI-powered review summaries...")
+        run_review_summarizer()
+    else:
+        print("⏭️ Skipping review summarization phase")
+
+    # Phase 6: WordPress Publishing
     if not args.skip_publishing:
-        print("🌐 PHASE 4: WordPress Publishing")
+        print("🌐 PHASE 6: WordPress Publishing")
         print("=" * 50)
         run_wordpress_publishing()
     else:
