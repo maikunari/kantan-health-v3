@@ -361,10 +361,16 @@ def main():
                        help='Medical specialty to help filter search results (e.g., "ENT", "cardiology")')
     parser.add_argument('--dry-run', action='store_true',
                        help='Check for duplicates without adding')
+    parser.add_argument('--skip-content-generation', action='store_true',
+                       help='Skip AI content generation (default: generate content)')
+    parser.add_argument('--skip-wordpress-sync', action='store_true',
+                       help='Skip WordPress sync (default: sync to WordPress)')
+    
+    # Legacy flags (for backward compatibility)
     parser.add_argument('--generate-content', action='store_true',
-                       help='Generate AI content after adding')
+                       help='Generate AI content after adding (default behavior)')
     parser.add_argument('--sync-wordpress', action='store_true',
-                       help='Sync to WordPress after adding')
+                       help='Sync to WordPress after adding (default behavior)')
     
     args = parser.parse_args()
     
@@ -389,23 +395,43 @@ def main():
                 
                 provider_name = result['provider']['provider_name']
                 
-                # Generate AI content if requested
-                if args.generate_content:
+                # Determine if we should generate AI content (default: yes, unless skipped)
+                should_generate_content = (
+                    not args.skip_content_generation and 
+                    not args.dry_run
+                )
+                
+                # Generate AI content (default behavior)
+                if should_generate_content:
                     print("\n" + "="*50)
+                    print("🤖 GENERATING AI CONTENT (default behavior)")
                     content_result = adder.generate_ai_content(provider_name)
                     if content_result['success']:
                         print(f"✅ {content_result['message']}")
                     else:
                         print(f"❌ AI Content Error: {content_result['error']}")
                 
-                # Sync to WordPress if requested
-                if args.sync_wordpress:
+                # Determine if we should sync to WordPress (default: yes, unless skipped)
+                should_sync_wordpress = (
+                    not args.skip_wordpress_sync and 
+                    not args.dry_run
+                )
+                
+                # Sync to WordPress (default behavior)
+                if should_sync_wordpress:
                     print("\n" + "="*50)
+                    print("🌐 SYNCING TO WORDPRESS (default behavior)")
                     sync_result = adder.sync_to_wordpress(provider_name)
                     if sync_result['success']:
                         print(f"✅ WordPress: {sync_result['message']}")
                     else:
                         print(f"❌ WordPress Error: {sync_result['error']}")
+                        
+                # Show what was skipped (if anything)
+                if args.skip_content_generation:
+                    print("\n⏭️ Skipped AI content generation (--skip-content-generation)")
+                if args.skip_wordpress_sync:
+                    print("⏭️ Skipped WordPress sync (--skip-wordpress-sync)")
         else:
             print(f"❌ ERROR: {result['error']}")
             if 'search_results' in result:
