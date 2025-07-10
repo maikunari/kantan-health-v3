@@ -604,6 +604,27 @@ python3 add_geographic_providers.py --city "Tokyo" --limit 10 --skip-content-gen
 # Use common terms - comprehensive mapping included
 ```
 
+**English Proficiency Quality Filter** 🌐:
+```bash
+# AUTOMATIC FILTERING: Only providers with English proficiency ≥3 are processed
+
+# Proficiency Scoring (0-5 scale):
+# Score 5: 'Fluent' (40+ points)      ✅ ACCEPTED
+# Score 4: 'Conversational' (20-39)   ✅ ACCEPTED  
+# Score 3: 'Basic' (10-19)           ✅ ACCEPTED (Minimum Required)
+# Score 0: 'Unknown' (<10 points)     ❌ REJECTED
+
+# Filtering analyzes:
+# - Reviews: "English speaking", "translator", "bilingual" mentions
+# - Website: "/en/" URLs, English content indicators
+# - Name analysis: "international", "foreign", "expat" keywords
+# - Sentiment analysis of English-related reviews
+
+# Example output:
+# ❌ Provider ABC rejected (score: 0, level: Unknown)
+# ✅ Provider XYZ accepted (score: 4, level: Conversational)
+```
+
 **Smart Query Generation**:
 - **Complete Automation**: Full pipeline runs automatically (Add → AI Content → WordPress)
 - **Healthcare Terms**: clinic, hospital, medical center, doctor, specialist
@@ -725,6 +746,7 @@ python3 wordpress_sync_manager.py --test-connection
 ## 🎉 Current System Status
 
 **Latest Enhancements (December 2024)**:
+- ✅ **English Proficiency Filtering**: Automatic quality control - only providers with Basic+ English support (score ≥3)
 - ✅ **Premium Token Allocation**: 3x increase in token limits for maximum content quality
 - ✅ **Cost Optimization**: 85-90% cost reduction through mega-batch processing  
 - ✅ **Content Quality**: Enhanced descriptions, excerpts, and summaries

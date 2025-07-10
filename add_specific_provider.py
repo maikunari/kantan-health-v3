@@ -84,6 +84,14 @@ class SpecificProviderAdder:
         try:
             provider_record = self.collector.create_comprehensive_provider_record(place_data)
             
+            # Check if provider was filtered out due to English proficiency
+            if provider_record is None:
+                return {
+                    'success': False,
+                    'error': f'Provider {provider_name} rejected: English proficiency score below 3 (Basic level required)',
+                    'provider': None
+                }
+            
             # Validate provider has photos (requirement)
             if not self._validate_provider_photos(provider_record):
                 return {

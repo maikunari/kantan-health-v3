@@ -289,6 +289,10 @@ class GooglePlacesHealthcareCollector:
                 try:
                     comprehensive_record = self.create_comprehensive_provider_record(detailed_data)
                     
+                    # Check if provider was filtered out due to English proficiency
+                    if comprehensive_record is None:
+                        continue  # Provider was rejected by English proficiency filter
+                    
                     # PHOTO VALIDATION: Reject providers without photos
                     photo_urls = comprehensive_record.get('photo_urls', '')
                     if not photo_urls or photo_urls == '[]':
@@ -703,6 +707,14 @@ class GooglePlacesHealthcareCollector:
                 city = city  # Fallback to original
 
         english_proficiency, english_indicators, simple_score = self.analyze_english_proficiency(place_data) if isinstance(place_data, dict) else ("Unknown", [], 0)
+        
+        # English Proficiency Filter: Only process providers with score 3+ (Basic or higher)
+        if simple_score < 3:
+            print(f"❌ English proficiency filter: {name} rejected (score: {simple_score}, level: {english_proficiency})")
+            return None  # Don't process this provider
+        else:
+            print(f"✅ English proficiency filter: {name} accepted (score: {simple_score}, level: {english_proficiency})")
+        
         amenities = self.extract_amenities(place_data) if isinstance(place_data, dict) else []
         reviews = self.process_reviews(place_data.get('reviews', [])) if isinstance(place_data, dict) else []
         photos = self.get_photo_urls(place_data.get('photos', [])) if isinstance(place_data, dict) else []

@@ -167,13 +167,30 @@ class ClaudeMegaBatchProcessor:
             else:
                 specialty_text = specialties
             
-            # Format location
+            # Format location with special handling for Tokyo wards
             location_parts = []
-            if district:
-                location_parts.append(district)
-            location_parts.append(city)
-            if prefecture and prefecture != city:
-                location_parts.append(prefecture)
+            
+            # Tokyo Ward Special Formatting: "Tokyo, Ward" instead of "Ward, Tokyo"
+            tokyo_wards = [
+                "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+                "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+                "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+                "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+            ]
+            
+            if (city == 'Tokyo' and district and district in tokyo_wards):
+                # Tokyo wards: Show city first, then ward
+                location_parts.append(city)      # "Tokyo"
+                location_parts.append(district)  # "Setagaya"
+                # Result: "Tokyo, Setagaya"
+            else:
+                # Normal formatting: district first (if exists), then city
+                if district:
+                    location_parts.append(district)
+                location_parts.append(city)
+                if prefecture and prefecture != city:
+                    location_parts.append(prefecture)
+            
             location_text = ', '.join(filter(None, location_parts))
             
             # Format review texts for analysis

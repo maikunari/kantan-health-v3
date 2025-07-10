@@ -172,14 +172,31 @@ class ClaudeDescriptionGenerator:
         else:
             specialty_text = specialties
         
-        # Location context (include district if available, like "Showa District, Nagoya, Aichi")
+        # Location context with special handling for Tokyo wards
         district = provider_data.get('district', '')
         location_parts = []
-        if district:
-            location_parts.append(district)
-        location_parts.append(city)
-        if prefecture and prefecture != city:
-            location_parts.append(prefecture)
+        
+        # Tokyo Ward Special Formatting: "Tokyo, Ward" instead of "Ward, Tokyo"
+        tokyo_wards = [
+            "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+            "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+            "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+            "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+        ]
+        
+        if (city == 'Tokyo' and district and district in tokyo_wards):
+            # Tokyo wards: Show city first, then ward
+            location_parts.append(city)      # "Tokyo"
+            location_parts.append(district)  # "Setagaya"
+            # Result: "Tokyo, Setagaya"
+        else:
+            # Normal formatting: district first (if exists), then city
+            if district:
+                location_parts.append(district)
+            location_parts.append(city)
+            if prefecture and prefecture != city:
+                location_parts.append(prefecture)
+        
         location_text = ', '.join(filter(None, location_parts))
         
         # Build enhanced prompt
@@ -237,13 +254,30 @@ Make it sound like a knowledgeable local would describe this provider to a frien
         else:
             specialty_text = specialties
         
-        # Location context (include district if available)
+        # Location context with special handling for Tokyo wards
         location_parts = []
-        if district:
-            location_parts.append(district)
-        location_parts.append(city)
-        if prefecture and prefecture != city:
-            location_parts.append(prefecture)
+        
+        # Tokyo Ward Special Formatting: "Tokyo, Ward" instead of "Ward, Tokyo"
+        tokyo_wards = [
+            "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+            "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+            "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+            "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+        ]
+        
+        if (city == 'Tokyo' and district and district in tokyo_wards):
+            # Tokyo wards: Show city first, then ward
+            location_parts.append(city)      # "Tokyo"
+            location_parts.append(district)  # "Setagaya"
+            # Result: "Tokyo, Setagaya"
+        else:
+            # Normal formatting: district first (if exists), then city
+            if district:
+                location_parts.append(district)
+            location_parts.append(city)
+            if prefecture and prefecture != city:
+                location_parts.append(prefecture)
+        
         location_text = ', '.join(filter(None, location_parts))
         
         prompt = f"""
@@ -383,14 +417,31 @@ Keep it conversational and informative - like explaining to a friend why this pr
             else:
                 specialty_text = specialties
             
-            # Location context (include district if available)
+            # Location context with special handling for Tokyo wards
             district = provider_data.get('district', '')
             location_parts = []
-            if district:
-                location_parts.append(district)
-            location_parts.append(city)
-            if prefecture and prefecture != city:
-                location_parts.append(prefecture)
+            
+            # Tokyo Ward Special Formatting: "Tokyo, Ward" instead of "Ward, Tokyo"
+            tokyo_wards = [
+                "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+                "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+                "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+                "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+            ]
+            
+            if (city == 'Tokyo' and district and district in tokyo_wards):
+                # Tokyo wards: Show city first, then ward
+                location_parts.append(city)      # "Tokyo"
+                location_parts.append(district)  # "Setagaya"
+                # Result: "Tokyo, Setagaya"
+            else:
+                # Normal formatting: district first (if exists), then city
+                if district:
+                    location_parts.append(district)
+                location_parts.append(city)
+                if prefecture and prefecture != city:
+                    location_parts.append(prefecture)
+            
             location_text = ', '.join(filter(None, location_parts))
             
             provider_details.append(f"""
@@ -578,14 +629,31 @@ Please provide exactly {len(provider_batch)} descriptions, numbered 1-{len(provi
             else:
                 specialty_text = specialties
             
-            # Location context (include district if available)
+            # Location context with special handling for Tokyo wards
             district = provider_data.get('district', '')
             location_parts = []
-            if district:
-                location_parts.append(district)
-            location_parts.append(city)
-            if prefecture and prefecture != city:
-                location_parts.append(prefecture)
+            
+            # Tokyo Ward Special Formatting: "Tokyo, Ward" instead of "Ward, Tokyo"
+            tokyo_wards = [
+                "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+                "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+                "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+                "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+            ]
+            
+            if (city == 'Tokyo' and district and district in tokyo_wards):
+                # Tokyo wards: Show city first, then ward
+                location_parts.append(city)      # "Tokyo"
+                location_parts.append(district)  # "Setagaya"
+                # Result: "Tokyo, Setagaya"
+            else:
+                # Normal formatting: district first (if exists), then city
+                if district:
+                    location_parts.append(district)
+                location_parts.append(city)
+                if prefecture and prefecture != city:
+                    location_parts.append(prefecture)
+            
             location_text = ', '.join(filter(None, location_parts))
             
             provider_details.append(f"""

@@ -354,6 +354,10 @@ class GeographicProviderAdder:
                 try:
                     provider_record = self.collector.create_comprehensive_provider_record(place_data)
                     
+                    # Check if provider was filtered out due to English proficiency
+                    if provider_record is None:
+                        continue  # Provider was rejected by English proficiency filter
+                    
                     # Validate photos (system requirement)
                     if not self._validate_provider_photos(provider_record):
                         print(f"📸 Skipping {provider_record.get('provider_name', 'Unknown')}: No photos")
@@ -546,7 +550,9 @@ class GeographicProviderAdder:
         print("🌐 Syncing new providers to WordPress...")
         
         try:
-            sync_manager = WordPressSyncManager()
+            # Use the wordpress_integration service to CREATE new posts (not update existing ones)
+            from wordpress_integration import WordPressIntegration
+            wp_integration = WordPressIntegration()
             
             # Get providers ready for WordPress sync
             query = self.session.query(Provider).filter(
@@ -568,14 +574,11 @@ class GeographicProviderAdder:
             
             print(f"📋 Found {len(providers)} providers ready for WordPress")
             
-            synced_count = 0
-            for provider in providers:
-                try:
-                    result = sync_manager.sync_single_provider(provider.provider_name)
-                    if result.get('status') == 'success':
-                        synced_count += 1
-                except Exception as e:
-                    print(f"❌ Error syncing {provider.provider_name}: {str(e)}")
+            # Use the existing wordpress_integration.run_sync() method
+            # This handles creating new WordPress posts for providers without wordpress_post_id
+            results = wp_integration.run_sync()
+            
+            synced_count = results.get('published', 0)
             
             return {
                 'success': True,

@@ -69,8 +69,15 @@ def test_real_google_places():
         
         # Test creating comprehensive record
         record = collector.create_comprehensive_provider_record(detailed_data)
+        
+        if record is None:
+            print(f"\n⚠️ Provider filtered out due to English proficiency requirements")
+            print("   (Score below 3 - Basic level required)")
+            return True  # This is expected behavior, not a failure
+        
         print(f"\n✅ Created comprehensive record")
         print(f"   Provider: {record.get('provider_name', 'Unknown')}")
+        print(f"   English Proficiency: {record.get('english_proficiency', 'Unknown')} (Score: {record.get('proficiency_score', 0)})")
         print(f"   Business hours present: {bool(record.get('business_hours'))}")
         
         if record.get('business_hours'):
