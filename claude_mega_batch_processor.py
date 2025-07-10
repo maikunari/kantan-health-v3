@@ -257,7 +257,7 @@ Generate content for all {len(provider_batch)} providers following this exact fo
         try:
             response = self.claude.messages.create(
                 model=self.model,
-                max_tokens=3000 * len(provider_batch),  # Premium token allocation for highest quality, comprehensive content
+                max_tokens=min(8000, 2000 * len(provider_batch)),  # Stay under 8192 limit while optimizing for quality
                 temperature=0.6,
                 system="You are a professional healthcare content specialist. Generate comprehensive, accurate content that helps international patients find quality healthcare providers. Focus on clarity, professionalism, and specific patient benefits.",
                 messages=[{"role": "user", "content": mega_prompt}]

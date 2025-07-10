@@ -757,6 +757,23 @@ class GooglePlacesHealthcareCollector:
 
         postal_code = next((comp['long_name'] for comp in address_components if 'postal_code' in comp['types']), '') if isinstance(address_components, list) else ''
 
+        # Tokyo Ward Standardization Enhancement
+        # Ensure all Tokyo wards show as city='Tokyo', district='ward_name'
+        tokyo_wards = [
+            "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+            "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+            "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+            "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+        ]
+        
+        # If prefecture is Tokyo and city is a ward name (with or without "City" suffix), standardize it
+        ward_name = city.replace(' City', '') if city.endswith(' City') else city
+        if (prefecture in ['Tokyo', '東京都', 'Tokyo Metropolis'] and 
+            ward_name in tokyo_wards and city != 'Tokyo'):
+            print(f"🏢 Tokyo ward standardization: '{city}' → city='Tokyo', district='{ward_name}'")
+            district = ward_name
+            city = 'Tokyo'
+
         record = {
             'provider_name': name,
             'address': self.clean_address(place_data.get('formatted_address', '')),

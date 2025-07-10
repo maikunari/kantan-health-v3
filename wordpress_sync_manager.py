@@ -106,6 +106,28 @@ class WordPressSyncManager:
         finally:
             session.close()
     
+    def sync_single_provider(self, provider_name: str) -> Dict[str, Any]:
+        """Sync a single provider by name - convenience method for external scripts"""
+        try:
+            success = self.sync_provider_by_name(provider_name, dry_run=False)
+            
+            if success:
+                return {
+                    'status': 'success',
+                    'message': f'Successfully synced {provider_name} to WordPress'
+                }
+            else:
+                return {
+                    'status': 'failed',
+                    'message': f'Failed to sync {provider_name} to WordPress'
+                }
+                
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Error syncing {provider_name}: {str(e)}'
+            }
+    
     def sync_providers_needing_update(self, limit: int = 50, dry_run: bool = False):
         """Sync all providers that need updating"""
         self.print_header("Syncing Providers Needing Updates")

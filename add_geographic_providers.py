@@ -362,6 +362,10 @@ class GeographicProviderAdder:
                     providers_found.append(provider_record)
                     print(f"✅ Found: {provider_record.get('provider_name', 'Unknown')}")
                     
+                    # Debug location info
+                    if provider_record.get('city') and provider_record.get('district'):
+                        print(f"📍 Location: {provider_record.get('city')}, {provider_record.get('district')}")
+                    
                     # Add to existing fingerprints to prevent duplicates within this session
                     provider_fingerprints = self._generate_provider_fingerprints(provider_record)
                     existing_fingerprints.update(provider_fingerprints)
@@ -437,11 +441,13 @@ class GeographicProviderAdder:
         
         fingerprinter = ProviderFingerprinter()
         
-        # Create provider data for fingerprinting
+        # Create provider data for fingerprinting  
+        # Note: Using basic place_data for fingerprinting to avoid complex city extraction
+        # The comprehensive provider record will handle proper city/district parsing
         provider_data = {
             'provider_name': place_data.get('name', ''),
             'address': place_data.get('formatted_address', ''),
-            'city': self._extract_city_from_place_data(place_data),
+            'city': place_data.get('name', ''),  # Temporary for fingerprinting only
             'phone': place_data.get('formatted_phone_number', ''),
             'google_place_id': place_data.get('place_id', '')
         }
@@ -468,25 +474,9 @@ class GeographicProviderAdder:
         
         return result
     
-    def _extract_city_from_place_data(self, place_data: Dict) -> str:
-        """Extract city from Google Places address components"""
-        address_components = place_data.get('address_components', [])
-        
-        # Look for locality first
-        for component in address_components:
-            if 'locality' in component.get('types', []):
-                return component.get('long_name', '')
-        
-        # Tokyo special case
-        administrative_area = next(
-            (comp['long_name'] for comp in address_components 
-             if 'administrative_area_level_1' in comp['types']), ''
-        )
-        
-        if administrative_area in ['Tokyo', '東京都', 'Tokyo Metropolis']:
-            return 'Tokyo'
-        
-        return administrative_area
+    # Note: City extraction is now handled by google_places_integration.py
+    # in the create_comprehensive_provider_record method which properly 
+    # handles Tokyo wards (city='Tokyo', district='Setagaya')
     
     def _validate_provider_photos(self, provider_record: Dict) -> bool:
         """Validate provider has photos (system requirement)"""
@@ -511,9 +501,11 @@ class GeographicProviderAdder:
         
         try:
             # Get recently added providers without AI content
+            # Check for NULL ai_description OR empty string ai_description
             query = self.session.query(Provider).filter(
-                Provider.ai_description.is_(None),
-                Provider.status == 'pending'
+                (Provider.ai_description.is_(None)) | 
+                (Provider.ai_description == '') |
+                (Provider.ai_description == '[]')  # Some might be stored as empty JSON
             ).order_by(Provider.created_at.desc())
             
             if limit:
@@ -529,14 +521,18 @@ class GeographicProviderAdder:
             
             print(f"📋 Found {len(providers)} providers needing AI content")
             
+            # Debug: Show provider info
+            for provider in providers[:3]:
+                print(f"   - {provider.provider_name} (status: {provider.status})")
+            
             # Use mega batch processor
             processor = ClaudeMegaBatchProcessor()
-            results = processor.process_providers(providers, dry_run=False)
+            results = processor.process_providers_mega_batch(providers)
             
             return {
                 'success': True,
-                'providers_processed': results['providers_processed'],
-                'message': f'AI content generated for {results["providers_processed"]} providers'
+                'providers_processed': results.get('updated_count', len(providers)),
+                'message': f'AI content generated for {results.get("updated_count", len(providers))} providers'
             }
             
         except Exception as e:
