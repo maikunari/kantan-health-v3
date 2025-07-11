@@ -23,13 +23,21 @@ from claude_mega_batch_processor import ClaudeMegaBatchProcessor, filter_provide
 from postgres_integration import PostgresIntegration, Provider
 
 def get_providers_needing_content(db: PostgresIntegration, limit: int = None) -> List[Provider]:
-    """Get providers that need AI-generated content"""
+    """Get providers that need AI-generated content (descriptions, SEO, or featured images)"""
     session = db.Session()
     
     try:
+        # Get providers that need any content type:
+        # 1. Missing basic AI content (descriptions)
+        # 2. Missing SEO content (titles or meta descriptions)  
+        # 3. Missing Claude-selected featured images
         query = session.query(Provider).filter(
-            Provider.ai_description.is_(None),
-            Provider.status != 'published'
+            # Need basic content OR SEO content OR featured images
+            Provider.ai_description.is_(None) |
+            Provider.seo_title.is_(None) |
+            Provider.seo_meta_description.is_(None) |
+            Provider.selected_featured_image.is_(None) |
+            (Provider.selected_featured_image == '')
         )
         
         if limit:
@@ -41,8 +49,11 @@ def get_providers_needing_content(db: PostgresIntegration, limit: int = None) ->
         
         if limit and len(providers) == limit:
             total_needing = session.query(Provider).filter(
-                Provider.ai_description.is_(None),
-                Provider.status != 'published'
+                Provider.ai_description.is_(None) |
+                Provider.seo_title.is_(None) |
+                Provider.seo_meta_description.is_(None) |
+                Provider.selected_featured_image.is_(None) |
+                (Provider.selected_featured_image == '')
             ).count()
             print(f"   (Limited to {limit} providers, {total_needing} total need content)")
         
@@ -58,23 +69,47 @@ def show_provider_stats(db: PostgresIntegration):
     try:
         total_providers = session.query(Provider).count()
         
-        # Content statistics
+        # Content statistics - all content types
         has_description = session.query(Provider).filter(Provider.ai_description.isnot(None)).count()
         has_excerpt = session.query(Provider).filter(Provider.ai_excerpt.isnot(None)).count()
         has_review_summary = session.query(Provider).filter(Provider.review_summary.isnot(None)).count()
         has_english_summary = session.query(Provider).filter(Provider.english_experience_summary.isnot(None)).count()
+        
+        # SEO content statistics
+        has_seo_title = session.query(Provider).filter(Provider.seo_title.isnot(None)).count()
+        has_seo_meta = session.query(Provider).filter(Provider.seo_meta_description.isnot(None)).count()
+        
+        # Featured image statistics
+        has_featured_image = session.query(Provider).filter(
+            Provider.selected_featured_image.isnot(None),
+            Provider.selected_featured_image != ''
+        ).count()
         
         # Status statistics
         pending = session.query(Provider).filter(Provider.status == 'pending').count()
         generated = session.query(Provider).filter(Provider.status == 'description_generated').count()
         published = session.query(Provider).filter(Provider.status == 'published').count()
         
-        # Providers with all content types
+        # Providers with all content types (complete content)
         complete_content = session.query(Provider).filter(
             Provider.ai_description.isnot(None),
             Provider.ai_excerpt.isnot(None),
             Provider.review_summary.isnot(None),
-            Provider.english_experience_summary.isnot(None)
+            Provider.english_experience_summary.isnot(None),
+            Provider.seo_title.isnot(None),
+            Provider.seo_meta_description.isnot(None)
+        ).count()
+        
+        # Providers with all content including selected featured image
+        complete_with_images = session.query(Provider).filter(
+            Provider.ai_description.isnot(None),
+            Provider.ai_excerpt.isnot(None),
+            Provider.review_summary.isnot(None),
+            Provider.english_experience_summary.isnot(None),
+            Provider.seo_title.isnot(None),
+            Provider.seo_meta_description.isnot(None),
+            Provider.selected_featured_image.isnot(None),
+            Provider.selected_featured_image != ''
         ).count()
         
         print("📊 PROVIDER CONTENT STATISTICS")
@@ -84,15 +119,23 @@ def show_provider_stats(db: PostgresIntegration):
         print(f"   📝 Has Excerpts: {has_excerpt}")
         print(f"   ⭐ Has Review Summaries: {has_review_summary}")
         print(f"   🗣️ Has English Summaries: {has_english_summary}")
-        print(f"   ✅ Complete Content: {complete_content}")
+        print(f"   🔍 Has SEO Titles: {has_seo_title}")
+        print(f"   📝 Has SEO Meta Descriptions: {has_seo_meta}")
+        print(f"   🖼️ Has Selected Featured Images: {has_featured_image}")
+        print(f"   ✅ Complete Content (no images): {complete_content}")
+        print(f"   🎯 Complete Content + Images: {complete_with_images}")
         print()
         print(f"📈 STATUS DISTRIBUTION")
         print(f"   ⏳ Pending: {pending}")
         print(f"   🤖 Generated: {generated}")
         print(f"   📄 Published: {published}")
         
-        completion_rate = (complete_content / total_providers) * 100 if total_providers > 0 else 0
-        print(f"\n📊 Content Completion: {completion_rate:.1f}%")
+        # Show completion rates
+        content_completion = (complete_content / total_providers) * 100 if total_providers > 0 else 0
+        full_completion = (complete_with_images / total_providers) * 100 if total_providers > 0 else 0
+        
+        print(f"\n📊 Content Completion: {content_completion:.1f}%")
+        print(f"🎯 Full Completion (with images): {full_completion:.1f}%")
         
     finally:
         session.close()
@@ -102,13 +145,21 @@ def estimate_api_costs(providers_count: int, batch_size: int):
     api_calls = (providers_count + batch_size - 1) // batch_size
     
     # Updated estimates for claude-3-5-sonnet-20241022 with premium token allocation
+    # Content generation tokens:
     # Input tokens: ~2500 per provider (comprehensive prompts with full context)
     # Output tokens: ~1200 per provider (all content types with premium quality)
-    input_tokens_per_call = 2500 * batch_size
-    output_tokens_per_call = 1200 * batch_size
+    content_input_tokens_per_call = 2500 * batch_size
+    content_output_tokens_per_call = 1200 * batch_size
     
-    total_input_tokens = input_tokens_per_call * api_calls
-    total_output_tokens = output_tokens_per_call * api_calls
+    # Image selection tokens (Claude Vision):
+    # Input tokens: ~800 per provider (image analysis prompts + image data)
+    # Output tokens: ~50 per provider (simple selection response)
+    image_input_tokens_per_call = 800 * batch_size
+    image_output_tokens_per_call = 50 * batch_size
+    
+    # Total tokens
+    total_input_tokens = (content_input_tokens_per_call + image_input_tokens_per_call) * api_calls
+    total_output_tokens = (content_output_tokens_per_call + image_output_tokens_per_call) * api_calls
     
     # Pricing estimates (as of late 2024)
     input_cost_per_million = 3.00  # $3 per million input tokens
@@ -122,8 +173,13 @@ def estimate_api_costs(providers_count: int, batch_size: int):
     print("=" * 25)
     print(f"   📞 API Calls: {api_calls}")
     print(f"   📊 Batch Size: {batch_size}")
-    print(f"   📝 Input Tokens: {total_input_tokens:,}")
-    print(f"   💬 Output Tokens: {total_output_tokens:,}")
+    print(f"   📝 Content Generation:")
+    print(f"      Input Tokens: {content_input_tokens_per_call * api_calls:,}")
+    print(f"      Output Tokens: {content_output_tokens_per_call * api_calls:,}")
+    print(f"   🎨 Image Selection:")
+    print(f"      Input Tokens: {image_input_tokens_per_call * api_calls:,}")
+    print(f"      Output Tokens: {image_output_tokens_per_call * api_calls:,}")
+    print(f"   📊 Total Tokens: {total_input_tokens:,} input, {total_output_tokens:,} output")
     print(f"   💵 Input Cost: ${input_cost:.2f}")
     print(f"   💵 Output Cost: ${output_cost:.2f}")
     print(f"   🔢 TOTAL COST: ${total_cost:.2f}")

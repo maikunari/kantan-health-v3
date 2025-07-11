@@ -643,7 +643,7 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
 
 
 def filter_providers_needing_content(providers: List[Any]) -> List[Any]:
-    """Filter providers that need AI-generated content"""
+    """Filter providers that need AI-generated content (descriptions, SEO, or featured images)"""
     filtered_providers = []
     skipped_count = 0
     
@@ -653,32 +653,48 @@ def filter_providers_needing_content(providers: List[Any]) -> List[Any]:
             # Provider object from database
             provider_name = getattr(provider, 'provider_name', 'Unknown Provider')
             ai_description = getattr(provider, 'ai_description', None)
+            seo_title = getattr(provider, 'seo_title', None)
+            seo_meta_description = getattr(provider, 'seo_meta_description', None)
+            selected_featured_image = getattr(provider, 'selected_featured_image', None)
             wordpress_post_id = getattr(provider, 'wordpress_post_id', None)
             status = getattr(provider, 'status', 'pending')
         else:
             # Dictionary input
             provider_name = provider.get('provider_name', 'Unknown Provider')
             ai_description = provider.get('ai_description', None)
+            seo_title = provider.get('seo_title', None)
+            seo_meta_description = provider.get('seo_meta_description', None)
+            selected_featured_image = provider.get('selected_featured_image', None)
             wordpress_post_id = provider.get('wordpress_post_id', None)
             status = provider.get('status', 'pending')
         
-        # Skip if already has content or is published
-        if ai_description and ai_description.strip():
-            logger.info(f"⏭️ Skipping {provider_name}: Already has AI content")
-            skipped_count += 1
-            continue
-            
-        if wordpress_post_id:
-            logger.info(f"⏭️ Skipping {provider_name}: Already published (ID: {wordpress_post_id})")
-            skipped_count += 1
-            continue
-            
-        if status in ['published', 'description_generated']:
-            logger.info(f"⏭️ Skipping {provider_name}: Status is {status}")
+        # Check if provider needs any content type
+        needs_basic_content = not (ai_description and ai_description.strip())
+        needs_seo_content = not (seo_title and seo_title.strip()) or not (seo_meta_description and seo_meta_description.strip())
+        needs_featured_image = not (selected_featured_image and selected_featured_image.strip())
+        
+        # Skip if already published (unless it needs new content types)
+        if wordpress_post_id and not needs_seo_content and not needs_featured_image:
+            logger.info(f"⏭️ Skipping {provider_name}: Already published with complete content (ID: {wordpress_post_id})")
             skipped_count += 1
             continue
         
-        # Provider needs content
+        # Skip if has all content types
+        if not needs_basic_content and not needs_seo_content and not needs_featured_image:
+            logger.info(f"⏭️ Skipping {provider_name}: Has all content types")
+            skipped_count += 1
+            continue
+        
+        # Provider needs some content - log what's needed
+        needed_content = []
+        if needs_basic_content:
+            needed_content.append("basic content")
+        if needs_seo_content:
+            needed_content.append("SEO content")
+        if needs_featured_image:
+            needed_content.append("featured image")
+        
+        logger.info(f"✅ Adding {provider_name}: Needs {', '.join(needed_content)}")
         filtered_providers.append(provider)
     
     logger.info(f"🔍 Filtering complete: {len(filtered_providers)} need content, {skipped_count} skipped")
