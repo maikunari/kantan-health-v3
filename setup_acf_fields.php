@@ -377,19 +377,70 @@ function healthcare_register_acf_fields() {
         'show_in_rest' => 1,
     ));
 
-    // 5. PHOTO GALLERY FIELD GROUP - Google Places API Direct Links (TOS Compliant)
+    // 5. PHOTO GALLERY FIELD GROUP  
     acf_add_local_field_group(array(
         'key' => 'group_photo_gallery',
-        'title' => 'Photo Gallery (Google Places Direct Links)',
+        'title' => 'Photo Gallery & Featured Image',
         'fields' => array(
             array(
-                'key' => 'field_photo_urls_raw',
-                'label' => 'Google Places Photo URLs',
+                'key' => 'field_photo_urls',
+                'label' => 'Photo URLs',
                 'name' => 'photo_urls',
                 'type' => 'textarea',
-                'instructions' => 'Direct links to Google Places photos (TOS compliant - no downloads/storage)',
-                'readonly' => 1,
+                'instructions' => 'Google Places photo URLs (one per line)',
                 'rows' => 5,
+                'wrapper' => array('width' => '100'),
+            ),
+            array(
+                'key' => 'field_external_featured_image',
+                'label' => 'External Featured Image URL',
+                'name' => 'external_featured_image',
+                'type' => 'url',
+                'instructions' => 'Claude AI-selected or primary photo URL (automatically managed)',
+                'readonly' => 1,
+                'wrapper' => array('width' => '70'),
+            ),
+            array(
+                'key' => 'field_featured_image_source',
+                'label' => 'Featured Image Source',
+                'name' => 'featured_image_source',
+                'type' => 'select',
+                'instructions' => 'Source of the featured image selection',
+                'choices' => array(
+                    'Claude AI Selected' => 'Claude AI Selected',
+                    'First Available Photo' => 'First Available Photo',
+                    'Manual Selection' => 'Manual Selection',
+                    'No Image Available' => 'No Image Available',
+                ),
+                'readonly' => 1,
+                'default_value' => 'No Image Available',
+                'wrapper' => array('width' => '30'),
+            ),
+            array(
+                'key' => 'field_photo_count',
+                'label' => 'Available Photos',
+                'name' => 'photo_count',
+                'type' => 'number',
+                'instructions' => 'Number of photos available from Google Places',
+                'readonly' => 1,
+                'min' => 0,
+                'wrapper' => array('width' => '20'),
+            ),
+            array(
+                'key' => 'field_image_selection_status',
+                'label' => 'Image Selection Status',
+                'name' => 'image_selection_status',
+                'type' => 'select',
+                'instructions' => 'Status of AI image selection process',
+                'choices' => array(
+                    'pending' => 'Pending Selection',
+                    'selected' => 'AI Selected',
+                    'fallback' => 'Using Fallback',
+                    'none' => 'No Images Available',
+                ),
+                'readonly' => 1,
+                'default_value' => 'pending',
+                'wrapper' => array('width' => '30'),
             ),
         ),
         'location' => array(
@@ -740,6 +791,10 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         
         // Photo Gallery Field Group
         'photo_urls' => 'photo_urls',
+        'external_featured_image' => 'external_featured_image',
+        'featured_image_source' => 'featured_image_source',
+        'photo_count' => 'photo_count',
+        'image_selection_status' => 'image_selection_status',
         
         // Patient Insights Field Group
         'review_keywords' => 'review_keywords',

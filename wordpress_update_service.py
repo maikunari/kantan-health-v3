@@ -319,7 +319,12 @@ class WordPressUpdateService:
             "proficiency_score": getattr(provider, 'proficiency_score', 0) or 0,
             
             # Photos
-            "photo_urls": self._format_photo_urls(provider.photo_urls or []),
+            # Photo Gallery Field Group
+            "photo_urls": self._format_photo_urls(provider.photo_urls),
+            "external_featured_image": self._get_primary_photo_url(provider),
+            "featured_image_source": self._get_featured_image_source(provider),
+            "photo_count": self._get_photo_count(provider),
+            "image_selection_status": self._get_image_selection_status(provider),
             
             # Patient Insights  
             "review_summary": getattr(provider, 'review_summary', '') or '',
@@ -598,4 +603,66 @@ class WordPressUpdateService:
             return ""
         except Exception as e:
             print(f"⚠️ Error getting primary photo URL: {str(e)}")
-            return "" 
+            return ""
+
+    def _get_featured_image_source(self, provider) -> str:
+        """Determine the source of the featured image"""
+        try:
+            selected_featured_image = getattr(provider, 'selected_featured_image', '')
+            photo_urls = getattr(provider, 'photo_urls', [])
+            
+            # Parse photo URLs if needed
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls) if photo_urls else []
+            
+            if selected_featured_image and selected_featured_image.strip():
+                return "Claude AI Selected"
+            elif photo_urls and len(photo_urls) > 0:
+                return "First Available Photo"
+            else:
+                return "No Image Available"
+                
+        except Exception as e:
+            print(f"⚠️ Error determining image source: {str(e)}")
+            return "No Image Available"
+
+    def _get_photo_count(self, provider) -> int:
+        """Get the number of available photos"""
+        try:
+            photo_urls = getattr(provider, 'photo_urls', [])
+            
+            # Parse photo URLs if needed
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls) if photo_urls else []
+            
+            if isinstance(photo_urls, list):
+                return len(photo_urls)
+            else:
+                return 0
+                
+        except Exception as e:
+            print(f"⚠️ Error counting photos: {str(e)}")
+            return 0
+
+    def _get_image_selection_status(self, provider) -> str:
+        """Determine the image selection status"""
+        try:
+            selected_featured_image = getattr(provider, 'selected_featured_image', '')
+            photo_urls = getattr(provider, 'photo_urls', [])
+            
+            # Parse photo URLs if needed
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls) if photo_urls else []
+            
+            if selected_featured_image and selected_featured_image.strip():
+                return "selected"  # AI selected
+            elif photo_urls and len(photo_urls) > 0:
+                return "fallback"  # Using fallback (first photo)
+            elif not photo_urls or len(photo_urls) == 0:
+                return "none"  # No images available
+            else:
+                return "pending"  # Pending selection
+                
+        except Exception as e:
+            print(f"⚠️ Error determining selection status: {str(e)}")
+            return "none" 

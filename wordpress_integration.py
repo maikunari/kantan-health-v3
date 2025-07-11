@@ -233,6 +233,10 @@ class WordPressIntegration:
                     
                     # Photo Gallery Field Group
                     "photo_urls": self.convert_photo_urls_for_greenshift(getattr(provider, 'photo_urls', '')),
+                    "external_featured_image": self.get_primary_photo_url(provider),
+                    "featured_image_source": self.get_featured_image_source(provider),
+                    "photo_count": self.get_photo_count(provider),
+                    "image_selection_status": self.get_image_selection_status(provider),
                     
                     # Accessibility & Services Field Group
                     "accessibility_status": self.format_accessibility_status(getattr(provider, 'wheelchair_accessible', False)),
@@ -1081,7 +1085,69 @@ class WordPressIntegration:
         except Exception as e:
             print(f"⚠️ Error getting primary photo URL: {str(e)}")
             return ""
-    
+
+    def get_featured_image_source(self, provider) -> str:
+        """Determine the source of the featured image"""
+        try:
+            selected_featured_image = getattr(provider, 'selected_featured_image', '')
+            photo_urls = getattr(provider, 'photo_urls', [])
+            
+            # Parse photo URLs if needed
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls) if photo_urls else []
+            
+            if selected_featured_image and selected_featured_image.strip():
+                return "Claude AI Selected"
+            elif photo_urls and len(photo_urls) > 0:
+                return "First Available Photo"
+            else:
+                return "No Image Available"
+                
+        except Exception as e:
+            print(f"⚠️ Error determining image source: {str(e)}")
+            return "No Image Available"
+
+    def get_photo_count(self, provider) -> int:
+        """Get the number of available photos"""
+        try:
+            photo_urls = getattr(provider, 'photo_urls', [])
+            
+            # Parse photo URLs if needed
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls) if photo_urls else []
+            
+            if isinstance(photo_urls, list):
+                return len(photo_urls)
+            else:
+                return 0
+                
+        except Exception as e:
+            print(f"⚠️ Error counting photos: {str(e)}")
+            return 0
+
+    def get_image_selection_status(self, provider) -> str:
+        """Determine the image selection status"""
+        try:
+            selected_featured_image = getattr(provider, 'selected_featured_image', '')
+            photo_urls = getattr(provider, 'photo_urls', [])
+            
+            # Parse photo URLs if needed
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls) if photo_urls else []
+            
+            if selected_featured_image and selected_featured_image.strip():
+                return "selected"  # AI selected
+            elif photo_urls and len(photo_urls) > 0:
+                return "fallback"  # Using fallback (first photo)
+            elif not photo_urls or len(photo_urls) == 0:
+                return "none"  # No images available
+            else:
+                return "pending"  # Pending selection
+                
+        except Exception as e:
+            print(f"⚠️ Error determining selection status: {str(e)}")
+            return "none"
+
     def clean_website_url(self, url):
         """Clean website URL by removing query parameters (utm_source, etc.)"""
         if not url:
@@ -1266,6 +1332,38 @@ class WordPressIntegration:
             return {'deleted': False, 'error': f"Network error: {str(e)}"}
         except Exception as e:
             return {'deleted': False, 'error': f"Unexpected error: {str(e)}"}
+
+    def update_post_acf_fields(self, post_id: int, acf_fields: dict) -> bool:
+        """Update ACF fields for a specific WordPress post"""
+        try:
+            if not post_id:
+                print(f"❌ No post ID provided")
+                return False
+            
+            update_data = {
+                'acf': acf_fields
+            }
+            
+            response = requests.post(
+                f"{self.wordpress_url}/wp-json/wp/v2/healthcare_provider/{post_id}",
+                auth=(self.username, self.application_password),
+                json=update_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                return True
+            else:
+                print(f"❌ Failed to update ACF fields for post {post_id}: {response.status_code} - {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Network error updating ACF fields for post {post_id}: {str(e)}")
+            return False
+        except Exception as e:
+            print(f"❌ Unexpected error updating ACF fields for post {post_id}: {str(e)}")
+            return False
 
     def test_connection(self):
         """Test WordPress connection"""
