@@ -1048,7 +1048,12 @@ class WordPressIntegration:
             for day in days_order:
                 if day in business_hours['formatted_hours']:
                     hours = business_hours['formatted_hours'][day]
-                    if hours.get('open') and hours.get('close'):
+                    
+                    # Check if explicitly marked as closed
+                    if hours.get('status') == 'closed':
+                        formatted_lines.append(f"{day}: Closed")
+                    # Check if has open/close times
+                    elif hours.get('open') and hours.get('close'):
                         formatted_lines.append(f"{day}: {hours['open']} - {hours['close']}")
                     else:
                         formatted_lines.append(f"{day}: Closed")
@@ -1066,6 +1071,12 @@ class WordPressIntegration:
         
         if 'formatted_hours' in business_hours and day in business_hours['formatted_hours']:
             hours = business_hours['formatted_hours'][day]
+            
+            # Check if explicitly marked as closed
+            if hours.get('status') == 'closed':
+                return "Closed"
+            
+            # Check if has open/close times
             if hours.get('open') and hours.get('close'):
                 return f"{hours['open']} - {hours['close']}"
             else:

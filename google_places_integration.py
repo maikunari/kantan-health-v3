@@ -608,6 +608,7 @@ class GooglePlacesHealthcareCollector:
             6: 'Saturday'
         }
         
+        # Process periods for open days
         for period in periods:
             if 'open' in period:
                 day = period['open'].get('day', 0)
@@ -645,9 +646,27 @@ class GooglePlacesHealthcareCollector:
                     'raw_close': close_time
                 }
         
-        # Add status indicators
+        # ENHANCEMENT: Process weekday_text to identify "Closed" days
+        # This fixes the issue where "Closed" days were showing as "Hours not available"
         if weekday_text:
             processed_hours['display_text'] = weekday_text
+            
+            # Parse weekday_text to identify explicitly closed days
+            for day_text in weekday_text:
+                if ':' in day_text:
+                    day_part, hours_part = day_text.split(':', 1)
+                    day_name = day_part.strip()
+                    hours_part = hours_part.strip()
+                    
+                    # Check if this day is explicitly marked as "Closed"
+                    if hours_part.lower() == 'closed':
+                        processed_hours['formatted_hours'][day_name] = {
+                            'open': '',
+                            'close': '',
+                            'raw_open': '',
+                            'raw_close': '',
+                            'status': 'closed'
+                        }
         
         return processed_hours
 
