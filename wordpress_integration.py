@@ -1211,3 +1211,70 @@ class WordPressIntegration:
             return "Open Now" if business_hours['open_now'] else "Closed"
         
         return "Status unknown"
+
+    def sync_provider_to_wordpress(self, provider) -> int:
+        """Sync a provider to WordPress and return the post ID"""
+        try:
+            provider_data = self.prepare_provider_data(provider)
+            
+            # Check if post already exists
+            if hasattr(provider, 'wordpress_post_id') and provider.wordpress_post_id:
+                # Update existing post
+                post_id = self.update_wordpress_post(provider.wordpress_post_id, provider_data)
+                if post_id:
+                    print(f"✅ Updated WordPress post {post_id} for {provider_data['title']}")
+                    return post_id
+                else:
+                    print(f"⚠️ Failed to update post {provider.wordpress_post_id}, creating new one")
+            
+            # Create new post
+            post_id = self.create_wordpress_post(provider_data)
+            if post_id:
+                print(f"✅ Created WordPress post {post_id} for {provider_data['title']}")
+                return post_id
+            else:
+                print(f"❌ Failed to create WordPress post for {provider_data['title']}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error syncing provider to WordPress: {str(e)}")
+            return None
+
+    def delete_post(self, post_id: int) -> dict:
+        """Delete a WordPress post by ID"""
+        try:
+            if not post_id:
+                return {'deleted': False, 'error': 'No post ID provided'}
+            
+            delete_url = f"{self.wordpress_url}/wp-json/wp/v2/healthcare_provider/{post_id}?force=true"
+            
+            response = requests.delete(
+                delete_url,
+                auth=(self.username, self.application_password),
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return {'deleted': True, 'data': result}
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                return {'deleted': False, 'error': error_msg}
+                
+        except requests.exceptions.RequestException as e:
+            return {'deleted': False, 'error': f"Network error: {str(e)}"}
+        except Exception as e:
+            return {'deleted': False, 'error': f"Unexpected error: {str(e)}"}
+
+    def test_connection(self):
+        """Test WordPress connection"""
+        try:
+            response = requests.get(
+                f"{self.wordpress_url}/wp-json/wp/v2/types/healthcare_provider",
+                auth=(self.username, self.application_password),
+                timeout=10
+            )
+            return response.status_code == 200
+        except:
+            return False
