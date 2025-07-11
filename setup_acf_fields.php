@@ -613,6 +613,75 @@ function healthcare_register_acf_blocks() {
             'anchor' => true,
         ),
     ));
+
+    // Add fields for Provider Featured Image Block
+    acf_add_local_field_group(array(
+        'key' => 'group_provider_featured_image_block',
+        'title' => 'Provider Featured Image Block Settings',
+        'fields' => array(
+            array(
+                'key' => 'field_image_size',
+                'label' => 'Image Size',
+                'name' => 'image_size',
+                'type' => 'select',
+                'instructions' => 'Choose how the featured image should be displayed',
+                'choices' => array(
+                    'small' => 'Small (200px height)',
+                    'medium' => 'Medium (300px height)',
+                    'large' => 'Large (400px height)',
+                    'full' => 'Full Size (original aspect ratio)',
+                ),
+                'default_value' => 'large',
+            ),
+            array(
+                'key' => 'field_show_caption',
+                'label' => 'Show Caption',
+                'name' => 'show_caption',
+                'type' => 'true_false',
+                'instructions' => 'Display a caption overlay on the image',
+                'default_value' => 0,
+            ),
+            array(
+                'key' => 'field_image_caption',
+                'label' => 'Image Caption',
+                'name' => 'image_caption',
+                'type' => 'textarea',
+                'instructions' => 'Caption text to display over the image (HTML allowed)',
+                'rows' => 3,
+                'conditional_logic' => array(
+                    array(
+                        array(
+                            'field' => 'field_show_caption',
+                            'operator' => '==',
+                            'value' => '1',
+                        ),
+                    ),
+                ),
+            ),
+            array(
+                'key' => 'field_show_ai_badge',
+                'label' => 'Show AI Selection Badge',
+                'name' => 'show_ai_badge',
+                'type' => 'true_false',
+                'instructions' => 'Display badge when image was selected by Claude AI',
+                'default_value' => 1,
+                'message' => 'Show "AI Selected" badge for Claude-chosen images',
+            ),
+        ),
+        'location' => array(
+            array(
+                array(
+                    'param' => 'block',
+                    'operator' => '==',
+                    'value' => 'acf/provider-featured-image',
+                ),
+            ),
+        ),
+        'menu_order' => 0,
+        'position' => 'normal',
+        'style' => 'default',
+        'show_in_rest' => 1,
+    ));
 }
 
 /**
