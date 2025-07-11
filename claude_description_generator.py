@@ -39,6 +39,7 @@ from dotenv import load_dotenv
 from anthropic import Anthropic
 from google_places_integration import GooglePlacesHealthcareCollector  # For session access
 from postgres_integration import Provider  # Added import
+import time # Added for rate limiting
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -157,8 +158,8 @@ class ClaudeDescriptionGenerator:
         rating = provider_data.get('rating', 0)
         total_reviews = provider_data.get('total_reviews', 0)
         business_hours = provider_data.get('business_hours', {})
-        wheelchair_accessible = provider_data.get('wheelchair_accessible', False)
-        parking_available = provider_data.get('parking_available', False)
+        wheelchair_accessible = provider_data.get('wheelchair_accessible', 'Unknown')
+        parking_available = provider_data.get('parking_available', 'Unknown')
         website = provider_data.get('website', '')
         phone = provider_data.get('phone', '')
         
@@ -199,6 +200,19 @@ class ClaudeDescriptionGenerator:
         
         location_text = ', '.join(filter(None, location_parts))
         
+        # Format accessibility information for the prompt
+        def format_accessibility_for_prompt(value):
+            """Format accessibility value for Claude prompt"""
+            if value is True or value == 'True':
+                return 'Yes'
+            elif value is False or value == 'False':
+                return 'No'
+            else:
+                return 'Not specified'
+        
+        wheelchair_text = format_accessibility_for_prompt(wheelchair_accessible)
+        parking_text = format_accessibility_for_prompt(parking_available)
+        
         # Build enhanced prompt
         prompt = f"""
 Write a natural, informative description for this healthcare provider. Focus on being specific and helpful to potential patients.
@@ -216,8 +230,8 @@ PATIENT EXPERIENCE DATA:
 - English Language Notes: {', '.join(review_insights['english_mentions']) if review_insights['english_mentions'] else 'English support level varies'}
 
 FACILITY INFORMATION:
-- Wheelchair Accessibility: {'Yes' if wheelchair_accessible else 'Not specified'}
-- Parking Available: {'Yes' if parking_available else 'Not specified'}
+- Wheelchair Accessibility: {wheelchair_text}
+- Parking Available: {parking_text}
 
 INSTRUCTIONS:
 Write a comprehensive 150-175 word description in TWO paragraphs that flow naturally together:
@@ -406,7 +420,7 @@ Keep it conversational and informative - like explaining to a friend why this pr
             english_proficiency = provider_data.get('english_proficiency', 'Unknown')
             rating = provider_data.get('rating', 0)
             total_reviews = provider_data.get('total_reviews', 0)
-            wheelchair_accessible = provider_data.get('wheelchair_accessible', False)
+            wheelchair_accessible = provider_data.get('wheelchair_accessible', 'Unknown')
             
             # Process reviews for insights
             review_insights = self.process_review_content(provider_data.get('review_content', ''))
@@ -444,6 +458,18 @@ Keep it conversational and informative - like explaining to a friend why this pr
             
             location_text = ', '.join(filter(None, location_parts))
             
+            # Format accessibility information consistently
+            def format_accessibility_for_prompt(value):
+                """Format accessibility value for Claude prompt"""
+                if value is True or value == 'True':
+                    return 'Yes'
+                elif value is False or value == 'False':
+                    return 'No'
+                else:
+                    return 'Not specified'
+            
+            wheelchair_text = format_accessibility_for_prompt(wheelchair_accessible)
+            
             provider_details.append(f"""
 Provider {idx}: {provider_name}
 - Location: {location_text}
@@ -452,7 +478,7 @@ Provider {idx}: {provider_name}
 - Patient Rating: {rating}/5 stars ({total_reviews} reviews)
 - Positive Feedback: {', '.join(review_insights['positive_themes']) if review_insights['positive_themes'] else 'Limited feedback available'}
 - English Language Notes: {', '.join(review_insights['english_mentions']) if review_insights['english_mentions'] else 'Support level varies'}
-- Accessibility: {'Wheelchair accessible' if wheelchair_accessible else 'Not specified'}""")
+- Accessibility: {wheelchair_text}""")
 
         batch_prompt = f"""
 Write comprehensive 150-175 word descriptions for these {len(provider_batch)} healthcare providers. Each description MUST be formatted in EXACTLY TWO paragraphs separated by a line break.
@@ -706,6 +732,401 @@ Please provide exactly {len(provider_batch)} excerpts, numbered 1-{len(provider_
             logger.error(f"⚠️ Error generating batch excerpts: {str(e)}")
             fallback_excerpts = [f"{provider_data.get('provider_name', 'Healthcare provider')} offers professional medical services in {provider_data.get('city', 'Japan')}." for provider_data in provider_batch]
             return fallback_excerpts
+
+    def create_seo_title_prompt(self, provider_data):
+        """Create a prompt for generating SEO-optimized title (50-60 characters)"""
+        provider_name = provider_data.get('provider_name', 'Unknown Provider')
+        city = provider_data.get('city', 'Unknown City')
+        prefecture = provider_data.get('prefecture', '')
+        district = provider_data.get('district', '')
+        specialties = provider_data.get('specialties', ['General Medicine'])
+        english_proficiency = provider_data.get('english_proficiency', 'Unknown')
+        
+        # Format specialties naturally
+        if isinstance(specialties, list):
+            primary_specialty = specialties[0] if specialties else 'General Medicine'
+            specialty_text = ', '.join(specialties[:2]) if len(specialties) > 1 else primary_specialty
+        else:
+            specialty_text = specialties
+            primary_specialty = specialties
+        
+        # Location context with special handling for Tokyo wards
+        location_parts = []
+        
+        # Tokyo Ward Special Formatting: "Tokyo, Ward" instead of "Ward, Tokyo"
+        tokyo_wards = [
+            "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+            "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+            "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+            "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+        ]
+        
+        if (city == 'Tokyo' and district and district in tokyo_wards):
+            # Tokyo wards: Show city first, then ward
+            location_parts.append(city)      # "Tokyo"
+            location_parts.append(district)  # "Setagaya"
+            location_text = f"{city}, {district}"
+        else:
+            # Normal formatting
+            if district:
+                location_parts.append(district)
+            location_parts.append(city)
+            location_text = ', '.join(filter(None, location_parts))
+        
+        # English support indicator for international patients
+        english_indicator = ""
+        if english_proficiency in ['High', 'Advanced', 'Native']:
+            english_indicator = " | English-Speaking"
+        elif english_proficiency in ['Intermediate', 'Good']:
+            english_indicator = " | English Support"
+        
+        prompt = f"""
+Create an SEO-optimized title for this healthcare provider. The title should be 50-60 characters and optimized for search engines.
+
+PROVIDER DETAILS:
+- Name: {provider_name}
+- Location: {location_text}
+- Primary Specialty: {primary_specialty}
+- All Specialties: {specialty_text}
+- English Support: {english_proficiency}
+
+SEO TITLE REQUIREMENTS:
+- Length: 50-60 characters (including spaces)
+- Include: Provider name, specialty, and location
+- Format: Focus on most searchable elements first
+- Keywords: Use terms patients would search for
+- Avoid: Unnecessary words, excessive punctuation
+
+TITLE FORMATS TO CONSIDER:
+1. "[Specialty] in [Location] | [Provider Name]"
+2. "[Provider Name] - [Specialty] | [Location]"
+3. "[Provider Name] | [Specialty] [Location]"
+
+Choose the format that best fits the character limit while maximizing SEO value.
+
+EXAMPLES:
+- "Internal Medicine in Tokyo, Shibuya | Dr. Tanaka Clinic"
+- "Tokyo Medical Center - Cardiology | Shinjuku, Tokyo"
+- "Pediatrics Clinic | English-Speaking | Osaka"
+
+Generate 1 optimized SEO title that is exactly 50-60 characters.
+"""
+        
+        return prompt
+
+    def create_seo_meta_description_prompt(self, provider_data):
+        """Create a prompt for generating SEO-optimized meta description (150-160 characters)"""
+        provider_name = provider_data.get('provider_name', 'Unknown Provider')
+        city = provider_data.get('city', 'Unknown City')
+        prefecture = provider_data.get('prefecture', '')
+        district = provider_data.get('district', '')
+        specialties = provider_data.get('specialties', ['General Medicine'])
+        english_proficiency = provider_data.get('english_proficiency', 'Unknown')
+        rating = provider_data.get('rating', 0)
+        total_reviews = provider_data.get('total_reviews', 0)
+        
+        # Format specialties naturally
+        if isinstance(specialties, list):
+            primary_specialty = specialties[0] if specialties else 'General Medicine'
+            specialty_text = ', '.join(specialties[:2]) if len(specialties) > 1 else primary_specialty
+        else:
+            specialty_text = specialties
+            primary_specialty = specialties
+        
+        # Location context with special handling for Tokyo wards
+        tokyo_wards = [
+            "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+            "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+            "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+            "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+        ]
+        
+        if (city == 'Tokyo' and district and district in tokyo_wards):
+            location_text = f"{city}, {district}"
+        else:
+            location_parts = []
+            if district:
+                location_parts.append(district)
+            location_parts.append(city)
+            location_text = ', '.join(filter(None, location_parts))
+        
+        # Rating context
+        rating_text = ""
+        if rating >= 4.0 and total_reviews >= 10:
+            rating_text = f" Rated {rating}/5 stars by {total_reviews} patients."
+        elif rating >= 3.5 and total_reviews >= 5:
+            rating_text = f" {rating}/5 star rating."
+        
+        # English support context
+        english_text = ""
+        if english_proficiency in ['High', 'Advanced', 'Native']:
+            english_text = " English-speaking staff available."
+        elif english_proficiency in ['Intermediate', 'Good']:
+            english_text = " English support provided."
+        
+        prompt = f"""
+Create an SEO-optimized meta description for this healthcare provider. The meta description should be 150-160 characters and encourage clicks.
+
+PROVIDER DETAILS:
+- Name: {provider_name}
+- Location: {location_text}
+- Primary Specialty: {primary_specialty}
+- All Specialties: {specialty_text}
+- English Support: {english_proficiency}
+- Rating: {rating}/5 stars ({total_reviews} reviews)
+
+META DESCRIPTION REQUIREMENTS:
+- Length: 150-160 characters (including spaces)
+- Include: Specialty, location, key benefits
+- Call to action: Encourage appointment booking/contact
+- Keywords: Use terms patients search for
+- Compelling: Make users want to click
+
+ELEMENTS TO INCLUDE:
+1. Primary specialty and location
+2. Key differentiator (English support, rating, etc.)
+3. Soft call to action
+4. Stay within character limit
+
+GOOD EXAMPLES:
+- "Expert cardiology care in Tokyo, Shibuya. English-speaking doctors, 4.8/5 rating. Book your consultation today."
+- "Tokyo Medical Center offers internal medicine in Shinjuku. Bilingual staff, convenient location. Schedule appointment."
+- "Pediatric care in Osaka with English support. Experienced doctors, family-friendly clinic. Contact us for consultation."
+
+Generate 1 optimized meta description that is exactly 150-160 characters.
+"""
+        
+        return prompt
+
+    def generate_seo_content(self, provider_data):
+        """Generate both SEO title and meta description for a provider"""
+        provider_name = provider_data.get('provider_name', 'Unknown Provider')
+        
+        # Generate SEO title
+        title_prompt = self.create_seo_title_prompt(provider_data)
+        meta_prompt = self.create_seo_meta_description_prompt(provider_data)
+
+        try:
+            logger.info(f"Generating SEO title and meta description for {provider_name}")
+            
+            # Generate SEO title
+            title_response = self.claude.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=200,  # Short response for titles
+                temperature=0.3,  # Lower temperature for more consistent SEO formatting
+                messages=[{"role": "user", "content": title_prompt}]
+            )
+            seo_title = title_response.content[0].text.strip()
+            
+            # Generate meta description
+            meta_response = self.claude.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=300,  # Short response for meta descriptions
+                temperature=0.3,  # Lower temperature for more consistent SEO formatting
+                messages=[{"role": "user", "content": meta_prompt}]
+            )
+            seo_meta_description = meta_response.content[0].text.strip()
+            
+            # Validate length constraints
+            if len(seo_title) > 60:
+                # Truncate title if too long
+                seo_title = seo_title[:57] + "..."
+                logger.warning(f"SEO title truncated for {provider_name}: {len(seo_title)} chars")
+            
+            if len(seo_meta_description) > 160:
+                # Truncate meta description if too long
+                seo_meta_description = seo_meta_description[:157] + "..."
+                logger.warning(f"Meta description truncated for {provider_name}: {len(seo_meta_description)} chars")
+            
+            logger.info(f"✅ Generated SEO content for {provider_name}")
+            logger.info(f"   Title: {len(seo_title)} chars - {seo_title}")
+            logger.info(f"   Meta: {len(seo_meta_description)} chars - {seo_meta_description}")
+            
+            return seo_title, seo_meta_description
+            
+        except Exception as e:
+            logger.error(f"⚠️ Error generating SEO content for {provider_name}: {str(e)}")
+            
+            # Generate fallback SEO content
+            location = provider_data.get('city', 'Japan')
+            specialty = provider_data.get('specialties', ['Healthcare'])[0] if provider_data.get('specialties') else 'Healthcare'
+            
+            fallback_title = f"{specialty} in {location} | {provider_name}"
+            if len(fallback_title) > 60:
+                fallback_title = f"{specialty} | {provider_name}"
+            
+            fallback_meta = f"{specialty} services in {location}. Professional healthcare provider. Contact {provider_name} for appointments."
+            if len(fallback_meta) > 160:
+                fallback_meta = f"{specialty} in {location}. Professional healthcare provider. Contact for appointments."
+            
+            return fallback_title, fallback_meta
+
+    def generate_batch_seo_content(self, provider_data_list, batch_size=5):
+        """Generate SEO titles and meta descriptions for multiple providers in batches"""
+        all_seo_content = []
+        
+        for i in range(0, len(provider_data_list), batch_size):
+            batch = provider_data_list[i:i + batch_size]
+            batch_seo_content = self._generate_seo_batch_chunk(batch)
+            all_seo_content.extend(batch_seo_content)
+            
+            # Rate limiting between batches
+            if i + batch_size < len(provider_data_list):
+                time.sleep(2)
+        
+        return all_seo_content
+
+    def _generate_seo_batch_chunk(self, provider_batch):
+        """Generate SEO content for a single batch chunk"""
+        if not provider_batch:
+            return []
+
+        # Build SEO batch prompt
+        provider_details = []
+        for idx, provider_data in enumerate(provider_batch, 1):
+            provider_name = provider_data.get('provider_name', 'Unknown Provider')
+            city = provider_data.get('city', 'Unknown City')
+            district = provider_data.get('district', '')
+            specialties = provider_data.get('specialties', ['General Medicine'])
+            english_proficiency = provider_data.get('english_proficiency', 'Unknown')
+            rating = provider_data.get('rating', 0)
+            total_reviews = provider_data.get('total_reviews', 0)
+            
+            # Format specialties
+            if isinstance(specialties, list):
+                primary_specialty = specialties[0] if specialties else 'General Medicine'
+                specialty_text = ', '.join(specialties[:2]) if len(specialties) > 1 else primary_specialty
+            else:
+                specialty_text = specialties
+                primary_specialty = specialties
+            
+            # Location context with special handling for Tokyo wards
+            tokyo_wards = [
+                "Adachi", "Arakawa", "Bunkyo", "Chiyoda", "Chuo", "Edogawa",
+                "Itabashi", "Katsushika", "Kita", "Koto", "Meguro", "Minato", 
+                "Nakano", "Nerima", "Ota", "Setagaya", "Shibuya", "Shinagawa",
+                "Shinjuku", "Suginami", "Sumida", "Taito", "Toshima"
+            ]
+            
+            if (city == 'Tokyo' and district and district in tokyo_wards):
+                location_text = f"{city}, {district}"
+            else:
+                location_parts = []
+                if district:
+                    location_parts.append(district)
+                location_parts.append(city)
+                location_text = ', '.join(filter(None, location_parts))
+            
+            provider_details.append(f"""
+Provider {idx}: {provider_name}
+- Location: {location_text}
+- Primary Specialty: {primary_specialty}
+- All Specialties: {specialty_text}
+- English Support: {english_proficiency}
+- Rating: {rating}/5 stars ({total_reviews} reviews)""")
+
+        seo_batch_prompt = f"""
+Generate SEO titles and meta descriptions for these {len(provider_batch)} healthcare providers. Focus on location + specialties for search optimization.
+
+{chr(10).join(provider_details)}
+
+REQUIREMENTS:
+- SEO TITLE: 50-60 characters, includes provider name, specialty, location
+- META DESCRIPTION: 150-160 characters, compelling with call to action
+- Keywords: Use terms patients search for
+- Location-focused: Emphasize city/district for local SEO
+
+FORMAT FOR EACH PROVIDER:
+Provider [X]:
+TITLE: [50-60 character SEO title]
+META: [150-160 character meta description]
+
+EXAMPLE:
+Provider 1:
+TITLE: Internal Medicine Tokyo, Shibuya | Dr. Tanaka Clinic
+META: Expert internal medicine in Tokyo, Shibuya. English-speaking doctors, 4.8/5 rating. Book your consultation today for quality healthcare.
+
+Please provide exactly {len(provider_batch)} sets of SEO content:
+"""
+
+        try:
+            logger.info(f"Generating SEO batch content for {len(provider_batch)} providers")
+            response = self.claude.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=400 * len(provider_batch),  # More tokens for SEO content
+                temperature=0.3,  # Lower temperature for consistent SEO formatting
+                messages=[{"role": "user", "content": seo_batch_prompt}]
+            )
+            
+            response_text = response.content[0].text.strip()
+            seo_content = self._parse_seo_batch_response(response_text, len(provider_batch))
+            
+            # Log results
+            for provider_data, (title, meta) in zip(provider_batch, seo_content):
+                provider_name = provider_data.get('provider_name', 'Unknown Provider')
+                logger.info(f"✅ Generated SEO content for {provider_name}")
+                logger.info(f"   Title: {len(title)} chars - {title}")
+                logger.info(f"   Meta: {len(meta)} chars - {meta}")
+                
+            return seo_content
+            
+        except Exception as e:
+            logger.error(f"⚠️ Error generating SEO batch content: {str(e)}")
+            # Generate fallback SEO content for the batch
+            fallback_seo = []
+            for provider_data in provider_batch:
+                provider_name = provider_data.get('provider_name', 'Unknown Provider')
+                location = provider_data.get('city', 'Japan')
+                specialty = provider_data.get('specialties', ['Healthcare'])[0] if provider_data.get('specialties') else 'Healthcare'
+                
+                fallback_title = f"{specialty} in {location} | {provider_name}"
+                if len(fallback_title) > 60:
+                    fallback_title = f"{specialty} | {provider_name}"
+                
+                fallback_meta = f"{specialty} services in {location}. Professional healthcare provider. Contact {provider_name} for appointments."
+                if len(fallback_meta) > 160:
+                    fallback_meta = f"{specialty} in {location}. Professional healthcare provider. Contact for appointments."
+                
+                fallback_seo.append((fallback_title, fallback_meta))
+            
+            return fallback_seo
+
+    def _parse_seo_batch_response(self, response_text, expected_count):
+        """Parse SEO batch response and extract titles and meta descriptions"""
+        seo_content = []
+        
+        # Split by provider sections
+        import re
+        provider_sections = re.split(r'Provider \d+:', response_text)
+        provider_sections = [section.strip() for section in provider_sections if section.strip()]
+        
+        for i, section in enumerate(provider_sections[:expected_count]):
+            try:
+                # Extract title and meta using regex
+                title_match = re.search(r'TITLE:\s*(.+)', section)
+                meta_match = re.search(r'META:\s*(.+)', section)
+                
+                title = title_match.group(1).strip() if title_match else f"Healthcare Provider {i+1}"
+                meta = meta_match.group(1).strip() if meta_match else f"Professional healthcare services. Contact for appointments."
+                
+                # Validate and truncate if necessary
+                if len(title) > 60:
+                    title = title[:57] + "..."
+                if len(meta) > 160:
+                    meta = meta[:157] + "..."
+                
+                seo_content.append((title, meta))
+                
+            except Exception as e:
+                logger.error(f"Error parsing SEO content for provider {i+1}: {str(e)}")
+                # Add fallback content
+                seo_content.append((f"Healthcare Provider {i+1}", f"Professional healthcare services. Contact for appointments."))
+        
+        # Fill any missing entries with fallbacks
+        while len(seo_content) < expected_count:
+            seo_content.append(("Healthcare Provider", "Professional healthcare services. Contact for appointments."))
+        
+        return seo_content
 
 def filter_providers_needing_descriptions(providers):
     """Filter providers to only include those that need AI descriptions generated.

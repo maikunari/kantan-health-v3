@@ -18,20 +18,25 @@ from typing import Dict, List, Any, Optional, NamedTuple
 from dotenv import load_dotenv
 from anthropic import Anthropic
 from postgres_integration import PostgresIntegration, Provider
+from dataclasses import dataclass
+from claude_description_generator import ClaudeDescriptionGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class ContentResult(NamedTuple):
-    """Container for all content types generated for a provider"""
+@dataclass
+class ContentResult:
+    """Result container for all generated content types"""
     description: str
     excerpt: str
     review_summary: str
     english_experience_summary: str
+    seo_title: str
+    seo_meta_description: str
 
 class ClaudeMegaBatchProcessor:
-    """Generate all AI content types in optimized mega-batches"""
+    """Generate all content types in optimized mega-batches"""
     
     def __init__(self):
         """Initialize Claude API and database connections"""
@@ -217,11 +222,11 @@ Patient Reviews Sample:
 {chr(10).join(review_texts[:5]) if review_texts else 'Limited review content available'}""")
 
         # Create comprehensive mega-batch prompt
-        mega_prompt = f"""Generate ALL FOUR content types for these {len(provider_batch)} healthcare providers. Each provider needs exactly 4 pieces of content with precise formatting.
+        mega_prompt = f"""Generate ALL SIX content types for these {len(provider_batch)} healthcare providers. Each provider needs exactly 6 pieces of content with precise formatting.
 
 {chr(10).join(provider_details)}
 
-CRITICAL: Generate exactly {len(provider_batch)} complete sets of content. For each provider, create ALL FOUR content types in this EXACT format:
+CRITICAL: Generate exactly {len(provider_batch)} complete sets of content. For each provider, create ALL SIX content types in this EXACT format:
 
 PROVIDER [NUMBER]:
 
@@ -237,11 +242,19 @@ REVIEW_SUMMARY:
 ENGLISH_SUMMARY:
 [80-100 word paragraph specifically about English language support and communication experience for international patients]
 
+SEO_TITLE:
+[50-60 character SEO title including provider name, specialty, and location for search optimization]
+
+SEO_META_DESCRIPTION:
+[150-160 character meta description with call to action, focusing on location + specialty for local SEO]
+
 FORMATTING REQUIREMENTS:
 1. DESCRIPTION: Exactly 2 paragraphs, 150-175 words total
 2. EXCERPT: Single paragraph, 50-75 words 
 3. REVIEW_SUMMARY: Single narrative paragraph, 80-100 words
 4. ENGLISH_SUMMARY: Single paragraph about language support, 80-100 words
+5. SEO_TITLE: 50-60 characters, includes name + specialty + location
+6. SEO_META_DESCRIPTION: 150-160 characters, compelling with call to action
 
 Content Guidelines:
 - Professional, informative tone throughout
@@ -251,6 +264,7 @@ Content Guidelines:
 - Focus on patient experience and medical quality
 - Avoid phone numbers or website URLs
 - Make each content type distinct but complementary
+- SEO content should target local search terms
 
 Example Structure:
 PROVIDER 1:
@@ -269,7 +283,13 @@ REVIEW_SUMMARY:
 ENGLISH_SUMMARY:
 [Specific details about English language support and international patient experience...]
 
-Generate content for all {len(provider_batch)} providers following this exact format."""
+SEO_TITLE:
+[Internal Medicine Tokyo, Shibuya | Dr. Tanaka Clinic]
+
+SEO_META_DESCRIPTION:
+[Expert internal medicine in Tokyo, Shibuya. English-speaking doctors, 4.8/5 rating. Book your consultation today.]
+
+Generate content for all {len(provider_batch)} providers with ALL SIX content types."""
 
         try:
             response = self.claude.messages.create(
@@ -293,24 +313,48 @@ Generate content for all {len(provider_batch)} providers following this exact fo
                 excerpt_words = len(result.excerpt.split())
                 review_words = len(result.review_summary.split())
                 english_words = len(result.english_experience_summary.split())
+                seo_title_chars = len(result.seo_title)
+                seo_meta_chars = len(result.seo_meta_description)
                 
                 logger.info(f"✅ Generated complete content for {provider_name}:")
                 logger.info(f"   📄 Description: {desc_words} words")
-                logger.info(f"   📝 Excerpt: {excerpt_words} words") 
+                logger.info(f"   📄 Excerpt: {excerpt_words} words") 
                 logger.info(f"   ⭐ Review Summary: {review_words} words")
                 logger.info(f"   🗣️ English Summary: {english_words} words")
+                logger.info(f"   🔍 SEO Title: {seo_title_chars} chars")
+                logger.info(f"   📝 SEO Meta: {seo_meta_chars} chars")
             
             return parsed_results
             
         except Exception as e:
             logger.error(f"❌ Error generating mega-batch content: {str(e)}")
-            # Return fallback content for all providers
-            return [ContentResult(
-                description="Professional healthcare provider offering quality medical services. Please contact directly for more information.",
-                excerpt="Healthcare provider offering medical services.",
-                review_summary="Healthcare provider with patient care services.",
-                english_experience_summary="English language support may be available. Please inquire when making appointments."
-            )] * len(provider_batch)
+            # Generate fallback content for providers that couldn't be processed
+            fallback_results = []
+            for i, provider_data in enumerate(provider_batch):
+                provider_name = provider_data.provider_name if hasattr(provider_data, 'provider_name') else provider_data.get('provider_name', f'Provider {i+1}')
+                city = provider_data.city if hasattr(provider_data, 'city') else provider_data.get('city', 'Japan')
+                specialty = provider_data.specialties[0] if hasattr(provider_data, 'specialties') and provider_data.specialties else provider_data.get('specialties', ['Healthcare'])[0] if provider_data.get('specialties') else 'Healthcare'
+                
+                # Generate fallback SEO content
+                fallback_seo_title = f"{specialty} in {city} | {provider_name}"
+                if len(fallback_seo_title) > 60:
+                    fallback_seo_title = f"{specialty} | {provider_name}"
+                
+                fallback_seo_meta = f"{specialty} services in {city}. Professional healthcare provider. Contact {provider_name} for appointments."
+                if len(fallback_seo_meta) > 160:
+                    fallback_seo_meta = f"{specialty} in {city}. Professional healthcare provider. Contact for appointments."
+                
+                fallback_results.append(ContentResult(
+                    description="Professional healthcare provider offering quality medical services.",
+                    excerpt="Healthcare provider offering medical services.",
+                    review_summary="Healthcare provider with patient care services.",
+                    english_experience_summary="English language support available upon request.",
+                    seo_title=fallback_seo_title,
+                    seo_meta_description=fallback_seo_meta
+                ))
+                logger.warning(f"Added fallback content for provider {len(fallback_results)}")
+            
+            return fallback_results
     
     def _parse_mega_batch_response(self, response_text: str, expected_count: int) -> List[ContentResult]:
         """Parse the mega-batch response to extract all content types for each provider"""
@@ -333,25 +377,33 @@ Generate content for all {len(provider_batch)} providers following this exact fo
                 description_match = re.search(r'DESCRIPTION:\s*\n(.*?)(?=EXCERPT:|$)', section, re.DOTALL)
                 excerpt_match = re.search(r'EXCERPT:\s*\n(.*?)(?=REVIEW_SUMMARY:|$)', section, re.DOTALL)
                 review_match = re.search(r'REVIEW_SUMMARY:\s*\n(.*?)(?=ENGLISH_SUMMARY:|$)', section, re.DOTALL)
-                english_match = re.search(r'ENGLISH_SUMMARY:\s*\n(.*?)(?=PROVIDER\s+\d+:|$)', section, re.DOTALL)
+                english_match = re.search(r'ENGLISH_SUMMARY:\s*\n(.*?)(?=SEO_TITLE:|$)', section, re.DOTALL)
+                seo_title_match = re.search(r'SEO_TITLE:\s*\n(.*?)(?=SEO_META_DESCRIPTION:|$)', section, re.DOTALL)
+                seo_meta_description_match = re.search(r'SEO_META_DESCRIPTION:\s*\n(.*?)(?=PROVIDER\s+\d+:|$)', section, re.DOTALL)
                 
                 # Extract and clean content
                 description = description_match.group(1).strip() if description_match else "Professional healthcare provider offering medical services."
                 excerpt = excerpt_match.group(1).strip() if excerpt_match else "Healthcare provider offering medical services."
                 review_summary = review_match.group(1).strip() if review_match else "Healthcare provider with patient care services."
                 english_summary = english_match.group(1).strip() if english_match else "English language support available upon request."
+                seo_title = seo_title_match.group(1).strip() if seo_title_match else ""
+                seo_meta_description = seo_meta_description_match.group(1).strip() if seo_meta_description_match else ""
                 
                 # Clean up any formatting artifacts
                 description = re.sub(r'\n\s*\n', '\n\n', description.strip())  # Normalize paragraph breaks
                 excerpt = excerpt.replace('\n', ' ').strip()
                 review_summary = review_summary.replace('\n', ' ').strip()
                 english_summary = english_summary.replace('\n', ' ').strip()
+                seo_title = seo_title.replace('\n', ' ').strip()
+                seo_meta_description = seo_meta_description.replace('\n', ' ').strip()
                 
                 results.append(ContentResult(
                     description=description,
                     excerpt=excerpt,
                     review_summary=review_summary,
-                    english_experience_summary=english_summary
+                    english_experience_summary=english_summary,
+                    seo_title=seo_title,
+                    seo_meta_description=seo_meta_description
                 ))
                 
                 logger.info(f"✅ Parsed content for provider {i+1}")
@@ -363,7 +415,9 @@ Generate content for all {len(provider_batch)} providers following this exact fo
                     description="Professional healthcare provider offering quality medical services.",
                     excerpt="Healthcare provider offering medical services.",
                     review_summary="Healthcare provider with patient care services.",
-                    english_experience_summary="English language support available upon request."
+                    english_experience_summary="English language support available upon request.",
+                    seo_title="",
+                    seo_meta_description=""
                 ))
         
         # Fill any missing results with fallbacks
@@ -372,7 +426,9 @@ Generate content for all {len(provider_batch)} providers following this exact fo
                 description="Professional healthcare provider offering quality medical services.",
                 excerpt="Healthcare provider offering medical services.",
                 review_summary="Healthcare provider with patient care services.",
-                english_experience_summary="English language support available upon request."
+                english_experience_summary="English language support available upon request.",
+                seo_title="",
+                seo_meta_description=""
             ))
             logger.warning(f"Added fallback content for provider {len(results)}")
         
@@ -382,7 +438,7 @@ Generate content for all {len(provider_batch)} providers following this exact fo
         """Check if the content result contains fallback content instead of AI-generated content"""
         fallback_indicators = [
             "Professional healthcare provider offering quality medical services.",
-            "Professional healthcare provider offering medical services.",
+            "Professional healthcare provider offering quality medical services.",
             "Healthcare provider offering medical services.",
             "Healthcare provider with patient care services.",
             "English language support available upon request.",
@@ -487,6 +543,8 @@ Generate content for all {len(provider_batch)} providers following this exact fo
                     provider_obj.ai_excerpt = result.excerpt
                     provider_obj.review_summary = result.review_summary
                     provider_obj.english_experience_summary = result.english_experience_summary
+                    provider_obj.seo_title = result.seo_title
+                    provider_obj.seo_meta_description = result.seo_meta_description
                     provider_obj.status = 'description_generated'
                     
                     updated_count += 1

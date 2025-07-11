@@ -253,6 +253,10 @@ class WordPressIntegration:
                     "ai_description": getattr(provider, 'ai_description', ''),
                     "ai_excerpt": getattr(provider, 'ai_excerpt', ''),  # Add excerpt to ACF fields as well
                     "provider_city": provider.city,
+                    
+                    # SEO Content Field Group
+                    "seo_title": getattr(provider, 'seo_title', ''),
+                    "seo_meta_description": getattr(provider, 'seo_meta_description', ''),
                 },
                 "meta": {
                     # Non-ACF meta fields only
@@ -276,7 +280,13 @@ class WordPressIntegration:
                     "provider_website": self.clean_website_url(provider.website or ""),
                     "provider_rating": provider.rating or 0,
                     "total_reviews": provider.total_reviews or 0,
-                    "english_proficiency": provider.english_proficiency or "Unknown"
+                    "english_proficiency": provider.english_proficiency or "Unknown",
+                    
+                    # SEO meta fields for Yoast/RankMath compatibility
+                    "_yoast_wpseo_title": getattr(provider, 'seo_title', ''),
+                    "_yoast_wpseo_metadesc": getattr(provider, 'seo_meta_description', ''),
+                    "_rank_math_title": getattr(provider, 'seo_title', ''),
+                    "_rank_math_description": getattr(provider, 'seo_meta_description', ''),
                 }
             }
             
@@ -808,18 +818,18 @@ class WordPressIntegration:
     
     def format_accessibility_status(self, wheelchair_accessible):
         """Format accessibility status with descriptive sentences"""
-        if wheelchair_accessible is True:
+        if wheelchair_accessible is True or wheelchair_accessible == 'True' or wheelchair_accessible == True:
             return "Location is wheelchair accessible"
-        elif wheelchair_accessible is False:
+        elif wheelchair_accessible is False or wheelchair_accessible == 'False' or wheelchair_accessible == False:
             return "Location is not wheelchair accessible"
         else:
             return "Wheelchair accessibility unknown"
 
     def format_parking_status(self, parking_available):
         """Format parking status with descriptive sentences"""
-        if parking_available is True:
+        if parking_available is True or parking_available == 'True' or parking_available == True:
             return "Parking available"
-        elif parking_available is False:
+        elif parking_available is False or parking_available == 'False' or parking_available == False:
             return "No Parking available"
         else:
             return "Parking availability unknown"
@@ -1089,18 +1099,18 @@ class WordPressIntegration:
     
     def format_wheelchair_accessibility(self, wheelchair_accessible):
         """Format wheelchair accessibility for ACF dropdown field"""
-        if wheelchair_accessible is True:
+        if wheelchair_accessible is True or wheelchair_accessible == 'True' or wheelchair_accessible == True:
             return "Wheelchair accessible"
-        elif wheelchair_accessible is False:
+        elif wheelchair_accessible is False or wheelchair_accessible == 'False' or wheelchair_accessible == False:
             return "Not wheelchair accessible"
         else:
             return "Wheelchair accessibility unknown"
     
     def format_parking_availability(self, parking_available):
         """Format parking availability for ACF dropdown field"""
-        if parking_available is True:
+        if parking_available is True or parking_available == 'True' or parking_available == True:
             return "Parking is available"
-        elif parking_available is False:
+        elif parking_available is False or parking_available == 'False' or parking_available == False:
             return "Parking is not available"
         else:
             return "Parking unknown"

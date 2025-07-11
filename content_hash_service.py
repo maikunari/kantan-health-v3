@@ -28,6 +28,8 @@ class ContentHashService:
             content_data = {
                 'ai_description': provider.ai_description or '',
                 'ai_excerpt': provider.ai_excerpt or '',
+                'seo_title': provider.seo_title or '',
+                'seo_meta_description': provider.seo_meta_description or '',
                 'provider_name': provider.provider_name or '',
                 'specialties': provider.specialties or [],
                 'city': provider.city or '',
@@ -45,7 +47,7 @@ class ContentHashService:
                 'nearest_station': provider.nearest_station or '',
                 'photo_urls': provider.photo_urls or [],
                 'review_summary': provider.review_summary or '',
-            'english_experience_summary': provider.english_experience_summary or '',
+                'english_experience_summary': provider.english_experience_summary or '',
                 'google_maps_embed': f"{provider.provider_name} {provider.address or ''} {provider.latitude or 0},{provider.longitude or 0}"
             }
             

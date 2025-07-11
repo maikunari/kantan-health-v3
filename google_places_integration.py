@@ -670,6 +670,98 @@ class GooglePlacesHealthcareCollector:
         
         return processed_hours
 
+    def enhanced_accessibility_detection(self, place_data):
+        """Enhanced accessibility and parking detection with proper unknown state handling"""
+        accessibility_info = {
+            'wheelchair_accessible': 'Unknown',
+            'parking_available': 'Unknown'
+        }
+        
+        if not isinstance(place_data, dict):
+            return accessibility_info
+        
+        # Get reviews once for both analyses
+        reviews = place_data.get('reviews', [])
+        
+        # WHEELCHAIR ACCESSIBILITY DETECTION
+        # Check for explicit wheelchair accessibility fields
+        wheelchair_entrance = place_data.get('wheelchair_accessible_entrance')
+        if wheelchair_entrance is not None:
+            accessibility_info['wheelchair_accessible'] = wheelchair_entrance
+        else:
+            # Check for other wheelchair accessibility indicators in reviews
+            wheelchair_mentions = 0
+            positive_wheelchair = 0
+            
+            for review in reviews:
+                text = review.get('text', '').lower()
+                if any(keyword in text for keyword in ['wheelchair', 'accessible', 'disability', 'handicap', 'ramp']):
+                    wheelchair_mentions += 1
+                    # Check sentiment of wheelchair-related mentions
+                    if any(positive in text for positive in ['accessible', 'wheelchair friendly', 'easy access', 'ramp available']):
+                        positive_wheelchair += 1
+            
+            # If we have enough wheelchair mentions with positive sentiment, infer accessibility
+            if wheelchair_mentions >= 2 and positive_wheelchair > wheelchair_mentions * 0.5:
+                accessibility_info['wheelchair_accessible'] = True
+            elif wheelchair_mentions >= 2 and positive_wheelchair == 0:
+                accessibility_info['wheelchair_accessible'] = False
+            # Otherwise remains 'Unknown'
+        
+        # PARKING AVAILABILITY DETECTION
+        # Multiple detection methods for parking
+        parking_indicators = []
+        
+        # Method 1: Check place types for parking-related types
+        place_types = place_data.get('types', [])
+        if any(ptype in ['parking', 'hospital', 'shopping_mall', 'shopping_center'] for ptype in place_types):
+            parking_indicators.append('type_suggests_parking')
+        
+        # Method 2: Check business name for parking indicators
+        name = place_data.get('name', '').lower()
+        if any(keyword in name for keyword in ['hospital', 'medical center', 'clinic center', 'shopping']):
+            parking_indicators.append('name_suggests_parking')
+        
+        # Method 3: Analyze reviews for parking mentions
+        parking_mentions = 0
+        positive_parking = 0
+        negative_parking = 0
+        
+        for review in reviews:
+            text = review.get('text', '').lower()
+            if any(keyword in text for keyword in ['parking', 'park', 'garage', 'lot']):
+                parking_mentions += 1
+                
+                # Positive parking indicators
+                if any(positive in text for positive in [
+                    'free parking', 'parking available', 'plenty of parking', 
+                    'easy parking', 'parking space', 'garage', 'parking lot'
+                ]):
+                    positive_parking += 1
+                    
+                # Negative parking indicators
+                elif any(negative in text for negative in [
+                    'no parking', 'difficult parking', 'hard to park', 
+                    'parking problem', 'nowhere to park'
+                ]):
+                    negative_parking += 1
+        
+        # Method 4: Check address for parking-related terms
+        address = place_data.get('formatted_address', '').lower()
+        if any(keyword in address for keyword in ['plaza', 'mall', 'center', 'complex']):
+            parking_indicators.append('address_suggests_parking')
+        
+        # Determine parking availability based on evidence
+        if positive_parking >= 2 or len(parking_indicators) >= 2:
+            accessibility_info['parking_available'] = True
+        elif negative_parking >= 2:
+            accessibility_info['parking_available'] = False
+        elif parking_mentions >= 3 and positive_parking > negative_parking:
+            accessibility_info['parking_available'] = True
+        # Otherwise remains 'Unknown'
+        
+        return accessibility_info
+
     def create_comprehensive_provider_record(self, place_data):
         """Create a comprehensive provider record with all available data, handling invalid data"""
         if not isinstance(place_data, dict):
@@ -805,6 +897,13 @@ class GooglePlacesHealthcareCollector:
             district = ward_name
             city = 'Tokyo'
 
+        # ENHANCED ACCESSIBILITY AND PARKING DETECTION
+        accessibility_info = self.enhanced_accessibility_detection(place_data)
+        
+        print(f"♿ Accessibility Analysis for {name}:")
+        print(f"   Wheelchair Accessible: {accessibility_info['wheelchair_accessible']}")
+        print(f"   Parking Available: {accessibility_info['parking_available']}")
+
         record = {
             'provider_name': name,
             'address': self.clean_address(place_data.get('formatted_address', '')),
@@ -834,8 +933,8 @@ class GooglePlacesHealthcareCollector:
             'google_place_id': place_data.get('place_id', ''),
             'business_status': place_data.get('business_status', 'UNKNOWN'),
             'service_categories': self._categorize_services(place_data.get('types', [])) if isinstance(place_data, dict) else [],
-            'wheelchair_accessible': place_data.get('wheelchair_accessible_entrance', False),
-            'parking_available': 'parking' in str(place_data.get('types', [])).lower() if isinstance(place_data.get('types', []), list) else False,
+            'wheelchair_accessible': accessibility_info['wheelchair_accessible'],
+            'parking_available': accessibility_info['parking_available'],
             'business_hours': self.process_opening_hours(place_data) if isinstance(place_data, dict) else {},
             'nearest_station': self.format_nearest_station(nearest_station_info) if nearest_station_info else ''
         }
@@ -921,8 +1020,8 @@ class GooglePlacesHealthcareCollector:
                         google_place_id=google_place_id,
                         ai_description=provider.get('ai_description', ''),
                         business_hours=provider.get('business_hours', {}),
-                        wheelchair_accessible=provider.get('wheelchair_accessible', False),
-                        parking_available=provider.get('parking_available', False),
+                        wheelchair_accessible=provider.get('wheelchair_accessible', 'Unknown'),
+                        parking_available=provider.get('parking_available', 'Unknown'),
                         # Add fingerprints for deduplication
                         primary_fingerprint=fingerprints.primary,
                         secondary_fingerprint=fingerprints.secondary if fingerprints.secondary else None,
