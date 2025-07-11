@@ -120,7 +120,7 @@ class ClaudeMegaBatchProcessor:
                 'english_mentions': []
             }
     
-    def generate_mega_batch_content(self, provider_batch: List[Any], batch_size: int = 4) -> List[ContentResult]:
+    def generate_mega_batch_content(self, provider_batch: List[Any]) -> List[ContentResult]:
         """Generate all content types for a batch of providers in a single API call"""
         if not provider_batch:
             return []
@@ -274,7 +274,7 @@ Generate content for all {len(provider_batch)} providers following this exact fo
         try:
             response = self.claude.messages.create(
                 model=self.model,
-                max_tokens=min(8000, 2000 * len(provider_batch)),  # Stay under 8192 limit while optimizing for quality
+                max_tokens=min(8000, 3000 * len(provider_batch)),  # Increased token allocation for comprehensive content
                 temperature=0.6,
                 system="You are a professional healthcare content specialist. Generate comprehensive, accurate content that helps international patients find quality healthcare providers. Focus on clarity, professionalism, and specific patient benefits.",
                 messages=[{"role": "user", "content": mega_prompt}]
@@ -378,7 +378,24 @@ Generate content for all {len(provider_batch)} providers following this exact fo
         
         return results[:expected_count]
     
-    def process_providers_mega_batch(self, providers: List[Any], batch_size: int = 4) -> Dict[str, Any]:
+    def _is_fallback_content(self, result: ContentResult) -> bool:
+        """Check if the content result contains fallback content instead of AI-generated content"""
+        fallback_indicators = [
+            "Professional healthcare provider offering quality medical services.",
+            "Professional healthcare provider offering medical services.",
+            "Healthcare provider offering medical services.",
+            "Healthcare provider with patient care services.",
+            "English language support available upon request.",
+            "English language support may be available. Please inquire when making appointments."
+        ]
+        
+        # Check if any of the content fields match fallback patterns
+        return (result.description in fallback_indicators or
+                result.excerpt in fallback_indicators or
+                result.review_summary in fallback_indicators or
+                result.english_experience_summary in fallback_indicators)
+    
+    def process_providers_mega_batch(self, providers: List[Any], batch_size: int = 2) -> Dict[str, Any]:
         """Process all providers using mega-batch API calls"""
         if not providers:
             logger.warning("No providers to process")
@@ -398,7 +415,22 @@ Generate content for all {len(provider_batch)} providers following this exact fo
             
             try:
                 # Generate all content types in single API call
-                batch_results = self.generate_mega_batch_content(batch, batch_size)
+                batch_results = self.generate_mega_batch_content(batch)
+                
+                # Check for fallback content and retry with individual processing if needed
+                fallback_count = sum(1 for result in batch_results if self._is_fallback_content(result))
+                if fallback_count > 0 and len(batch) > 1:
+                    logger.warning(f"⚠️ {fallback_count}/{len(batch)} providers got fallback content, retrying individually...")
+                    # Retry failed providers individually
+                    retry_results = []
+                    for provider in batch:
+                        individual_result = self.generate_mega_batch_content([provider])
+                        retry_results.extend(individual_result)
+                    batch_results = retry_results
+                    
+                    # Log retry results
+                    retry_fallback_count = sum(1 for result in batch_results if self._is_fallback_content(result))
+                    logger.info(f"🔄 Retry complete: {len(batch_results) - retry_fallback_count}/{len(batch_results)} providers now have proper content")
                 
                 # Update database with results
                 batch_updated, batch_errors = self._update_database_batch(batch, batch_results)
@@ -524,7 +556,7 @@ def filter_providers_needing_content(providers: List[Any]) -> List[Any]:
     return filtered_providers
 
 
-def run_mega_batch_content_generation(providers: List[Any] = None, batch_size: int = 4):
+def run_mega_batch_content_generation(providers: List[Any] = None, batch_size: int = 2):
     """Main function to run mega-batch content generation for all providers"""
     print("🚀 CLAUDE MEGA-BATCH CONTENT PROCESSOR")
     print("=" * 60)

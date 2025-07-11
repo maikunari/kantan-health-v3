@@ -130,7 +130,7 @@ def estimate_api_costs(providers_count: int, batch_size: int):
     
     return total_cost
 
-def run_mega_batch_automation(batch_size: int = 4, limit: int = None, dry_run: bool = False):
+def run_mega_batch_automation(batch_size: int = 2, limit: int = None, dry_run: bool = False):
     """Run the complete mega-batch content generation automation"""
     
     print("🚀 MEGA-BATCH CONTENT GENERATION AUTOMATION")
@@ -222,8 +222,8 @@ def main():
     """Main function with command line argument parsing"""
     parser = argparse.ArgumentParser(description='Mega-Batch Content Generation Automation')
     
-    parser.add_argument('--batch-size', type=int, default=4,
-                        help='Number of providers per batch (default: 4)')
+    parser.add_argument('--batch-size', type=int, default=2,
+                        help='Number of providers per batch (default: 2, optimized for reliability)')
     parser.add_argument('--limit', type=int, default=None,
                         help='Limit number of providers to process (for testing)')
     parser.add_argument('--dry-run', action='store_true',
