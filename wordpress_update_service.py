@@ -83,7 +83,8 @@ class WordPressUpdateService:
                 'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'sync_source': 'WordPress Sync Enhancement - ACF Only',
                 'content_hash': content_comparison.new_hash,
-                'data_display_method': 'acf_fields_only'
+                'data_display_method': 'acf_fields_only',
+                'external_featured_image': self._get_primary_photo_url(provider)
             }
         }
         
@@ -567,4 +568,34 @@ class WordPressUpdateService:
             return str(photo_urls) if photo_urls else ''
         except Exception as e:
             logger.error(f"❌ Error formatting photo URLs: {str(e)}")
-            return str(photo_urls) if photo_urls else '' 
+            return str(photo_urls) if photo_urls else ''
+
+    def _get_primary_photo_url(self, provider) -> str:
+        """Get the primary photo URL for external featured image - prioritizes Claude-selected image"""
+        try:
+            # First priority: Claude-selected featured image
+            selected_featured_image = getattr(provider, 'selected_featured_image', '')
+            if selected_featured_image and selected_featured_image.strip():
+                return selected_featured_image.strip()
+            
+            # Fallback: Use first photo from photo_urls if no selection available
+            photo_urls = getattr(provider, 'photo_urls', [])
+            if not photo_urls:
+                return ""
+            
+            # Parse photo URLs if they're in JSON string format
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls)
+            
+            if photo_urls and isinstance(photo_urls, list) and len(photo_urls) > 0:
+                # Return the first photo URL as fallback
+                return photo_urls[0]
+            else:
+                return ""
+                
+        except json.JSONDecodeError:
+            print(f"⚠️ Error parsing photo URLs for {getattr(provider, 'provider_name', 'Unknown Provider')}")
+            return ""
+        except Exception as e:
+            print(f"⚠️ Error getting primary photo URL: {str(e)}")
+            return "" 

@@ -282,6 +282,9 @@ class WordPressIntegration:
                     "total_reviews": provider.total_reviews or 0,
                     "english_proficiency": provider.english_proficiency or "Unknown",
                     
+                    # External Featured Image - TOS Compliant
+                    "external_featured_image": self.get_primary_photo_url(provider),
+                    
                     # SEO meta fields for Yoast/RankMath compatibility
                     "_yoast_wpseo_title": getattr(provider, 'seo_title', ''),
                     "_yoast_wpseo_metadesc": getattr(provider, 'seo_meta_description', ''),
@@ -1047,6 +1050,36 @@ class WordPressIntegration:
             
         except Exception as e:
             print(f"Error extracting English indicators: {str(e)}")
+            return ""
+
+    def get_primary_photo_url(self, provider) -> str:
+        """Get the primary photo URL for external featured image - prioritizes Claude-selected image"""
+        try:
+            # First priority: Claude-selected featured image
+            selected_featured_image = getattr(provider, 'selected_featured_image', '')
+            if selected_featured_image and selected_featured_image.strip():
+                return selected_featured_image.strip()
+            
+            # Fallback: Use first photo from photo_urls if no selection available
+            photo_urls = getattr(provider, 'photo_urls', [])
+            if not photo_urls:
+                return ""
+            
+            # Parse photo URLs if they're in JSON string format
+            if isinstance(photo_urls, str):
+                photo_urls = json.loads(photo_urls)
+            
+            if photo_urls and isinstance(photo_urls, list) and len(photo_urls) > 0:
+                # Return the first photo URL as fallback
+                return photo_urls[0]
+            else:
+                return ""
+                
+        except json.JSONDecodeError:
+            print(f"⚠️ Error parsing photo URLs for {getattr(provider, 'provider_name', 'Unknown Provider')}")
+            return ""
+        except Exception as e:
+            print(f"⚠️ Error getting primary photo URL: {str(e)}")
             return ""
     
     def clean_website_url(self, url):

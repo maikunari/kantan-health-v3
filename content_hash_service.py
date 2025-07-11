@@ -8,6 +8,7 @@ import hashlib
 import json
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from datetime import datetime
 from postgres_integration import Provider
 
 @dataclass
@@ -39,25 +40,25 @@ class ContentHashService:
                 'english_proficiency': provider.english_proficiency or 'Unknown',
                 'rating': provider.rating or 0,
                 'total_reviews': provider.total_reviews or 0,
-                'business_hours': provider.business_hours or {},
-                'wheelchair_accessible': provider.wheelchair_accessible or False,
-                'parking_available': provider.parking_available or False,
-                'latitude': provider.latitude or 0,
-                'longitude': provider.longitude or 0,
-                'nearest_station': provider.nearest_station or '',
+                'wheelchair_accessible': provider.wheelchair_accessible or 'Unknown',
+                'parking_available': provider.parking_available or 'Unknown',
                 'photo_urls': provider.photo_urls or [],
-                'review_summary': provider.review_summary or '',
-                'english_experience_summary': provider.english_experience_summary or '',
-                'google_maps_embed': f"{provider.provider_name} {provider.address or ''} {provider.latitude or 0},{provider.longitude or 0}"
+                'selected_featured_image': provider.selected_featured_image or '',  # Include Claude-selected image
+                'primary_photo_url': self._get_primary_photo_url(provider.photo_urls or [])  # Keep existing logic for backwards compatibility
             }
             
             # Sort keys for consistent hashing
             content_json = json.dumps(content_data, sort_keys=True, default=str)
-            return hashlib.sha256(content_json.encode()).hexdigest()
+            
+            # Generate SHA256 hash
+            content_hash = hashlib.sha256(content_json.encode('utf-8')).hexdigest()
+            
+            return content_hash
             
         except Exception as e:
             print(f"❌ Error generating hash for {provider.provider_name}: {str(e)}")
-            return ""
+            # Return a default hash if error occurs
+            return hashlib.sha256(f"error_{provider.provider_name}_{datetime.now().isoformat()}".encode('utf-8')).hexdigest()
     
     def content_changed(self, provider: Provider) -> bool:
         """Check if provider content has changed since last sync"""
@@ -255,3 +256,28 @@ class ContentHashService:
         except Exception as e:
             print(f"❌ Error generating sync report: {str(e)}")
             return report 
+
+    def _get_primary_photo_url(self, photo_urls) -> str:
+        """Get the first/primary photo URL from provider's photo_urls for external featured image"""
+        try:
+            if not photo_urls:
+                return ""
+            
+            # Parse photo URLs
+            if isinstance(photo_urls, str):
+                photo_list = json.loads(photo_urls)
+            else:
+                photo_list = photo_urls
+            
+            if photo_list and isinstance(photo_list, list) and len(photo_list) > 0:
+                # Return the first photo URL as the primary/featured image
+                return photo_list[0]
+            else:
+                return ""
+                
+        except json.JSONDecodeError:
+            print(f"⚠️ Error parsing photo URLs for content hash")
+            return ""
+        except Exception as e:
+            print(f"⚠️ Error getting primary photo URL: {str(e)}")
+            return "" 

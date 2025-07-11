@@ -34,6 +34,7 @@ class ContentResult:
     english_experience_summary: str
     seo_title: str
     seo_meta_description: str
+    selected_featured_image: str  # Claude-selected best photo URL
 
 class ClaudeMegaBatchProcessor:
     """Generate all content types in optimized mega-batches"""
@@ -306,8 +307,12 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
             # Parse the mega-batch response
             parsed_results = self._parse_mega_batch_response(response_text, len(provider_batch))
             
-            # Log results
-            for i, result in enumerate(parsed_results):
+            # Process featured image selection for the batch
+            logger.info(f"🎨 Starting image selection for {len(provider_batch)} providers")
+            final_results = self.process_batch_image_selection(provider_batch, parsed_results)
+            
+            # Log results with image selection info
+            for i, result in enumerate(final_results):
                 provider_name = provider_batch[i].provider_name if hasattr(provider_batch[i], 'provider_name') else provider_batch[i].get('provider_name', f'Provider {i+1}')
                 desc_words = len(result.description.split())
                 excerpt_words = len(result.excerpt.split())
@@ -315,6 +320,7 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
                 english_words = len(result.english_experience_summary.split())
                 seo_title_chars = len(result.seo_title)
                 seo_meta_chars = len(result.seo_meta_description)
+                has_featured_image = "✅" if result.selected_featured_image else "❌"
                 
                 logger.info(f"✅ Generated complete content for {provider_name}:")
                 logger.info(f"   📄 Description: {desc_words} words")
@@ -323,8 +329,9 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
                 logger.info(f"   🗣️ English Summary: {english_words} words")
                 logger.info(f"   🔍 SEO Title: {seo_title_chars} chars")
                 logger.info(f"   📝 SEO Meta: {seo_meta_chars} chars")
+                logger.info(f"   🖼️ Featured Image: {has_featured_image}")
             
-            return parsed_results
+            return final_results
             
         except Exception as e:
             logger.error(f"❌ Error generating mega-batch content: {str(e)}")
@@ -350,11 +357,71 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
                     review_summary="Healthcare provider with patient care services.",
                     english_experience_summary="English language support available upon request.",
                     seo_title=fallback_seo_title,
-                    seo_meta_description=fallback_seo_meta
+                    seo_meta_description=fallback_seo_meta,
+                    selected_featured_image="" # No image for fallback
                 ))
                 logger.warning(f"Added fallback content for provider {len(fallback_results)}")
             
             return fallback_results
+    
+    def process_batch_image_selection(self, provider_batch: List[Any], content_results: List[ContentResult]) -> List[ContentResult]:
+        """Process image selection for a batch of providers using Claude Vision API"""
+        logger.info(f"🎨 Processing featured image selection for {len(provider_batch)} providers")
+        
+        # Import the description generator for image selection functionality
+        from claude_description_generator import ClaudeDescriptionGenerator
+        image_selector = ClaudeDescriptionGenerator()
+        
+        updated_results = []
+        
+        for provider_data, content_result in zip(provider_batch, content_results):
+            try:
+                # Convert provider object to dictionary if needed
+                if hasattr(provider_data, '__dict__'):
+                    provider_dict = {
+                        'provider_name': getattr(provider_data, 'provider_name', 'Unknown Provider'),
+                        'city': getattr(provider_data, 'city', 'Unknown City'),
+                        'prefecture': getattr(provider_data, 'prefecture', ''),
+                        'specialties': getattr(provider_data, 'specialties', ['Healthcare']),
+                        'photo_urls': getattr(provider_data, 'photo_urls', [])
+                    }
+                else:
+                    provider_dict = provider_data
+                
+                # Select best featured image using Claude Vision
+                selected_image_url = image_selector.select_best_featured_image(provider_dict)
+                
+                # Update the content result with selected image
+                updated_result = ContentResult(
+                    description=content_result.description,
+                    excerpt=content_result.excerpt,
+                    review_summary=content_result.review_summary,
+                    english_experience_summary=content_result.english_experience_summary,
+                    seo_title=content_result.seo_title,
+                    seo_meta_description=content_result.seo_meta_description,
+                    selected_featured_image=selected_image_url
+                )
+                
+                updated_results.append(updated_result)
+                
+                provider_name = provider_dict.get('provider_name', f'Provider {len(updated_results)}')
+                logger.info(f"🖼️ Featured image selected for {provider_name}")
+                
+            except Exception as e:
+                logger.error(f"❌ Error selecting image for provider: {str(e)}")
+                # Keep original result without selected image
+                updated_result = ContentResult(
+                    description=content_result.description,
+                    excerpt=content_result.excerpt,
+                    review_summary=content_result.review_summary,
+                    english_experience_summary=content_result.english_experience_summary,
+                    seo_title=content_result.seo_title,
+                    seo_meta_description=content_result.seo_meta_description,
+                    selected_featured_image=""  # Empty if selection failed
+                )
+                updated_results.append(updated_result)
+        
+        return updated_results
     
     def _parse_mega_batch_response(self, response_text: str, expected_count: int) -> List[ContentResult]:
         """Parse the mega-batch response to extract all content types for each provider"""
@@ -403,7 +470,8 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
                     review_summary=review_summary,
                     english_experience_summary=english_summary,
                     seo_title=seo_title,
-                    seo_meta_description=seo_meta_description
+                    seo_meta_description=seo_meta_description,
+                    selected_featured_image="" # No image for fallback
                 ))
                 
                 logger.info(f"✅ Parsed content for provider {i+1}")
@@ -417,7 +485,8 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
                     review_summary="Healthcare provider with patient care services.",
                     english_experience_summary="English language support available upon request.",
                     seo_title="",
-                    seo_meta_description=""
+                    seo_meta_description="",
+                    selected_featured_image=""
                 ))
         
         # Fill any missing results with fallbacks
@@ -428,7 +497,8 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
                 review_summary="Healthcare provider with patient care services.",
                 english_experience_summary="English language support available upon request.",
                 seo_title="",
-                seo_meta_description=""
+                seo_meta_description="",
+                selected_featured_image=""
             ))
             logger.warning(f"Added fallback content for provider {len(results)}")
         
@@ -545,6 +615,7 @@ Generate content for all {len(provider_batch)} providers with ALL SIX content ty
                     provider_obj.english_experience_summary = result.english_experience_summary
                     provider_obj.seo_title = result.seo_title
                     provider_obj.seo_meta_description = result.seo_meta_description
+                    provider_obj.selected_featured_image = result.selected_featured_image
                     provider_obj.status = 'description_generated'
                     
                     updated_count += 1

@@ -851,3 +851,199 @@ function healthcare_featured_image_info_callback($post) {
 }
 
 
+/**
+ * EXTERNAL FEATURED IMAGE SYSTEM (Google Places TOS Compliant)
+ * Allows featured images to be set using external URLs without importing to media library
+ */
+
+/**
+ * Override post thumbnail HTML to use external featured image when available
+ */
+add_filter('post_thumbnail_html', 'healthcare_external_featured_image', 10, 5);
+function healthcare_external_featured_image($html, $post_id, $post_thumbnail_id, $size, $attr) {
+    // Only for healthcare providers
+    if (get_post_type($post_id) !== 'healthcare_provider') {
+        return $html;
+    }
+    
+    // If there's already a featured image, use it
+    if (!empty($html)) {
+        return $html;
+    }
+    
+    // Get external featured image URL
+    $external_image_url = get_post_meta($post_id, 'external_featured_image', true);
+    
+    if (!empty($external_image_url)) {
+        $provider_name = get_the_title($post_id);
+        
+        // Build image attributes
+        $default_attr = array(
+            'alt' => esc_attr($provider_name . ' - Healthcare Provider'),
+            'title' => esc_attr($provider_name),
+            'class' => 'wp-post-image external-featured-image'
+        );
+        
+        // Merge with provided attributes
+        $attr = wp_parse_args($attr, $default_attr);
+        
+        // Build HTML attributes string
+        $attr_string = '';
+        foreach ($attr as $key => $value) {
+            $attr_string .= $key . '="' . esc_attr($value) . '" ';
+        }
+        
+        // Return external image HTML
+        return '<img src="' . esc_url($external_image_url) . '" ' . $attr_string . '/>';
+    }
+    
+    return $html;
+}
+
+/**
+ * Add external featured image support to has_post_thumbnail function
+ */
+add_filter('has_post_thumbnail', 'healthcare_has_external_featured_image', 10, 2);
+function healthcare_has_external_featured_image($has_thumbnail, $post_id) {
+    // Only for healthcare providers
+    if (get_post_type($post_id) !== 'healthcare_provider') {
+        return $has_thumbnail;
+    }
+    
+    // If already has thumbnail, return true
+    if ($has_thumbnail) {
+        return true;
+    }
+    
+    // Check for external featured image
+    $external_image_url = get_post_meta($post_id, 'external_featured_image', true);
+    
+    return !empty($external_image_url);
+}
+
+/**
+ * Override get_the_post_thumbnail to use external image
+ */
+add_filter('get_the_post_thumbnail', 'healthcare_get_external_post_thumbnail', 10, 5);
+function healthcare_get_external_post_thumbnail($html, $post_id, $size, $attr) {
+    // Only for healthcare providers
+    if (get_post_type($post_id) !== 'healthcare_provider') {
+        return $html;
+    }
+    
+    // If there's already thumbnail HTML, use it
+    if (!empty($html)) {
+        return $html;
+    }
+    
+    // Get external featured image
+    $external_image_url = get_post_meta($post_id, 'external_featured_image', true);
+    
+    if (!empty($external_image_url)) {
+        $provider_name = get_the_title($post_id);
+        
+        // Handle different size parameters
+        $width = '';
+        $height = '';
+        
+        if (is_array($size)) {
+            $width = 'width="' . esc_attr($size[0]) . '"';
+            $height = 'height="' . esc_attr($size[1]) . '"';
+        } elseif (is_string($size)) {
+            // Handle named sizes (thumbnail, medium, large, full)
+            switch ($size) {
+                case 'thumbnail':
+                    $width = 'width="150"';
+                    $height = 'height="150"';
+                    break;
+                case 'medium':
+                    $width = 'width="300"';
+                    $height = 'height="300"';
+                    break;
+                case 'large':
+                    $width = 'width="600"';
+                    $height = 'height="400"';
+                    break;
+                default:
+                    // Full size - no width/height restrictions
+                    break;
+            }
+        }
+        
+        // Build image attributes
+        $default_attr = array(
+            'alt' => esc_attr($provider_name . ' - Healthcare Provider'),
+            'title' => esc_attr($provider_name),
+            'class' => 'wp-post-image external-featured-image'
+        );
+        
+        // Merge with provided attributes
+        $attr = wp_parse_args($attr, $default_attr);
+        
+        // Build HTML attributes string
+        $attr_string = '';
+        foreach ($attr as $key => $value) {
+            $attr_string .= $key . '="' . esc_attr($value) . '" ';
+        }
+        
+        // Return external image HTML
+        return '<img src="' . esc_url($external_image_url) . '" ' . $width . ' ' . $height . ' ' . $attr_string . '/>';
+    }
+    
+    return $html;
+}
+
+/**
+ * Add external featured image info to admin metabox
+ */
+add_action('add_meta_boxes', 'healthcare_add_external_featured_image_info');
+function healthcare_add_external_featured_image_info() {
+    add_meta_box(
+        'healthcare_external_featured_image_info',
+        'External Featured Image (Google Places)',
+        'healthcare_external_featured_image_info_callback',
+        'healthcare_provider',
+        'side',
+        'low'
+    );
+}
+
+function healthcare_external_featured_image_info_callback($post) {
+    $external_image_url = get_post_meta($post->ID, 'external_featured_image', true);
+    
+    if (!empty($external_image_url)) {
+        echo '<div style="text-align: center; padding: 10px;">';
+        echo '<img src="' . esc_url($external_image_url) . '" style="max-width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px;">';
+        echo '<p><strong>✅ External featured image loaded</strong></p>';
+        echo '<p><small>Source: Google Places (TOS compliant)</small></p>';
+        echo '<p><small>URL: ' . esc_html($external_image_url) . '</small></p>';
+        echo '</div>';
+    } else {
+        echo '<div style="text-align: center; padding: 15px; background: #f0f0f1; border-radius: 4px;">';
+        echo '<p><strong>No external featured image</strong></p>';
+        echo '<p><small>External featured images are automatically set during sync from Google Places photos.</small></p>';
+        echo '</div>';
+    }
+}
+
+/**
+ * Add CSS for external featured images
+ */
+add_action('wp_head', 'healthcare_external_featured_image_css');
+function healthcare_external_featured_image_css() {
+    if (is_singular('healthcare_provider')) {
+        echo '<style>
+            .external-featured-image {
+                object-fit: cover;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                transition: transform 0.3s ease;
+            }
+            .external-featured-image:hover {
+                transform: scale(1.02);
+            }
+        </style>';
+    }
+}
+
+

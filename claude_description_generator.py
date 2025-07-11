@@ -961,6 +961,106 @@ Generate 1 optimized meta description that is exactly 150-160 characters.
             
             return fallback_title, fallback_meta
 
+    def select_best_featured_image(self, provider_data):
+        """Use Claude Vision API to select the best featured image from available photos"""
+        provider_name = provider_data.get('provider_name', 'Unknown Provider')
+        photo_urls = provider_data.get('photo_urls', [])
+        
+        # Parse photo URLs if they're in JSON string format
+        if isinstance(photo_urls, str):
+            try:
+                import json
+                photo_urls = json.loads(photo_urls)
+            except json.JSONDecodeError:
+                logger.error(f"⚠️ Error parsing photo URLs for {provider_name}")
+                return ""
+        
+        if not photo_urls or len(photo_urls) == 0:
+            logger.warning(f"📸 No photos available for {provider_name}")
+            return ""
+        
+        # If only one photo, return it
+        if len(photo_urls) == 1:
+            logger.info(f"📸 Only one photo available for {provider_name}, using it")
+            return photo_urls[0]
+        
+        try:
+            logger.info(f"🔍 Analyzing {len(photo_urls)} photos for {provider_name} to select best featured image")
+            
+            # Create Claude Vision prompt for image selection
+            image_selection_prompt = f"""
+You are selecting the best featured image for a healthcare provider: {provider_name}
+
+PROVIDER CONTEXT:
+- Name: {provider_name}
+- Location: {provider_data.get('city', 'Unknown')}, {provider_data.get('prefecture', '')}
+- Specialties: {', '.join(provider_data.get('specialties', ['Healthcare']))}
+- Type: Healthcare/Medical facility
+
+I will show you {len(photo_urls)} photos. Please analyze each photo and select the BEST one for a featured image based on these criteria:
+
+SELECTION CRITERIA (in order of importance):
+1. **Professional Appearance**: Clean, well-lit, professional-looking facility
+2. **Facility Representation**: Shows the actual healthcare facility (exterior, reception, treatment areas)
+3. **Image Quality**: Clear, sharp, good lighting, not blurry or dark
+4. **Trust Factor**: Inspires confidence in healthcare quality
+5. **Avoid**: Poor lighting, blurry images, irrelevant content, staff photos, equipment close-ups
+
+RESPONSE FORMAT:
+Return ONLY the number (1-{len(photo_urls)}) of the best image. No explanation needed.
+
+For example, if image 3 is best, respond: 3
+"""
+
+            # Build content with images
+            content = [{"type": "text", "text": image_selection_prompt}]
+            
+            # Add images to the content
+            for i, photo_url in enumerate(photo_urls[:5], 1):  # Limit to 5 photos max
+                content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": photo_url
+                    }
+                })
+                content.append({
+                    "type": "text", 
+                    "text": f"Image {i}:"
+                })
+            
+            # Call Claude Vision API
+            response = self.claude.messages.create(
+                model="claude-3-5-sonnet-20241022",  # Latest Claude model with vision
+                max_tokens=50,  # Very short response - just a number
+                temperature=0.2,  # Lower temperature for consistent selection
+                messages=[{"role": "user", "content": content}]
+            )
+            
+            selection_response = response.content[0].text.strip()
+            
+            # Parse the selection (should be a number)
+            try:
+                selected_index = int(selection_response) - 1  # Convert to 0-based index
+                
+                if 0 <= selected_index < len(photo_urls):
+                    selected_url = photo_urls[selected_index]
+                    logger.info(f"✅ Claude selected image {selected_index + 1}/{len(photo_urls)} for {provider_name}")
+                    logger.info(f"   Selected URL: {selected_url}")
+                    return selected_url
+                else:
+                    logger.warning(f"⚠️ Claude returned invalid selection {selection_response} for {provider_name}, using first image")
+                    return photo_urls[0]
+                    
+            except ValueError:
+                logger.warning(f"⚠️ Claude returned non-numeric selection '{selection_response}' for {provider_name}, using first image")
+                return photo_urls[0]
+                
+        except Exception as e:
+            logger.error(f"❌ Error in Claude image selection for {provider_name}: {str(e)}")
+            logger.info(f"   Falling back to first image")
+            return photo_urls[0] if photo_urls else ""
+
     def generate_batch_seo_content(self, provider_data_list, batch_size=5):
         """Generate SEO titles and meta descriptions for multiple providers in batches"""
         all_seo_content = []

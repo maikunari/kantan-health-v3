@@ -46,6 +46,7 @@ class Provider(Base):
     ai_excerpt = Column(Text)  # Short excerpt for provider preview (50-100 words)
     seo_title = Column(String(100))  # SEO-optimized title (50-60 characters)
     seo_meta_description = Column(String(200))  # SEO-optimized meta description (150-160 characters)
+    selected_featured_image = Column(Text)  # Claude-selected best photo URL for featured image
     google_place_id = Column(String(255))
     business_hours = Column(JSON)  # Store business hours data
     wheelchair_accessible = Column(String(50))  # Store wheelchair accessibility status
@@ -94,7 +95,7 @@ class PostgresIntegration:
                 "specialties", "english_proficiency", "proficiency_score", "rating", "total_reviews",
                 "review_content", "review_keywords", "review_highlights", "review_summary", "english_experience_summary", "photo_urls",
                 "nearest_station", "latitude", "longitude", "status", "created_at", "wordpress_post_id", 
-                "ai_description", "ai_excerpt", "seo_title", "seo_meta_description", "google_place_id", "business_hours", "wheelchair_accessible",
+                "ai_description", "ai_excerpt", "seo_title", "seo_meta_description", "selected_featured_image", "google_place_id", "business_hours", "wheelchair_accessible",
                 "parking_available", "primary_fingerprint", "secondary_fingerprint", "fuzzy_fingerprint",
                 "last_wordpress_sync", "content_hash", "wordpress_status"
             }
