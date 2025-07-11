@@ -32,6 +32,11 @@ def force_update_acf_fields():
                 'wordpress_post_id': provider.wordpress_post_id,
                 'photo_urls': provider.photo_urls,
                 'selected_featured_image': provider.selected_featured_image,
+                'latitude': provider.latitude,
+                'longitude': provider.longitude,
+                'address': provider.address,
+                'seo_title': provider.seo_title,
+                'seo_meta_description': provider.seo_meta_description,
             }
             provider_dicts.append(provider_dict)
         
@@ -52,9 +57,29 @@ def force_update_acf_fields():
                 
                 print(f"🔄 Updating {name} (Post ID: {wordpress_post_id})...")
                 
-                # Get photo URLs and counts
+                # Get photo URLs and counts - properly parse JSON format
                 photo_urls_str = provider.get('photo_urls', '')
-                photo_urls = [url.strip() for url in photo_urls_str.split('\n') if url.strip()] if photo_urls_str else []
+                photo_urls = []
+                
+                if photo_urls_str:
+                    try:
+                        # Parse JSON string to get list of URLs
+                        if isinstance(photo_urls_str, str):
+                            photo_urls = json.loads(photo_urls_str)
+                        else:
+                            photo_urls = photo_urls_str
+                        
+                        # Ensure it's a list
+                        if not isinstance(photo_urls, list):
+                            photo_urls = []
+                            
+                    except json.JSONDecodeError:
+                        # If it's not JSON, try treating as newline-separated (fallback)
+                        photo_urls = [url.strip() for url in photo_urls_str.split('\n') if url.strip()]
+                    except Exception as e:
+                        print(f"   ⚠️ Error parsing photo URLs: {str(e)}")
+                        photo_urls = []
+                
                 photo_count = len(photo_urls)
                 
                 # Get Claude-selected featured image
@@ -74,23 +99,48 @@ def force_update_acf_fields():
                     image_selection_status = "none"
                     external_featured_image = ""
                 
+                # Generate Google Map array
+                google_map_data = ""
+                latitude = provider.get('latitude', 0)
+                longitude = provider.get('longitude', 0)
+                name = provider.get('name', '')
+                address = provider.get('address', '')
+                
+                if latitude and longitude:
+                    google_map_data = {
+                        'location': {
+                            'lat': float(latitude),
+                            'lng': float(longitude)
+                        },
+                        'title': name,
+                        'description': address.replace(', Japan', '').strip() if address else ''
+                    }
+                
+                # Get SEO data
+                seo_title = provider.get('seo_title', '')
+                seo_meta_description = provider.get('seo_meta_description', '')
+                
                 # Prepare ACF field updates
                 acf_fields = {
                     'external_featured_image': external_featured_image,
                     'featured_image_source': featured_image_source,
                     'photo_count': photo_count,
                     'image_selection_status': image_selection_status,
-                    'photo_urls': '\n'.join(photo_urls) if photo_urls else ''
+                    'photo_urls': '\n'.join(photo_urls) if photo_urls else '',
+                    'google_map': google_map_data,
+                    'seo_title': seo_title,
+                    'seo_meta_description': seo_meta_description
                 }
                 
-                # Update WordPress post with ACF fields
-                success = wp.update_post_acf_fields(wordpress_post_id, acf_fields)
+                # Update WordPress post with ACF fields and SEO meta
+                success = wp.update_post_with_seo_meta(wordpress_post_id, acf_fields, seo_title, seo_meta_description)
                 
                 if success:
-                    print(f"✅ {name}: Updated ACF fields")
+                    print(f"✅ {name}: Updated ACF fields and SEO data")
                     print(f"   📸 Featured Image: {featured_image_source}")
                     print(f"   🔢 Photo Count: {photo_count}")
                     print(f"   📊 Status: {image_selection_status}")
+                    print(f"   🎯 SEO Title: {seo_title[:40]}..." if len(seo_title) > 40 else f"   🎯 SEO Title: {seo_title}")
                     updated_count += 1
                 else:
                     print(f"❌ {name}: Failed to update ACF fields")
@@ -106,11 +156,14 @@ def force_update_acf_fields():
         print(f"📋 Total processed: {len(providers)}")
         
         if updated_count > 0:
-            print(f"\n🎉 ACF fields have been populated! Your Greenshift integration should now work with:")
+            print(f"\n🎉 ACF fields and SEO data have been populated! Available fields:")
             print(f"   {{acf:external_featured_image}} - Featured image URL")
             print(f"   {{acf:featured_image_source}} - Image source method")
             print(f"   {{acf:photo_count}} - Number of photos")
             print(f"   {{acf:image_selection_status}} - Selection status")
+            print(f"   {{acf:seo_title}} - SEO optimized title")
+            print(f"   {{acf:seo_meta_description}} - SEO meta description")
+            print(f"   📊 Yoast SEO meta fields also populated for search engines")
         
     except Exception as e:
         print(f"💥 Fatal error: {str(e)}")

@@ -313,6 +313,7 @@ class WordPressUpdateService:
             "longitude": provider.longitude or 0,
             "nearest_station": provider.nearest_station or '',
             "google_maps_embed": self._generate_google_maps_embed(provider.latitude, provider.longitude, provider.provider_name, provider.address or ""),
+            "google_map": self._generate_google_map_array(provider),
             
             # Language Support
             "english_proficiency": provider.english_proficiency or 'Unknown',
@@ -549,6 +550,29 @@ class WordPressUpdateService:
             src="https://maps.google.com/maps?q={search_query}&hl=en&z=15&output=embed" 
             allowfullscreen>
         </iframe>'''
+
+    def _generate_google_map_array(self, provider: Provider) -> dict:
+        """Generate Google Map array for ACF google_map field type"""
+        try:
+            latitude = getattr(provider, 'latitude', 0)
+            longitude = getattr(provider, 'longitude', 0)
+            
+            if not latitude or not longitude:
+                return ""
+            
+            # Return array in ACF google_map format
+            return {
+                'location': {
+                    'lat': float(latitude),
+                    'lng': float(longitude)
+                },
+                'title': getattr(provider, 'provider_name', ''),
+                'description': self._clean_address(getattr(provider, 'address', ''))
+            }
+            
+        except Exception as e:
+            logger.error(f"⚠️ Error generating Google Map array: {str(e)}")
+            return ""
     
     def _format_photo_urls(self, photo_urls) -> str:
         """Format photo URLs for ACF - convert to newline-separated format to match WordPress integration"""

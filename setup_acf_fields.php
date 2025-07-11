@@ -14,6 +14,72 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Register Yoast SEO meta fields for REST API access
+ * This allows our automation scripts to update Yoast SEO data via REST API
+ */
+add_action('rest_api_init', 'healthcare_register_yoast_meta_fields');
+function healthcare_register_yoast_meta_fields() {
+    // Register Yoast SEO title field
+    register_rest_field('healthcare_provider', '_yoast_wpseo_title', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post['id'], '_yoast_wpseo_title', true);
+        },
+        'update_callback' => function($value, $post) {
+            return update_post_meta($post->ID, '_yoast_wpseo_title', $value);
+        },
+        'schema' => array(
+            'description' => 'Yoast SEO title',
+            'type' => 'string',
+            'context' => array('view', 'edit')
+        )
+    ));
+    
+    // Register Yoast SEO meta description field
+    register_rest_field('healthcare_provider', '_yoast_wpseo_metadesc', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post['id'], '_yoast_wpseo_metadesc', true);
+        },
+        'update_callback' => function($value, $post) {
+            return update_post_meta($post->ID, '_yoast_wpseo_metadesc', $value);
+        },
+        'schema' => array(
+            'description' => 'Yoast SEO meta description',
+            'type' => 'string',
+            'context' => array('view', 'edit')
+        )
+    ));
+    
+    // Register RankMath fields as backup
+    register_rest_field('healthcare_provider', '_rank_math_title', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post['id'], '_rank_math_title', true);
+        },
+        'update_callback' => function($value, $post) {
+            return update_post_meta($post->ID, '_rank_math_title', $value);
+        },
+        'schema' => array(
+            'description' => 'RankMath SEO title',
+            'type' => 'string',
+            'context' => array('view', 'edit')
+        )
+    ));
+    
+    register_rest_field('healthcare_provider', '_rank_math_description', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post['id'], '_rank_math_description', true);
+        },
+        'update_callback' => function($value, $post) {
+            return update_post_meta($post->ID, '_rank_math_description', $value);
+        },
+        'schema' => array(
+            'description' => 'RankMath SEO meta description',
+            'type' => 'string',
+            'context' => array('view', 'edit')
+        )
+    ));
+}
+
+/**
  * Register ACF Field Groups for Healthcare Providers
  */
 add_action('acf/init', 'healthcare_register_acf_fields');
@@ -206,6 +272,19 @@ function healthcare_register_acf_fields() {
                 'instructions' => 'Generated automatically from coordinates',
                 'readonly' => 1,
                 'rows' => 3,
+            ),
+            array(
+                'key' => 'field_google_map',
+                'label' => 'Interactive Google Map',
+                'name' => 'google_map',
+                'type' => 'google_map',
+                'instructions' => 'Interactive map location for Greenshift integration',
+                'center_lat' => 35.6762,
+                'center_lng' => 139.6503,
+                'zoom' => 15,
+                'height' => 300,
+                'readonly' => 1,
+                'wrapper' => array('width' => '100'),
             ),
         ),
         'location' => array(
@@ -458,7 +537,49 @@ function healthcare_register_acf_fields() {
         'show_in_rest' => 1,
     ));
 
-    // 6. PATIENT INSIGHTS FIELD GROUP
+    // 6. SEO CONTENT FIELD GROUP
+    acf_add_local_field_group(array(
+        'key' => 'group_seo_content',
+        'title' => 'SEO Content',
+        'fields' => array(
+            array(
+                'key' => 'field_seo_title',
+                'label' => 'SEO Title',
+                'name' => 'seo_title',
+                'type' => 'text',
+                'instructions' => 'SEO-optimized title (50-60 characters) - automatically generated',
+                'maxlength' => 100,
+                'readonly' => 1,
+                'wrapper' => array('width' => '100'),
+            ),
+            array(
+                'key' => 'field_seo_meta_description',
+                'label' => 'SEO Meta Description',
+                'name' => 'seo_meta_description',
+                'type' => 'textarea',
+                'instructions' => 'SEO meta description (150-160 characters) - automatically generated',
+                'maxlength' => 200,
+                'rows' => 3,
+                'readonly' => 1,
+                'wrapper' => array('width' => '100'),
+            ),
+        ),
+        'location' => array(
+            array(
+                array(
+                    'param' => 'post_type',
+                    'operator' => '==',
+                    'value' => 'healthcare_provider',
+                ),
+            ),
+        ),
+        'menu_order' => 6,
+        'position' => 'normal',
+        'style' => 'default',
+        'show_in_rest' => 1,
+    ));
+
+    // 7. PATIENT INSIGHTS FIELD GROUP
     acf_add_local_field_group(array(
         'key' => 'group_patient_insights',
         'title' => 'Patient Insights',
@@ -527,7 +648,7 @@ function healthcare_register_acf_fields() {
                 ),
             ),
         ),
-        'menu_order' => 6,
+        'menu_order' => 7,
         'position' => 'normal',
         'style' => 'default',
         'show_in_rest' => 1,
@@ -783,6 +904,7 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         'longitude' => 'longitude',
         'district' => 'district',
         'nearest_station' => 'nearest_station',
+        'google_map' => 'google_map',
         
         // Language Support Field Group
         'english_proficiency' => 'english_proficiency',
@@ -798,6 +920,10 @@ function healthcare_populate_acf_from_meta($value, $post_id, $field) {
         
         // Patient Insights Field Group
         'review_keywords' => 'review_keywords',
+        
+        // SEO Content Field Group
+        'seo_title' => 'seo_title',
+        'seo_meta_description' => 'seo_meta_description',
     );
     
     // If this field should be populated from meta and value is empty

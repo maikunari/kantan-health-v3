@@ -225,6 +225,7 @@ class WordPressIntegration:
                     "longitude": getattr(provider, 'longitude', 0),
                     "nearest_station": getattr(provider, 'nearest_station', ''),
                     "google_maps_embed": self.generate_google_maps_embed(getattr(provider, 'latitude', 0), getattr(provider, 'longitude', 0), provider.provider_name, self.clean_address(getattr(provider, 'address', ''))),
+                    "google_map": self.generate_google_map_array(provider),
                     
                     # Language Support Field Group
                     "english_proficiency": getattr(provider, 'english_proficiency', 'Unknown'),
@@ -867,6 +868,29 @@ class WordPressIntegration:
         
         return embed_code
 
+    def generate_google_map_array(self, provider):
+        """Generate Google Map array for ACF google_map field type"""
+        try:
+            latitude = getattr(provider, 'latitude', 0)
+            longitude = getattr(provider, 'longitude', 0)
+            
+            if not latitude or not longitude or latitude == 0 or longitude == 0:
+                return ""
+            
+            # Return array in ACF google_map format
+            return {
+                'location': {
+                    'lat': float(latitude),
+                    'lng': float(longitude)
+                },
+                'title': getattr(provider, 'provider_name', ''),
+                'description': self.clean_address(getattr(provider, 'address', ''))
+            }
+            
+        except Exception as e:
+            print(f"⚠️ Error generating Google Map array: {str(e)}")
+            return ""
+
     def extract_patient_feedback_themes(self, review_content):
         """Extract key patient feedback themes from review content"""
         if not review_content:
@@ -1363,6 +1387,48 @@ class WordPressIntegration:
             return False
         except Exception as e:
             print(f"❌ Unexpected error updating ACF fields for post {post_id}: {str(e)}")
+            return False
+
+    def update_post_with_seo_meta(self, post_id: int, acf_fields: dict, seo_title: str = '', seo_meta_description: str = '') -> bool:
+        """Update both ACF fields and Yoast SEO meta fields for a WordPress post"""
+        try:
+            if not post_id:
+                print(f"❌ No post ID provided")
+                return False
+            
+            # Prepare update data with ACF fields and registered REST fields for Yoast
+            update_data = {
+                'acf': acf_fields
+            }
+            
+            # Add Yoast SEO fields as registered REST fields (not meta)
+            if seo_title:
+                update_data['_yoast_wpseo_title'] = seo_title
+                update_data['_rank_math_title'] = seo_title
+            
+            if seo_meta_description:
+                update_data['_yoast_wpseo_metadesc'] = seo_meta_description
+                update_data['_rank_math_description'] = seo_meta_description
+            
+            response = requests.post(
+                f"{self.wordpress_url}/wp-json/wp/v2/healthcare_provider/{post_id}",
+                auth=(self.username, self.application_password),
+                json=update_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                return True
+            else:
+                print(f"❌ Failed to update post {post_id}: {response.status_code} - {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Network error updating post {post_id}: {str(e)}")
+            return False
+        except Exception as e:
+            print(f"❌ Unexpected error updating post {post_id}: {str(e)}")
             return False
 
     def test_connection(self):
