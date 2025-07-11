@@ -394,13 +394,40 @@ class WordPressIntegration:
         # Normalize the specialty name
         normalized_specialty = specialty_mapping.get(specialty_name.lower(), specialty_name)
         
-        # Search for the specialty
-        specialty_terms = self.get_all_wordpress_terms('specialties')
+        # Search for the specialty with multiple methods
+        print(f"📄 Searching for specialty: {normalized_specialty}")
         
+        # Method 1: Direct search API call
+        search_results = self.search_wordpress_terms('specialties', normalized_specialty)
+        for term in search_results:
+            if (term["name"].lower() == normalized_specialty.lower() or 
+                term["name"].lower() == specialty_name.lower()):
+                print(f"✅ Found via search API: {normalized_specialty} (ID: {term['id']})")
+                return term['id']
+        
+        # Method 2: Get all terms and search manually
+        specialty_terms = self.get_all_wordpress_terms('specialties')
+        print(f"📊 Total specialties fetched: {len(specialty_terms)}")
+        
+        # Try exact matches first
         for term in specialty_terms:
             if (term["name"].lower() == normalized_specialty.lower() or 
                 term["name"].lower() == specialty_name.lower()):
-                print(f"✅ Found specialty: {normalized_specialty} (ID: {term['id']})")
+                print(f"✅ Found exact match: {normalized_specialty} (ID: {term['id']})")
+                return term['id']
+        
+        # Try partial matches and common variations
+        for term in specialty_terms:
+            term_name_lower = term["name"].lower().strip()
+            normalized_lower = normalized_specialty.lower().strip()
+            specialty_lower = specialty_name.lower().strip()
+            
+            # Check if terms are similar (accounting for punctuation, spacing differences)
+            if (term_name_lower.replace('&', 'and').replace('(', '').replace(')', '').replace(',', '').replace(' ', '') == 
+                normalized_lower.replace('&', 'and').replace('(', '').replace(')', '').replace(',', '').replace(' ', '') or
+                term_name_lower.replace('&', 'and').replace('(', '').replace(')', '').replace(',', '').replace(' ', '') == 
+                specialty_lower.replace('&', 'and').replace('(', '').replace(')', '').replace(',', '').replace(' ', '')):
+                print(f"✅ Found similar match: {term['name']} for {normalized_specialty} (ID: {term['id']})")
                 return term['id']
         
         # Try creating the specialty
@@ -418,6 +445,53 @@ class WordPressIntegration:
                 new_id = response.json()["id"]
                 print(f"✅ Created specialty: {normalized_specialty} (ID: {new_id})")
                 return new_id
+            elif response.status_code == 400:
+                # Handle "term_exists" error - extract existing term ID
+                try:
+                    error_data = response.json()
+                    print(f"⚠️ Creation failed: {response.status_code} - {error_data}")
+                    
+                    if "term_exists" in response.text or "already exists" in response.text:
+                        print(f"🔄 Term exists but not found in search, extracting ID from error...")
+                        
+                        # Extract term_id from various possible error response formats
+                        existing_id = None
+                        
+                        # Method 1: Check data.term_id
+                        if isinstance(error_data, dict) and "data" in error_data:
+                            data = error_data["data"]
+                            if isinstance(data, dict) and "term_id" in data:
+                                existing_id = data["term_id"]
+                        
+                        # Method 2: Check additional_data array
+                        if not existing_id and isinstance(error_data, dict) and "additional_data" in error_data:
+                            additional_data = error_data["additional_data"]
+                            if isinstance(additional_data, list) and len(additional_data) > 0:
+                                existing_id = additional_data[0]
+                        
+                        # Method 3: Check top-level term_id
+                        if not existing_id and isinstance(error_data, dict) and "term_id" in error_data:
+                            existing_id = error_data["term_id"]
+                        
+                        if existing_id:
+                            print(f"✅ Retrieved existing specialty ID from error: {normalized_specialty} (ID: {existing_id})")
+                            return existing_id
+                        else:
+                            print(f"⚠️ Could not extract term_id from error response")
+                            
+                    # Final attempt: force refresh and search again
+                    print(f"🔄 Final attempt: re-fetching all specialties...")
+                    time.sleep(1)
+                    final_terms = self.get_all_wordpress_terms('specialties')
+                    for term in final_terms:
+                        if (term["name"].lower() == normalized_specialty.lower() or 
+                            term["name"].lower() == specialty_name.lower()):
+                            print(f"✅ Found on final attempt: {normalized_specialty} (ID: {term['id']})")
+                            return term['id']
+                            
+                except Exception as parse_error:
+                    print(f"❌ Error parsing term_exists response: {str(parse_error)}")
+                    print(f"Raw response: {response.text}")
             else:
                 print(f"❌ Failed to create specialty: {response.status_code} - {response.text}")
                 
