@@ -37,6 +37,8 @@ def force_update_acf_fields():
                 'address': provider.address,
                 'seo_title': provider.seo_title,
                 'seo_meta_description': provider.seo_meta_description,
+                'wheelchair_accessible': provider.wheelchair_accessible,
+                'parking_available': provider.parking_available,
             }
             provider_dicts.append(provider_dict)
         
@@ -120,6 +122,26 @@ def force_update_acf_fields():
                 seo_title = provider.get('seo_title', '')
                 seo_meta_description = provider.get('seo_meta_description', '')
                 
+                # Get and format accessibility data
+                wheelchair_raw = provider.get('wheelchair_accessible', '')
+                parking_raw = provider.get('parking_available', '')
+                
+                # Format wheelchair accessibility for ACF dropdown
+                if wheelchair_raw == 'true':
+                    wheelchair_formatted = "Wheelchair accessible"
+                elif wheelchair_raw == 'false':
+                    wheelchair_formatted = "Not wheelchair accessible"
+                else:
+                    wheelchair_formatted = "Wheelchair accessibility unknown"
+                
+                # Format parking availability for ACF dropdown  
+                if parking_raw == 'true':
+                    parking_formatted = "Parking is available"
+                elif parking_raw == 'false':
+                    parking_formatted = "Parking is not available"
+                else:
+                    parking_formatted = "Parking unknown"
+                
                 # Prepare ACF field updates
                 acf_fields = {
                     'external_featured_image': external_featured_image,
@@ -129,7 +151,9 @@ def force_update_acf_fields():
                     'photo_urls': '\n'.join(photo_urls) if photo_urls else '',
                     'google_map': google_map_data,
                     'seo_title': seo_title,
-                    'seo_meta_description': seo_meta_description
+                    'seo_meta_description': seo_meta_description,
+                    'wheelchair_accessible': wheelchair_formatted,
+                    'parking_available': parking_formatted
                 }
                 
                 # Update WordPress post with ACF fields and SEO meta
@@ -141,6 +165,8 @@ def force_update_acf_fields():
                     print(f"   🔢 Photo Count: {photo_count}")
                     print(f"   📊 Status: {image_selection_status}")
                     print(f"   🎯 SEO Title: {seo_title[:40]}..." if len(seo_title) > 40 else f"   🎯 SEO Title: {seo_title}")
+                    print(f"   ♿ Wheelchair: {wheelchair_formatted}")
+                    print(f"   🅿️ Parking: {parking_formatted}")
                     updated_count += 1
                 else:
                     print(f"❌ {name}: Failed to update ACF fields")
@@ -156,13 +182,15 @@ def force_update_acf_fields():
         print(f"📋 Total processed: {len(providers)}")
         
         if updated_count > 0:
-            print(f"\n🎉 ACF fields and SEO data have been populated! Available fields:")
+            print(f"\n🎉 ACF fields, SEO data, and accessibility info have been populated! Available fields:")
             print(f"   {{acf:external_featured_image}} - Featured image URL")
             print(f"   {{acf:featured_image_source}} - Image source method")
             print(f"   {{acf:photo_count}} - Number of photos")
             print(f"   {{acf:image_selection_status}} - Selection status")
             print(f"   {{acf:seo_title}} - SEO optimized title")
             print(f"   {{acf:seo_meta_description}} - SEO meta description")
+            print(f"   {{acf:wheelchair_accessible}} - Wheelchair accessibility")
+            print(f"   {{acf:parking_available}} - Parking availability")
             print(f"   📊 Yoast SEO meta fields also populated for search engines")
         
     except Exception as e:
