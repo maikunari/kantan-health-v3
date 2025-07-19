@@ -46,7 +46,7 @@ def sync_providers():
             session = Session()
             providers = session.query(Provider).filter(
                 Provider.status == 'approved',
-                Provider.wordpress_id.is_(None),
+                Provider.wordpress_post_id.is_(None),
                 Provider.ai_description.isnot(None)
             ).limit(limit).all()
             provider_ids = [p.id for p in providers]
@@ -93,22 +93,22 @@ def get_sync_status():
         sync_stats = session.execute(text("""
             SELECT 
                 COUNT(*) as total_providers,
-                COUNT(wordpress_id) as synced_providers,
-                COUNT(CASE WHEN status = 'approved' AND wordpress_id IS NULL THEN 1 END) as pending_sync,
-                COUNT(CASE WHEN last_synced > CURRENT_TIMESTAMP - INTERVAL '24 hours' THEN 1 END) as synced_24h
+                COUNT(wordpress_post_id) as synced_providers,
+                COUNT(CASE WHEN status = 'approved' AND wordpress_post_id IS NULL THEN 1 END) as pending_sync,
+                COUNT(CASE WHEN last_wordpress_sync > CURRENT_TIMESTAMP - INTERVAL '24 hours' THEN 1 END) as synced_24h
             FROM providers
         """)).fetchone()
         
         # Recent sync operations
         recent_syncs = session.execute(text("""
             SELECT 
-                operation_type,
-                status,
+                sync_type,
+                sync_status,
                 COUNT(*) as count,
-                MAX(timestamp) as last_operation
-            FROM wordpress_sync_operations
-            WHERE timestamp > CURRENT_TIMESTAMP - INTERVAL '7 days'
-            GROUP BY operation_type, status
+                MAX(sync_timestamp) as last_operation
+            FROM wordpress_sync_log
+            WHERE sync_timestamp > CURRENT_TIMESTAMP - INTERVAL '7 days'
+            GROUP BY sync_type, sync_status
             ORDER BY last_operation DESC
         """)).fetchall()
         
@@ -117,11 +117,11 @@ def get_sync_status():
             SELECT 
                 provider_id,
                 error_message,
-                timestamp
-            FROM wordpress_sync_operations
-            WHERE status = 'error'
-                AND timestamp > CURRENT_TIMESTAMP - INTERVAL '24 hours'
-            ORDER BY timestamp DESC
+                sync_timestamp
+            FROM wordpress_sync_log
+            WHERE sync_status = 'error'
+                AND sync_timestamp > CURRENT_TIMESTAMP - INTERVAL '24 hours'
+            ORDER BY sync_timestamp DESC
             LIMIT 10
         """)).fetchall()
         
@@ -172,15 +172,15 @@ def check_provider_sync(provider_id):
         # Get sync history
         sync_history = session.execute(text("""
             SELECT 
-                operation_type,
-                status,
-                wordpress_id,
+                sync_type,
+                sync_status,
+                wordpress_post_id,
                 content_hash,
                 error_message,
-                timestamp
-            FROM wordpress_sync_operations
+                sync_timestamp
+            FROM wordpress_sync_log
             WHERE provider_id = :provider_id
-            ORDER BY timestamp DESC
+            ORDER BY sync_timestamp DESC
             LIMIT 10
         """), {'provider_id': provider_id}).fetchall()
         
@@ -191,8 +191,8 @@ def check_provider_sync(provider_id):
                 'id': provider.id,
                 'name': provider.provider_name,
                 'status': provider.status,
-                'wordpress_id': provider.wordpress_id,
-                'last_synced': provider.last_synced.isoformat() if provider.last_synced else None
+                'wordpress_id': provider.wordpress_post_id,
+                'last_synced': provider.last_wordpress_sync.isoformat() if provider.last_wordpress_sync else None
             },
             'sync_history': [
                 {
@@ -270,9 +270,9 @@ def get_batch_sync_status():
         queue_stats = session.execute(text("""
             SELECT 
                 COUNT(*) as total_approved,
-                COUNT(CASE WHEN wordpress_id IS NULL THEN 1 END) as not_synced,
-                COUNT(CASE WHEN wordpress_id IS NOT NULL 
-                           AND last_synced < CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 END) as needs_update
+                COUNT(CASE WHEN wordpress_post_id IS NULL THEN 1 END) as not_synced,
+                COUNT(CASE WHEN wordpress_post_id IS NOT NULL 
+                           AND last_wordpress_sync < CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 END) as needs_update
             FROM providers
             WHERE status = 'approved'
                 AND ai_description IS NOT NULL

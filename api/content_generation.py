@@ -4,7 +4,7 @@ Handles AI content generation requests and monitoring
 """
 
 from flask import Blueprint, request, jsonify
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import subprocess
 import json
@@ -212,12 +212,12 @@ def get_batch_status():
             SELECT 
                 COUNT(*) as total,
                 COUNT(CASE WHEN ai_description IS NOT NULL THEN 1 END) as with_description,
-                COUNT(CASE WHEN ai_english_experience IS NOT NULL THEN 1 END) as with_experience,
-                COUNT(CASE WHEN ai_review_summary IS NOT NULL THEN 1 END) as with_reviews,
+                COUNT(CASE WHEN english_experience_summary IS NOT NULL THEN 1 END) as with_experience,
+                COUNT(CASE WHEN review_summary IS NOT NULL THEN 1 END) as with_reviews,
                 COUNT(CASE WHEN seo_title IS NOT NULL THEN 1 END) as with_seo,
                 COUNT(CASE WHEN ai_description IS NOT NULL 
-                           AND ai_english_experience IS NOT NULL 
-                           AND ai_review_summary IS NOT NULL 
+                           AND english_experience_summary IS NOT NULL 
+                           AND review_summary IS NOT NULL 
                            AND seo_title IS NOT NULL THEN 1 END) as fully_complete
             FROM providers
             WHERE status = 'approved'

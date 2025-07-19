@@ -200,7 +200,7 @@ const ProviderList: React.FC = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 120,
       render: (status: string) => (
         <Tag color={getStatusColor(status)}>
           {status.toUpperCase()}
@@ -210,14 +210,16 @@ const ProviderList: React.FC = () => {
     {
       title: 'Content',
       key: 'content',
-      width: 120,
+      width: 150,
       render: (_, record: Provider) => {
         const hasContent = !!(record.ai_description && record.seo_title);
         return (
-          <Badge
-            status={hasContent ? 'success' : 'default'}
-            text={hasContent ? 'Complete' : 'Missing'}
-          />
+          <div>
+            <Badge
+              status={hasContent ? 'success' : 'default'}
+              text={hasContent ? 'Complete' : 'Pending'}
+            />
+          </div>
         );
       },
     },
@@ -249,7 +251,11 @@ const ProviderList: React.FC = () => {
             />
           </Tooltip>
           <Tooltip title="Edit">
-            <Button icon={<EditOutlined />} size="small" />
+            <Button 
+              icon={<EditOutlined />} 
+              size="small" 
+              onClick={() => handleViewProvider(record)}
+            />
           </Tooltip>
           {record.status === 'pending' && (
             <>
@@ -409,7 +415,7 @@ const ProviderList: React.FC = () => {
           }}
           rowSelection={rowSelection}
           onChange={handleTableChange}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1400 }}
         />
       </Card>
 

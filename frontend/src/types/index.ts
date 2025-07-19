@@ -6,7 +6,7 @@ export interface Provider {
   ward?: string;
   phone?: string;
   website?: string;
-  specialties?: string;
+  specialties?: any;
   english_proficiency: string;
   english_proficiency_score: number;
   business_hours?: any;

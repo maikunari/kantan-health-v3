@@ -69,14 +69,25 @@ def get_providers():
                 'provider_name': provider.provider_name,
                 'address': provider.address,
                 'city': provider.city,
+                'ward': provider.district,
+                'phone': provider.phone,
+                'website': provider.website,
                 'specialties': provider.specialties,
                 'english_proficiency': provider.english_proficiency,
                 'english_proficiency_score': provider.proficiency_score,
+                'business_hours': provider.business_hours,
                 'ai_description': provider.ai_description,
+                'ai_english_experience': provider.english_experience_summary,
+                'ai_review_summary': provider.review_summary,
                 'seo_title': provider.seo_title,
+                'seo_description': provider.seo_meta_description,
+                'seo_focus_keyword': getattr(provider, 'seo_focus_keyword', None),
+                'seo_keywords': getattr(provider, 'seo_keywords', None),
+                'featured_image_url': provider.selected_featured_image,
                 'status': provider.status,
                 'wordpress_id': provider.wordpress_post_id,
-                'last_synced': getattr(provider, 'last_synced', None)
+                'last_synced': getattr(provider, 'last_synced', None),
+                'created_at': provider.created_at if provider.created_at else None
             })
         
         session.close()

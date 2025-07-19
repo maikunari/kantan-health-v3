@@ -43,6 +43,13 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Initialize form with provider data when component mounts or provider changes
+  React.useEffect(() => {
+    if (provider) {
+      form.setFieldsValue(provider);
+    }
+  }, [provider, form]);
+
   const handleEdit = () => {
     setEditing(true);
     form.setFieldsValue(provider);
@@ -85,6 +92,12 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
     return <Badge status="error" text={`Score ${score} - Unknown`} />;
   };
 
+  const getProficiencyColor = (score: number) => {
+    if (score >= 4) return 'green';
+    if (score === 3) return 'orange';
+    return 'red';
+  };
+
   return (
     <div>
       {/* Header */}
@@ -125,38 +138,38 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
         </Space>
       </div>
 
-      <Form form={form} layout="vertical" disabled={!editing}>
+      <Form form={form} layout="vertical" disabled={!editing} initialValues={provider}>
         {/* Basic Information */}
         <Card title="Basic Information" style={{ marginBottom: 16 }}>
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item label="Provider Name" name="provider_name">
-                <Input />
+                {editing ? <Input /> : <Text>{provider?.provider_name}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="City" name="city">
-                <Input />
+                {editing ? <Input /> : <Text>{provider?.city}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Ward" name="ward">
-                <Input />
+                {editing ? <Input /> : <Text>{provider?.ward || 'Not specified'}</Text>}
               </Form.Item>
             </Col>
             <Col span={24}>
               <Form.Item label="Address" name="address">
-                <TextArea rows={2} />
+                {editing ? <TextArea rows={2} /> : <Text>{provider?.address}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Phone" name="phone">
-                <Input prefix={<PhoneOutlined />} />
+                {editing ? <Input prefix={<PhoneOutlined />} /> : <Text>{provider?.phone || 'Not provided'}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Website" name="website">
-                <Input prefix={<GlobalOutlined />} />
+                {editing ? <Input prefix={<GlobalOutlined />} /> : <Text>{provider?.website || 'Not provided'}</Text>}
               </Form.Item>
             </Col>
           </Row>
@@ -167,36 +180,42 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item label="Specialties" name="specialties">
-                <TextArea rows={2} />
+                {editing ? <TextArea rows={2} /> : <Text>{Array.isArray(provider?.specialties) ? provider.specialties.join(', ') : provider?.specialties || 'Not specified'}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="English Proficiency" name="english_proficiency">
-                <Select>
-                  <Option value="Fluent">Fluent</Option>
-                  <Option value="Conversational">Conversational</Option>
-                  <Option value="Basic">Basic</Option>
-                  <Option value="Unknown">Unknown</Option>
-                </Select>
+                {editing ? (
+                  <Select>
+                    <Option value="Fluent">Fluent</Option>
+                    <Option value="Conversational">Conversational</Option>
+                    <Option value="Basic">Basic</Option>
+                    <Option value="Unknown">Unknown</Option>
+                  </Select>
+                ) : <Text>{provider?.english_proficiency || 'Unknown'}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Proficiency Score" name="english_proficiency_score">
-                <Select>
-                  <Option value={5}>5 - Fluent</Option>
-                  <Option value={4}>4 - Conversational</Option>
-                  <Option value={3}>3 - Basic</Option>
-                  <Option value={0}>0 - Unknown</Option>
-                </Select>
+                {editing ? (
+                  <Select>
+                    <Option value={5}>5 - Fluent</Option>
+                    <Option value={4}>4 - Conversational</Option>
+                    <Option value={3}>3 - Basic</Option>
+                    <Option value={0}>0 - Unknown</Option>
+                  </Select>
+                ) : <Tag color={getProficiencyColor(provider?.english_proficiency_score || 0)}>Score {provider?.english_proficiency_score || 0}</Tag>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Status" name="status">
-                <Select>
-                  <Option value="pending">Pending</Option>
-                  <Option value="approved">Approved</Option>
-                  <Option value="rejected">Rejected</Option>
-                </Select>
+                {editing ? (
+                  <Select>
+                    <Option value="pending">Pending</Option>
+                    <Option value="approved">Approved</Option>
+                    <Option value="rejected">Rejected</Option>
+                  </Select>
+                ) : <Tag color={getStatusColor(provider?.status || 'pending')}>{provider?.status?.toUpperCase() || 'PENDING'}</Tag>}
               </Form.Item>
             </Col>
           </Row>
@@ -207,17 +226,29 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
           <Collapse>
             <Panel header="Description" key="description">
               <Form.Item name="ai_description">
-                <TextArea rows={6} placeholder="AI generated description..." />
+                {editing ? (
+                  <TextArea rows={6} placeholder="AI generated description..." />
+                ) : (
+                  <Text>{provider?.ai_description || 'No description generated yet'}</Text>
+                )}
               </Form.Item>
             </Panel>
             <Panel header="English Experience Summary" key="experience">
               <Form.Item name="ai_english_experience">
-                <TextArea rows={4} placeholder="AI generated English experience summary..." />
+                {editing ? (
+                  <TextArea rows={4} placeholder="AI generated English experience summary..." />
+                ) : (
+                  <Text>{provider?.ai_english_experience || 'No English experience summary generated yet'}</Text>
+                )}
               </Form.Item>
             </Panel>
             <Panel header="Review Summary" key="reviews">
               <Form.Item name="ai_review_summary">
-                <TextArea rows={4} placeholder="AI generated review summary..." />
+                {editing ? (
+                  <TextArea rows={4} placeholder="AI generated review summary..." />
+                ) : (
+                  <Text>{provider?.ai_review_summary || 'No review summary generated yet'}</Text>
+                )}
               </Form.Item>
             </Panel>
           </Collapse>
@@ -228,27 +259,27 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item label="SEO Title" name="seo_title">
-                <Input />
+                {editing ? <Input /> : <Text>{provider?.seo_title || 'No SEO title generated yet'}</Text>}
               </Form.Item>
             </Col>
             <Col span={24}>
               <Form.Item label="SEO Description" name="seo_description">
-                <TextArea rows={3} />
+                {editing ? <TextArea rows={3} /> : <Text>{provider?.seo_description || 'No SEO description generated yet'}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Focus Keyword" name="seo_focus_keyword">
-                <Input />
+                {editing ? <Input /> : <Text>{provider?.seo_focus_keyword || 'Not specified'}</Text>}
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="SEO Keywords" name="seo_keywords">
-                <Input placeholder="keyword1, keyword2, keyword3" />
+                {editing ? <Input placeholder="keyword1, keyword2, keyword3" /> : <Text>{provider?.seo_keywords || 'Not specified'}</Text>}
               </Form.Item>
             </Col>
             <Col span={24}>
               <Form.Item label="Featured Image URL" name="featured_image_url">
-                <Input />
+                {editing ? <Input /> : <Text>{provider?.featured_image_url || 'No featured image selected'}</Text>}
               </Form.Item>
             </Col>
           </Row>
