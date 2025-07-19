@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: Healthcare Schema Generator
+ * Plugin Name: Healthcare Schema Generator v2
  * Plugin URI: https://care-compass.jp
- * Description: Automatically generates Schema.org markup for healthcare provider pages using ACF fields. Improves SEO and rich snippets for international patients searching for English-speaking healthcare in Japan.
- * Version: 1.0.0
+ * Description: Automatically generates Schema.org markup for healthcare provider pages using ACF fields. Updated with correct field mappings for Care Compass Japan.
+ * Version: 2.0.0
  * Author: Care Compass Japan
  * License: GPL v2 or later
  * 
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class HealthcareSchemaGenerator {
+class HealthcareSchemaGeneratorV2 {
     
     public function __init() {
         add_action('wp_head', array($this, 'output_provider_schema'));
@@ -34,8 +34,8 @@ class HealthcareSchemaGenerator {
         
         global $post;
         
-        // Get ACF fields (using actual ACF field names from setup_acf_fields.php)
-        $provider_name = get_the_title(); // Use post title as primary name
+        // Get ACF fields (using correct ACF field names)
+        $provider_name = get_the_title();
         $ai_description = get_field('ai_description');
         $ai_excerpt = get_field('ai_excerpt');
         $review_summary = get_field('review_summary');
@@ -50,12 +50,10 @@ class HealthcareSchemaGenerator {
         $review_count = get_field('provider_reviews');
         $english_proficiency = get_field('english_proficiency');
         $proficiency_score = get_field('proficiency_score');
-        $medical_specialties = get_field('specialties'); // This may need to be mapped from database
-        $city = get_field('city'); // May need database mapping
-        $district = get_field('district');
         $nearest_station = get_field('nearest_station');
-        $accessibility_features = get_field('wheelchair_accessible');
+        $wheelchair_accessible = get_field('wheelchair_accessible');
         $parking_available = get_field('parking_available');
+        $district = get_field('district');
         
         // Build schema data
         $schema = array(
@@ -91,22 +89,16 @@ class HealthcareSchemaGenerator {
         }
         
         // Add address information
-        if (!empty($address) || !empty($city)) {
+        if (!empty($address)) {
             $postal_address = array(
                 '@type' => 'PostalAddress',
+                'streetAddress' => $address,
                 'addressCountry' => 'JP'
             );
             
-            if (!empty($address)) {
-                $postal_address['streetAddress'] = $address;
-            }
-            
-            if (!empty($city)) {
-                $postal_address['addressLocality'] = $city;
-            }
-            
+            // Try to extract city from address or use district
             if (!empty($district)) {
-                $postal_address['addressRegion'] = $district;
+                $postal_address['addressLocality'] = $district;
             }
             
             $schema['address'] = $postal_address;
@@ -125,8 +117,8 @@ class HealthcareSchemaGenerator {
         if (!empty($latitude) && !empty($longitude)) {
             $schema['geo'] = array(
                 '@type' => 'GeoCoordinates',
-                'latitude' => $latitude,
-                'longitude' => $longitude
+                'latitude' => floatval($latitude),
+                'longitude' => floatval($longitude)
             );
         }
         
@@ -142,23 +134,17 @@ class HealthcareSchemaGenerator {
         if (!empty($rating) && is_numeric($rating)) {
             $rating_schema = array(
                 '@type' => 'AggregateRating',
-                'ratingValue' => $rating,
+                'ratingValue' => floatval($rating),
                 'bestRating' => '5',
                 'worstRating' => '1'
             );
             
             // Add review count if available
             if (!empty($review_count) && is_numeric($review_count)) {
-                $rating_schema['reviewCount'] = $review_count;
+                $rating_schema['reviewCount'] = intval($review_count);
             }
             
             $schema['aggregateRating'] = $rating_schema;
-        }
-        
-        // Add medical specialties
-        if (!empty($medical_specialties)) {
-            $specialties = is_array($medical_specialties) ? $medical_specialties : array($medical_specialties);
-            $schema['medicalSpecialty'] = $specialties;
         }
         
         // Add English language capability with proficiency score
@@ -180,7 +166,7 @@ class HealthcareSchemaGenerator {
                 $schema['additionalProperty'][] = array(
                     '@type' => 'PropertyValue',
                     'name' => 'English Proficiency Score',
-                    'value' => $proficiency_score,
+                    'value' => intval($proficiency_score),
                     'maxValue' => 5,
                     'minValue' => 0
                 );
@@ -189,16 +175,21 @@ class HealthcareSchemaGenerator {
             $schema['availableLanguage'] = $language_schema;
         }
         
-        // Add accessibility and amenities information
-        if (!empty($accessibility_features)) {
-            $schema['accessibilityFeature'] = $accessibility_features;
+        // Add accessibility features
+        if (!empty($wheelchair_accessible)) {
+            $is_accessible = ($wheelchair_accessible === 'yes' || $wheelchair_accessible === true || $wheelchair_accessible === 'true');
+            if ($is_accessible) {
+                $schema['accessibilityFeature'] = 'wheelchair accessible';
+            }
         }
         
+        // Add parking amenity
         if (!empty($parking_available)) {
+            $has_parking = ($parking_available === 'yes' || $parking_available === true || $parking_available === 'true');
             $schema['amenityFeature'] = array(
                 '@type' => 'LocationFeatureSpecification',
                 'name' => 'Parking',
-                'value' => $parking_available === 'yes' || $parking_available === true
+                'value' => $has_parking
             );
         }
         
@@ -215,6 +206,13 @@ class HealthcareSchemaGenerator {
         $schema['@id'] = get_permalink() . '#organization';
         $schema['identifier'] = get_the_ID();
         
+        // Add Care Compass specific branding
+        $schema['additionalProperty'][] = array(
+            '@type' => 'PropertyValue',
+            'name' => 'Directory Source',
+            'value' => 'Care Compass Japan - Verified English-Speaking Healthcare'
+        );
+        
         // Output the schema
         echo '<script type="application/ld+json">';
         echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -230,8 +228,8 @@ class HealthcareSchemaGenerator {
             return;
         }
         
-        $site_name = get_bloginfo('name');
-        $site_description = get_bloginfo('description');
+        $site_name = get_bloginfo('name') ?: 'Care Compass Japan';
+        $site_description = get_bloginfo('description') ?: 'Find verified English-speaking healthcare providers in Japan';
         $site_url = home_url();
         
         // Website Schema
@@ -251,12 +249,12 @@ class HealthcareSchemaGenerator {
             )
         );
         
-        // Medical Organization Schema for the directory itself
+        // Medical Organization Schema for Care Compass directory
         $organization_schema = array(
             '@context' => 'https://schema.org',
             '@type' => 'MedicalOrganization',
             'name' => $site_name,
-            'description' => 'Comprehensive directory of English-speaking healthcare providers in Japan for international patients',
+            'description' => 'Comprehensive directory of verified English-speaking healthcare providers in Japan for international patients',
             'url' => $site_url,
             'areaServed' => array(
                 array('@type' => 'City', 'name' => 'Tokyo'),
@@ -277,6 +275,18 @@ class HealthcareSchemaGenerator {
                 'Dentistry'
             ),
             'availableLanguage' => array('English', 'Japanese'),
+            'additionalProperty' => array(
+                array(
+                    '@type' => 'PropertyValue',
+                    'name' => 'Verification Method',
+                    'value' => 'AI-powered English proficiency verification'
+                ),
+                array(
+                    '@type' => 'PropertyValue',
+                    'name' => 'Target Audience',
+                    'value' => 'International patients, expats, and travelers in Japan'
+                )
+            ),
             '@id' => $site_url . '#organization'
         );
         
@@ -292,7 +302,6 @@ class HealthcareSchemaGenerator {
     
     /**
      * Format business hours for schema.org format
-     * Converts your business_hours JSON to schema.org openingHours format
      */
     private function format_business_hours($business_hours) {
         if (empty($business_hours)) {
@@ -324,60 +333,52 @@ class HealthcareSchemaGenerator {
         );
         
         foreach ($hours_data as $day => $hours) {
-            if (isset($day_mapping[strtolower($day)]) && !empty($hours) && $hours !== 'Closed') {
-                $day_code = $day_mapping[strtolower($day)];
-                // Format: "Mo-Fr 09:00-17:00" or "Mo 09:00-17:00"
+            $day_lower = strtolower($day);
+            if (isset($day_mapping[$day_lower]) && !empty($hours) && 
+                $hours !== 'Closed' && $hours !== 'closed' && 
+                $hours !== 'Hours not available') {
+                
+                $day_code = $day_mapping[$day_lower];
+                // Format: "Mo 09:00-17:00"
                 $opening_hours[] = $day_code . ' ' . $hours;
             }
         }
         
         return $opening_hours;
     }
-    
-    /**
-     * Add admin notice about plugin activation
-     */
-    public function admin_notice() {
-        if (get_transient('healthcare_schema_activated')) {
-            echo '<div class="notice notice-success is-dismissible">';
-            echo '<p><strong>Healthcare Schema Generator activated!</strong> Schema.org markup will now be automatically generated for healthcare provider pages.</p>';
-            echo '</div>';
-            delete_transient('healthcare_schema_activated');
-        }
-    }
 }
 
 // Initialize the plugin
-function init_healthcare_schema_generator() {
-    $healthcare_schema = new HealthcareSchemaGenerator();
+function init_healthcare_schema_generator_v2() {
+    $healthcare_schema = new HealthcareSchemaGeneratorV2();
     $healthcare_schema->__init();
 }
-add_action('init', 'init_healthcare_schema_generator');
+add_action('init', 'init_healthcare_schema_generator_v2');
 
 // Activation hook
 register_activation_hook(__FILE__, function() {
-    set_transient('healthcare_schema_activated', true, 30);
+    set_transient('healthcare_schema_v2_activated', true, 30);
 });
 
 // Add admin notice
 add_action('admin_notices', function() {
-    if (get_transient('healthcare_schema_activated')) {
+    if (get_transient('healthcare_schema_v2_activated')) {
         echo '<div class="notice notice-success is-dismissible">';
-        echo '<p><strong>Healthcare Schema Generator activated!</strong> Schema.org markup will now be automatically generated for healthcare provider pages to improve SEO and rich snippets.</p>';
+        echo '<p><strong>Healthcare Schema Generator v2 activated!</strong> Schema.org markup will now be automatically generated with correct ACF field mappings for Care Compass Japan.</p>';
         echo '</div>';
-        delete_transient('healthcare_schema_activated');
+        delete_transient('healthcare_schema_v2_activated');
     }
 });
 
 /**
  * Plugin compatibility check
  */
-function healthcare_schema_compatibility_check() {
+function healthcare_schema_v2_compatibility_check() {
     // Check if ACF is active
     if (!function_exists('get_field')) {
         add_action('admin_notices', function() {
             echo '<div class="notice notice-error">';
-            echo '<p><strong>Healthcare Schema Generator:</strong> Advanced Custom Fields (ACF) plugin is required but not active.</p>';
+            echo '<p><strong>Healthcare Schema Generator v2:</strong> Advanced Custom Fields (ACF) plugin is required but not active.</p>';
             echo '</div>';
         });
     }
@@ -386,11 +387,11 @@ function healthcare_schema_compatibility_check() {
     if (!post_type_exists('healthcare_provider')) {
         add_action('admin_notices', function() {
             echo '<div class="notice notice-warning">';
-            echo '<p><strong>Healthcare Schema Generator:</strong> The "healthcare_provider" post type was not found. Schema will only work on homepage until this is resolved.</p>';
+            echo '<p><strong>Healthcare Schema Generator v2:</strong> The "healthcare_provider" post type was not found. Schema will only work on homepage until this is resolved.</p>';
             echo '</div>';
         });
     }
 }
-add_action('admin_init', 'healthcare_schema_compatibility_check');
+add_action('admin_init', 'healthcare_schema_v2_compatibility_check');
 
 ?>
