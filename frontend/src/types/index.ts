@@ -94,6 +94,7 @@ export interface SyncStatus {
     error: string;
     timestamp: string;
   }>;
+  batch_running?: boolean;
 }
 
 export interface ContentGenerationStatus {

@@ -35,19 +35,20 @@ def get_overview():
                 COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
                 COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
                 COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected,
-                COUNT(CASE WHEN wordpress_id IS NOT NULL THEN 1 END) as synced_to_wordpress,
+                COUNT(CASE WHEN wordpress_post_id IS NOT NULL THEN 1 END) as synced_to_wordpress,
                 COUNT(CASE WHEN ai_description IS NOT NULL THEN 1 END) as with_ai_content
             FROM providers
         """)).fetchone()
         
         # Recent activity (last 24 hours)
-        yesterday = datetime.now() - timedelta(days=1)
+        yesterday_str = (datetime.now() - timedelta(days=1)).isoformat()
+        yesterday_ts = datetime.now() - timedelta(days=1)
         recent_activity = session.execute(text("""
             SELECT 
-                COUNT(CASE WHEN created_at > :yesterday THEN 1 END) as new_providers,
-                COUNT(CASE WHEN last_synced > :yesterday THEN 1 END) as recent_syncs
+                COUNT(CASE WHEN created_at > :yesterday_str THEN 1 END) as new_providers,
+                COUNT(CASE WHEN last_wordpress_sync > :yesterday_ts THEN 1 END) as recent_syncs
             FROM providers
-        """), {'yesterday': yesterday}).fetchone()
+        """), {'yesterday_str': yesterday_str, 'yesterday_ts': yesterday_ts}).fetchone()
         
         # API usage metrics
         api_metrics = session.execute(text("""
@@ -56,17 +57,17 @@ def get_overview():
                 SUM(value) as total,
                 COUNT(*) as count
             FROM metrics
-            WHERE timestamp > :yesterday
+            WHERE timestamp > :yesterday_str
             GROUP BY metric_type
-        """), {'yesterday': yesterday.isoformat()}).fetchall()
+        """), {'yesterday_str': yesterday_str}).fetchall()
         
         # Content generation progress
         content_progress = session.execute(text("""
             SELECT 
                 COUNT(*) as total,
                 COUNT(CASE WHEN ai_description IS NOT NULL 
-                           AND ai_english_experience IS NOT NULL 
-                           AND ai_review_summary IS NOT NULL 
+                           AND english_experience_summary IS NOT NULL 
+                           AND review_summary IS NOT NULL 
                            AND seo_title IS NOT NULL THEN 1 END) as fully_processed
             FROM providers
             WHERE status = 'approved'

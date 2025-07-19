@@ -8,6 +8,7 @@ import Dashboard from './components/Dashboard/Dashboard';
 import ProviderList from './components/Providers/ProviderList';
 import ContentGeneration from './components/ContentGeneration/ContentGeneration';
 import WordPressSync from './components/Sync/WordPressSync';
+import LoginTest from './components/LoginTest';
 import './App.css';
 
 // Protected Route Component
@@ -26,6 +27,7 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/test" element={<LoginTest />} />
       <Route
         path="/"
         element={

@@ -26,7 +26,7 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   ClockCircleOutlined,
-  WordpressOutlined,
+  GlobalOutlined,
   ReloadOutlined,
   ThunderboltOutlined,
   LinkOutlined,
@@ -171,7 +171,7 @@ const WordPressSync: React.FC = () => {
       <Alert
         message={
           <Space>
-            <WordpressOutlined />
+            <GlobalOutlined />
             WordPress Connection Status
           </Space>
         }
@@ -199,7 +199,7 @@ const WordPressSync: React.FC = () => {
             <Statistic
               title="Total Providers"
               value={status.sync_overview.total_providers}
-              prefix={<WordpressOutlined style={{ color: '#1890ff' }} />}
+              prefix={<GlobalOutlined style={{ color: '#1890ff' }} />}
               valueStyle={{ color: '#1890ff' }}
             />
           </Card>

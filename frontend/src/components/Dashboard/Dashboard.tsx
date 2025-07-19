@@ -20,7 +20,7 @@ import {
   ApiOutlined,
   DollarOutlined,
   FileTextOutlined,
-  WordpressOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from 'recharts';
 import { DashboardOverview, ProviderStats } from '../../types';
@@ -144,7 +144,7 @@ const Dashboard: React.FC = () => {
             <Statistic
               title="Synced to WordPress"
               value={overview.providers.synced_to_wordpress}
-              prefix={<WordpressOutlined style={{ color: '#722ed1' }} />}
+              prefix={<GlobalOutlined style={{ color: '#722ed1' }} />}
               valueStyle={{ color: '#722ed1' }}
             />
           </Card>

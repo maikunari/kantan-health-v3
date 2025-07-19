@@ -153,9 +153,9 @@ def update_provider(provider_id):
         # Update allowed fields
         allowed_fields = [
             'provider_name', 'address', 'city', 'ward', 'phone', 'website',
-            'specialties', 'english_proficiency', 'english_proficiency_score',
-            'ai_description', 'ai_english_experience', 'ai_review_summary',
-            'seo_title', 'seo_description', 'seo_focus_keyword', 'seo_keywords',
+            'specialties', 'english_proficiency', 'proficiency_score',
+            'ai_description', 'english_experience_summary', 'review_summary',
+            'seo_title', 'seo_meta_description', 'seo_focus_keyword', 'seo_keywords',
             'featured_image_url', 'status'
         ]
         
@@ -239,11 +239,11 @@ def get_provider_stats():
         
         # Get counts by proficiency
         proficiency_stats = session.execute(text("""
-            SELECT english_proficiency_score, COUNT(*) as count
+            SELECT proficiency_score, COUNT(*) as count
             FROM providers
-            WHERE english_proficiency_score IS NOT NULL
-            GROUP BY english_proficiency_score
-            ORDER BY english_proficiency_score
+            WHERE proficiency_score IS NOT NULL
+            GROUP BY proficiency_score
+            ORDER BY proficiency_score
         """)).fetchall()
         
         # Get AI content completion stats
@@ -251,8 +251,8 @@ def get_provider_stats():
             SELECT 
                 COUNT(*) as total,
                 COUNT(ai_description) as with_description,
-                COUNT(ai_english_experience) as with_experience,
-                COUNT(ai_review_summary) as with_reviews,
+                COUNT(english_experience_summary) as with_experience,
+                COUNT(review_summary) as with_reviews,
                 COUNT(seo_title) as with_seo
             FROM providers
         """)).fetchone()
