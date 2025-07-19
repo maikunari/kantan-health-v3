@@ -48,7 +48,7 @@ def get_providers():
         if specialty:
             query = query.filter(Provider.specialties.ilike(f'%{specialty}%'))
         if proficiency:
-            query = query.filter(Provider.english_proficiency_score == int(proficiency))
+            query = query.filter(Provider.proficiency_score == int(proficiency))
         if search:
             query = query.filter(
                 (Provider.provider_name.ilike(f'%{search}%')) |
@@ -71,12 +71,12 @@ def get_providers():
                 'city': provider.city,
                 'specialties': provider.specialties,
                 'english_proficiency': provider.english_proficiency,
-                'english_proficiency_score': provider.english_proficiency_score,
+                'english_proficiency_score': provider.proficiency_score,
                 'ai_description': provider.ai_description,
                 'seo_title': provider.seo_title,
                 'status': provider.status,
-                'wordpress_id': provider.wordpress_id,
-                'last_synced': provider.last_synced.isoformat() if provider.last_synced else None
+                'wordpress_id': provider.wordpress_post_id,
+                'last_synced': getattr(provider, 'last_synced', None)
             })
         
         session.close()
@@ -110,25 +110,25 @@ def get_provider(provider_id):
             'provider_name': provider.provider_name,
             'address': provider.address,
             'city': provider.city,
-            'ward': provider.ward,
+            'ward': provider.district,
             'phone': provider.phone,
             'website': provider.website,
             'specialties': provider.specialties,
             'english_proficiency': provider.english_proficiency,
-            'english_proficiency_score': provider.english_proficiency_score,
+            'english_proficiency_score': provider.proficiency_score,
             'business_hours': provider.business_hours,
             'ai_description': provider.ai_description,
-            'ai_english_experience': provider.ai_english_experience,
-            'ai_review_summary': provider.ai_review_summary,
+            'ai_english_experience': provider.english_experience_summary,
+            'ai_review_summary': provider.review_summary,
             'seo_title': provider.seo_title,
-            'seo_description': provider.seo_description,
-            'seo_focus_keyword': provider.seo_focus_keyword,
-            'seo_keywords': provider.seo_keywords,
-            'featured_image_url': provider.featured_image_url,
+            'seo_description': provider.seo_meta_description,
+            'seo_focus_keyword': getattr(provider, 'seo_focus_keyword', None),
+            'seo_keywords': getattr(provider, 'seo_keywords', None),
+            'featured_image_url': provider.selected_featured_image,
             'status': provider.status,
-            'wordpress_id': provider.wordpress_id,
-            'last_synced': provider.last_synced.isoformat() if provider.last_synced else None,
-            'created_at': provider.created_at.isoformat() if provider.created_at else None
+            'wordpress_id': provider.wordpress_post_id,
+            'last_synced': getattr(provider, 'last_synced', None),
+            'created_at': provider.created_at if provider.created_at else None
         }
         
         session.close()

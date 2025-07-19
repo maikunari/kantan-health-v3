@@ -12,6 +12,19 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, text, TIMESTAMP
 from sqlalchemy.orm import sessionmaker, declarative_base
 
+def get_postgres_config():
+    """Get PostgreSQL configuration from environment variables"""
+    # Load environment from config/.env
+    config_path = os.path.join('config', '.env')
+    load_dotenv(config_path)
+    
+    return {
+        'user': os.getenv("POSTGRES_USER", "postgres"),
+        'password': os.getenv("POSTGRES_PASSWORD", "password"),
+        'host': os.getenv("POSTGRES_HOST", "localhost"),
+        'database': os.getenv("POSTGRES_DB", "directory")
+    }
+
 Base = declarative_base()
 
 class Provider(Base):

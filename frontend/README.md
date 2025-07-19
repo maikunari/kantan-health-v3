@@ -40,7 +40,7 @@ cd frontend
 npm install
 npm start
 ```
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3999](http://localhost:3999)
 
 ### Default Login
 - Username: `admin`
@@ -84,7 +84,7 @@ WordPress synchronization management with connection testing and operation histo
 ## Available Scripts
 
 ### `npm start`
-Runs the app in development mode at [http://localhost:3000](http://localhost:3000).
+Runs the app in development mode at [http://localhost:3999](http://localhost:3999).
 
 ### `npm test`
 Launches the test runner in interactive watch mode.

@@ -29,17 +29,17 @@ check_port() {
 
 # Check required ports
 echo "📋 Checking required ports..."
-if ! check_port 5000; then
-    echo "   Backend API port 5000 is in use"
+if ! check_port 5001; then
+    echo "   Backend API port 5001 is in use"
 fi
-if ! check_port 3000; then
-    echo "   Frontend port 3000 is in use"
+if ! check_port 3999; then
+    echo "   Frontend port 3999 is in use"
 fi
 
 # Install backend dependencies
 echo ""
 echo "📦 Installing backend dependencies..."
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # Install frontend dependencies
 echo ""
@@ -76,8 +76,8 @@ FRONTEND_PID=$!
 echo ""
 echo "✅ Development environment started successfully!"
 echo ""
-echo "🌐 Frontend: http://localhost:3000"
-echo "🔧 Backend API: http://localhost:5000"
+echo "🌐 Frontend: http://localhost:3999"
+echo "🔧 Backend API: http://localhost:5001"
 echo ""
 echo "📋 Default Login:"
 echo "   Username: admin"

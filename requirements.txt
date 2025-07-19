@@ -15,7 +15,7 @@ pytrends==4.9.2
 Flask-CORS==4.0.0
 Flask-SQLAlchemy==3.0.5
 Flask-RESTful==0.3.10
-Flask-Login==0.6.2
+Flask-Login==0.6.3
 
 # Google Maps for places API
 googlemaps==4.10.0
