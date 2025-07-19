@@ -1,3 +1,4 @@
+# Core dependencies
 requests==2.31.0
 pyairtable==2.3.0
 python-dotenv==1.0.1
@@ -9,3 +10,26 @@ sqlalchemy==2.0.31
 psycopg2-binary==2.9.9
 pandas==2.2.2
 pytrends==4.9.2
+
+# Additional Flask dependencies for the UI
+Flask-CORS==4.0.0
+Flask-SQLAlchemy==3.0.5
+Flask-RESTful==0.3.10
+Flask-Login==0.6.2
+
+# Google Maps for places API
+googlemaps==4.10.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Production server
+gunicorn==21.2.0
+
+# Optional: Background tasks
+celery==5.3.4
+redis==5.0.0
+
+# Optional: Monitoring
+flask-limiter==3.5.0

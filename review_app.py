@@ -4,11 +4,14 @@ Flask Review Dashboard
 Provides a bare-bones interface for reviewing and editing provider data, and tracking metrics.
 """
 
-from flask import Flask, render_template, request
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON
+import os
+from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import logging
 
 Base = declarative_base()
 
