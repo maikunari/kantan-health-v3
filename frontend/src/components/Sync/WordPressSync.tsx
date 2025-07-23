@@ -29,7 +29,6 @@ import {
   GlobalOutlined,
   ReloadOutlined,
   ThunderboltOutlined,
-  LinkOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -58,11 +57,9 @@ const WordPressSync: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown');
 
   useEffect(() => {
     fetchStatus();
-    testConnection();
     const interval = setInterval(fetchStatus, 15000); // Update every 15 seconds
     return () => clearInterval(interval);
   }, []);
@@ -86,14 +83,6 @@ const WordPressSync: React.FC = () => {
     }
   };
 
-  const testConnection = async () => {
-    try {
-      const response = await api.get(API_ENDPOINTS.SYNC_TEST_CONNECTION);
-      setConnectionStatus(response.data.status === 'connected' ? 'success' : 'error');
-    } catch (error) {
-      setConnectionStatus('error');
-    }
-  };
 
   const handleStartSync = async () => {
     try {
@@ -164,33 +153,12 @@ const WordPressSync: React.FC = () => {
     <div>
       <div style={{ marginBottom: 24 }}>
         <Title level={2}>WordPress Sync Management</Title>
-        <Text type="secondary">Manage synchronization between the database and WordPress</Text>
+        <Text type="secondary">
+          Manage synchronization between the database and WordPress. 
+          Configure WordPress connection settings in <a href="/settings">Settings</a>.
+        </Text>
       </div>
 
-      {/* Connection Status */}
-      <Alert
-        message={
-          <Space>
-            <GlobalOutlined />
-            WordPress Connection Status
-          </Space>
-        }
-        description={
-          connectionStatus === 'success' 
-            ? 'Successfully connected to WordPress API'
-            : connectionStatus === 'error'
-            ? 'Unable to connect to WordPress API. Check your credentials and URL.'
-            : 'Testing connection...'
-        }
-        type={connectionStatus === 'success' ? 'success' : connectionStatus === 'error' ? 'error' : 'info'}
-        showIcon
-        style={{ marginBottom: 24 }}
-        action={
-          <Button size="small" onClick={testConnection}>
-            Test Connection
-          </Button>
-        }
-      />
 
       {/* Status Overview */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -351,7 +319,7 @@ const WordPressSync: React.FC = () => {
               icon={<SyncOutlined />}
               onClick={handleStartSync}
               loading={loading}
-              disabled={status.batch_running || connectionStatus === 'error'}
+              disabled={status.batch_running}
               size="large"
             >
               Start Sync
@@ -363,13 +331,6 @@ const WordPressSync: React.FC = () => {
               loading={refreshing}
             >
               Refresh Status
-            </Button>
-
-            <Button
-              icon={<LinkOutlined />}
-              onClick={testConnection}
-            >
-              Test Connection
             </Button>
           </Space>
         </Form>

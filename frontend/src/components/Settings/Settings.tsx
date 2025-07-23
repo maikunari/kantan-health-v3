@@ -18,7 +18,7 @@ import {
 } from 'antd';
 import {
   SettingOutlined,
-  TestOutlined,
+  ApiOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   EyeInvisibleOutlined,
@@ -61,7 +61,11 @@ interface TestResult {
   error?: string;
   user_info?: any;
   test_response?: string;
-  usage?: any;
+  model?: string;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
   quota_info?: any;
 }
 
@@ -401,7 +405,7 @@ const Settings: React.FC = () => {
                 Save Configuration
               </Button>
               <Button 
-                icon={<TestOutlined />}
+                icon={<ApiOutlined />}
                 onClick={() => testConnection('wordpress')}
                 loading={testing === 'wordpress'}
               >
@@ -496,7 +500,7 @@ const Settings: React.FC = () => {
                 Save Configuration
               </Button>
               <Button 
-                icon={<TestOutlined />}
+                icon={<ApiOutlined />}
                 onClick={() => testConnection('google')}
                 loading={testing === 'google'}
               >
@@ -592,7 +596,7 @@ const Settings: React.FC = () => {
                 Save Configuration
               </Button>
               <Button 
-                icon={<TestOutlined />}
+                icon={<ApiOutlined />}
                 onClick={() => testConnection('claude')}
                 loading={testing === 'claude'}
               >
