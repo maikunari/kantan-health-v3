@@ -39,4 +39,15 @@ export const API_ENDPOINTS = {
   SYNC_TEST_CONNECTION: '/api/sync/test-connection',
   SYNC_FORCE_UPDATE: '/api/sync/force-update',
   SYNC_BATCH_STATUS: '/api/sync/batch-status',
+
+  // Settings
+  SETTINGS_CONFIG: '/api/settings/config',
+  SETTINGS_UPDATE_WORDPRESS: '/api/settings/config/wordpress',
+  SETTINGS_UPDATE_GOOGLE: '/api/settings/config/google',
+  SETTINGS_UPDATE_CLAUDE: '/api/settings/config/claude',
+  SETTINGS_UPDATE_ADMIN: '/api/settings/config/admin',
+  SETTINGS_TEST_WORDPRESS: '/api/settings/test/wordpress',
+  SETTINGS_TEST_GOOGLE: '/api/settings/test/google',
+  SETTINGS_TEST_CLAUDE: '/api/settings/test/claude',
+  SETTINGS_BACKUP: '/api/settings/backup',
 };

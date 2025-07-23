@@ -9,6 +9,7 @@ import ProviderList from './components/Providers/ProviderList';
 import ContentGeneration from './components/ContentGeneration/ContentGeneration';
 import WordPressSync from './components/Sync/WordPressSync';
 import AddProviders from './components/AddProviders/AddProviders';
+import Settings from './components/Settings/Settings';
 import LoginTest from './components/LoginTest';
 import './App.css';
 
@@ -42,7 +43,7 @@ const AppRoutes: React.FC = () => {
         <Route path="add-providers" element={<AddProviders />} />
         <Route path="content" element={<ContentGeneration />} />
         <Route path="sync" element={<WordPressSync />} />
-        <Route path="settings" element={<div>Settings page coming soon...</div>} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
