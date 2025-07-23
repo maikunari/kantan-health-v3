@@ -46,13 +46,30 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
   // Initialize form with provider data when component mounts or provider changes
   React.useEffect(() => {
     if (provider) {
-      form.setFieldsValue(provider);
+      // Map provider data to form field names
+      const formData = {
+        ...provider,
+        // Map frontend field names to API field names
+        proficiency_score: provider.english_proficiency_score,
+        english_experience_summary: provider.ai_english_experience,
+        review_summary: provider.ai_review_summary,
+        seo_meta_description: provider.seo_description,
+      };
+      form.setFieldsValue(formData);
     }
   }, [provider, form]);
 
   const handleEdit = () => {
     setEditing(true);
-    form.setFieldsValue(provider);
+    // Use the same mapping as in useEffect
+    const formData = {
+      ...provider,
+      proficiency_score: provider.english_proficiency_score,
+      english_experience_summary: provider.ai_english_experience,
+      review_summary: provider.ai_review_summary,
+      seo_meta_description: provider.seo_description,
+    };
+    form.setFieldsValue(formData);
   };
 
   const handleSave = async () => {
@@ -60,12 +77,16 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
       setLoading(true);
       const values = await form.validateFields();
       
+      console.log('Form values to be sent:', values);
+      console.log('API URL:', `${API_ENDPOINTS.PROVIDERS}/${provider.id}`);
+      
       await api.put(`${API_ENDPOINTS.PROVIDERS}/${provider.id}`, values);
       
       message.success('Provider updated successfully');
       setEditing(false);
       onUpdate();
     } catch (error: any) {
+      console.error('Save error:', error);
       message.error(error.response?.data?.error || 'Failed to update provider');
     } finally {
       setLoading(false);
@@ -196,7 +217,7 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="Proficiency Score" name="english_proficiency_score">
+              <Form.Item label="Proficiency Score" name="proficiency_score">
                 {editing ? (
                   <Select>
                     <Option value={5}>5 - Fluent</Option>
@@ -234,7 +255,7 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
               </Form.Item>
             </Panel>
             <Panel header="English Experience Summary" key="experience">
-              <Form.Item name="ai_english_experience">
+              <Form.Item name="english_experience_summary">
                 {editing ? (
                   <TextArea rows={4} placeholder="AI generated English experience summary..." />
                 ) : (
@@ -243,7 +264,7 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
               </Form.Item>
             </Panel>
             <Panel header="Review Summary" key="reviews">
-              <Form.Item name="ai_review_summary">
+              <Form.Item name="review_summary">
                 {editing ? (
                   <TextArea rows={4} placeholder="AI generated review summary..." />
                 ) : (
@@ -263,7 +284,7 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
               </Form.Item>
             </Col>
             <Col span={24}>
-              <Form.Item label="SEO Description" name="seo_description">
+              <Form.Item label="SEO Description" name="seo_meta_description">
                 {editing ? <TextArea rows={3} /> : <Text>{provider?.seo_description || 'No SEO description generated yet'}</Text>}
               </Form.Item>
             </Col>

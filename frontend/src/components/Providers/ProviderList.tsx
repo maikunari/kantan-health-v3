@@ -243,13 +243,6 @@ const ProviderList: React.FC = () => {
       width: 150,
       render: (_, record: Provider) => (
         <Space size="small">
-          <Tooltip title="View Details">
-            <Button 
-              icon={<EyeOutlined />} 
-              size="small" 
-              onClick={() => handleViewProvider(record)}
-            />
-          </Tooltip>
           <Tooltip title="Edit">
             <Button 
               icon={<EditOutlined />} 
@@ -429,10 +422,7 @@ const ProviderList: React.FC = () => {
           setSelectedProvider(null);
         }}
         extra={
-          <Space>
-            <Button onClick={() => setDrawerVisible(false)}>Cancel</Button>
-            <Button type="primary">Save Changes</Button>
-          </Space>
+          <Button onClick={() => setDrawerVisible(false)}>Close</Button>
         }
       >
         {selectedProvider && (

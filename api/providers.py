@@ -172,7 +172,11 @@ def update_provider(provider_id):
         
         for field in allowed_fields:
             if field in data:
-                setattr(provider, field, data[field])
+                # Handle field name mapping
+                if field == 'ward':
+                    setattr(provider, 'district', data[field])
+                else:
+                    setattr(provider, field, data[field])
         
         session.commit()
         session.close()

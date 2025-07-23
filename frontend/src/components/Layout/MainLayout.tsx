@@ -11,6 +11,7 @@ import {
   HeartOutlined,
   SettingOutlined,
   ApiOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -34,6 +35,11 @@ const MainLayout: React.FC = () => {
       key: '/providers',
       icon: <UserOutlined />,
       label: 'Providers',
+    },
+    {
+      key: '/add-providers',
+      icon: <PlusOutlined />,
+      label: 'Add Providers',
     },
     {
       key: '/content',

@@ -11,6 +11,12 @@ export const API_ENDPOINTS = {
   PROVIDERS: '/providers',
   PROVIDER_STATS: '/providers/stats',
   PROVIDER_BULK_UPDATE: '/providers/bulk-update',
+  
+  // Add Providers
+  ADD_SPECIFIC_PROVIDER: '/providers/add-specific',
+  ADD_GEOGRAPHIC_PROVIDERS: '/providers/add-geographic',
+  VALIDATE_PLACE_ID: '/providers/validate-place-id',
+  SEARCH_PREVIEW: '/providers/search-preview',
 
   // Dashboard
   DASHBOARD_OVERVIEW: '/dashboard/overview',

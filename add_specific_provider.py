@@ -32,6 +32,7 @@ Usage:
 import argparse
 import sys
 import time
+import json
 from typing import Optional, Dict, List
 from google_places_integration import GooglePlacesHealthcareCollector
 from claude_mega_batch_processor import ClaudeMegaBatchProcessor
@@ -373,6 +374,8 @@ def main():
                        help='Skip AI content generation (default: generate content)')
     parser.add_argument('--skip-wordpress-sync', action='store_true',
                        help='Skip WordPress sync (default: sync to WordPress)')
+    parser.add_argument('--json-output', action='store_true',
+                       help='Output results in JSON format for API consumption')
     
     # Legacy flags (for backward compatibility)
     parser.add_argument('--generate-content', action='store_true',
@@ -382,8 +385,9 @@ def main():
     
     args = parser.parse_args()
     
-    print("🏥 SPECIFIC PROVIDER ADDITION")
-    print("=" * 50)
+    if not args.json_output:
+        print("🏥 SPECIFIC PROVIDER ADDITION")
+        print("=" * 50)
     
     adder = SpecificProviderAdder()
     
@@ -448,13 +452,32 @@ def main():
             if result.get('provider'):
                 print(f"📋 Provider found but not added: {result['provider'].get('provider_name', 'Unknown')}")
             
-            sys.exit(1)
+            if not args.json_output:
+                sys.exit(1)
+        
+        # Output JSON result if requested
+        if args.json_output:
+            json_result = {
+                'success': result['success'],
+                'message': result['message'],
+                'dry_run': result.get('dry_run', False),
+                'provider_id': result.get('provider', {}).get('id') if result.get('provider') else None,
+                'provider_name': result.get('provider', {}).get('provider_name') if result.get('provider') else None,
+                'error': result.get('error') if not result['success'] else None
+            }
+            print(json.dumps(json_result, indent=2))
     
     except KeyboardInterrupt:
-        print("\n⏹️ Operation cancelled by user")
+        if not args.json_output:
+            print("\n⏹️ Operation cancelled by user")
+        else:
+            print(json.dumps({'success': False, 'error': 'Operation cancelled by user'}))
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
+        if not args.json_output:
+            print(f"❌ Unexpected error: {str(e)}")
+        else:
+            print(json.dumps({'success': False, 'error': str(e)}))
         sys.exit(1)
     finally:
         adder.close()

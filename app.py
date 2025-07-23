@@ -44,6 +44,7 @@ from api.dashboard import dashboard_bp
 from api.content_generation import content_bp
 from api.wordpress_sync import sync_bp
 from api.auth import auth_bp, init_auth
+from api.add_providers import add_providers_bp
 
 # Initialize authentication
 init_auth(app)
@@ -54,6 +55,7 @@ app.register_blueprint(providers_bp, url_prefix='/api/providers')
 app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
 app.register_blueprint(content_bp, url_prefix='/api/content')
 app.register_blueprint(sync_bp, url_prefix='/api/sync')
+app.register_blueprint(add_providers_bp, url_prefix='/api/providers')
 
 @app.route('/')
 def index():
