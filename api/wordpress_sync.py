@@ -35,7 +35,7 @@ def sync_providers():
         dry_run = data.get('dry_run', False)
         
         # Build command
-        cmd = ['python3', 'wordpress_sync_manager.py']
+        cmd = ['python', 'wordpress_sync_manager.py']
         
         if sync_all:
             cmd.append('--sync-all')
@@ -215,7 +215,7 @@ def check_provider_sync(provider_id):
 def test_wordpress_connection():
     """Test WordPress API connection"""
     try:
-        cmd = ['python3', 'wordpress_sync_manager.py', '--test-connection']
+        cmd = ['python', 'wordpress_sync_manager.py', '--test-connection']
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 0:
@@ -240,7 +240,7 @@ def force_update_provider(provider_id):
     """Force update a specific provider in WordPress"""
     try:
         cmd = [
-            'python3', 'wordpress_sync_manager.py',
+            'python', 'wordpress_sync_manager.py',
             '--provider-ids', str(provider_id),
             '--force'
         ]

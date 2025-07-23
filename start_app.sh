@@ -12,9 +12,15 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
+# Activate virtual environment if it exists
+if [ -d "venv" ]; then
+    echo "🐍 Activating virtual environment..."
+    source venv/bin/activate
+fi
+
 # Start Flask backend
 echo "🔧 Starting Flask backend on port 5001..."
-python3 app.py &
+python app.py &
 BACKEND_PID=$!
 
 # Wait a moment for backend to start

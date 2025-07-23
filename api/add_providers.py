@@ -81,29 +81,55 @@ def run_full_pipeline_for_newly_added_providers(num_providers):
             'providers_processed': 0
         }
         
+        # Get the correct working directory
+        import os
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
         # Generate AI content for newly added providers (mega batch will process providers without AI content)
         logger.info(f"Running mega batch AI content generation for up to {num_providers} providers...")
-        ai_cmd = ['python3', 'run_mega_batch_automation.py', '--limit', str(num_providers)]
-        ai_result = subprocess.run(ai_cmd, capture_output=True, text=True, timeout=600)
+        logger.info(f"Working directory: {script_dir}")
+        
+        ai_cmd = ['python', 'run_mega_batch_automation.py', '--limit', str(num_providers)]
+        logger.info(f"Running command: {' '.join(ai_cmd)}")
+        
+        ai_result = subprocess.run(
+            ai_cmd, 
+            capture_output=True, 
+            text=True, 
+            timeout=600,
+            cwd=script_dir
+        )
         
         pipeline_results['ai_content_success'] = ai_result.returncode == 0
         pipeline_results['ai_output'] = ai_result.stdout
         
         if ai_result.returncode != 0:
-            logger.warning(f"AI content generation failed: {ai_result.stderr}")
+            logger.error(f"AI content generation failed with return code {ai_result.returncode}")
+            logger.error(f"STDERR: {ai_result.stderr}")
+            logger.error(f"STDOUT: {ai_result.stdout}")
         else:
             logger.info(f"AI content generation completed successfully")
+            logger.info(f"Output preview: {ai_result.stdout[:500]}")
         
         # Sync to WordPress (will sync providers that have content but aren't synced)
         logger.info(f"Running WordPress sync for up to {num_providers} providers...")
-        wp_cmd = ['python3', 'wordpress_sync_manager.py', '--sync-all', '--limit', str(num_providers)]
-        wp_result = subprocess.run(wp_cmd, capture_output=True, text=True, timeout=600)
+        wp_cmd = ['python', 'wordpress_sync_manager.py', '--sync-all', '--limit', str(num_providers)]
+        logger.info(f"Running command: {' '.join(wp_cmd)}")
+        
+        wp_result = subprocess.run(
+            wp_cmd, 
+            capture_output=True, 
+            text=True, 
+            timeout=600,
+            cwd=script_dir
+        )
         
         pipeline_results['wordpress_sync_success'] = wp_result.returncode == 0
         pipeline_results['wp_output'] = wp_result.stdout
         
         if wp_result.returncode != 0:
-            logger.warning(f"WordPress sync failed: {wp_result.stderr}")
+            logger.error(f"WordPress sync failed with return code {wp_result.returncode}")
+            logger.error(f"STDERR: {wp_result.stderr}")
         else:
             logger.info(f"WordPress sync completed successfully")
         
@@ -126,7 +152,7 @@ def add_specific_provider():
         data = request.json
         
         # Build command for add_specific_provider.py
-        cmd = ['python3', 'add_specific_provider.py']
+        cmd = ['python', 'add_specific_provider.py']
         
         # Add parameters based on request
         if data.get('place_id'):
@@ -233,7 +259,7 @@ def add_geographic_providers():
         data = request.json
         
         # Build command for add_geographic_providers.py
-        cmd = ['python3', 'add_geographic_providers.py']
+        cmd = ['python', 'add_geographic_providers.py']
         
         # Geographic parameters
         if data.get('city'):
@@ -362,7 +388,7 @@ def validate_place_id():
         
         # Use the specific provider script with dry-run to validate
         cmd = [
-            'python3', 'add_specific_provider.py',
+            'python', 'add_specific_provider.py',
             '--place-id', place_id,
             '--dry-run',
             '--json-output'
@@ -410,7 +436,7 @@ def search_preview():
         if data.get('place_id'):
             # Use specific provider script for place ID preview
             cmd = [
-                'python3', 'add_specific_provider.py',
+                'python', 'add_specific_provider.py',
                 '--place-id', data['place_id'],
                 '--dry-run',
                 '--json-output'
@@ -418,7 +444,7 @@ def search_preview():
         elif data.get('name'):
             # Use specific provider script for name search preview
             cmd = [
-                'python3', 'add_specific_provider.py',
+                'python', 'add_specific_provider.py',
                 '--name', data['name'],
                 '--dry-run',
                 '--json-output'
@@ -428,7 +454,7 @@ def search_preview():
         elif data.get('city'):
             # Use geographic script for area preview
             cmd = [
-                'python3', 'add_geographic_providers.py',
+                'python', 'add_geographic_providers.py',
                 '--dry-run',
                 '--json-output'
             ]

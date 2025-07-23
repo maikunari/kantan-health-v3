@@ -32,6 +32,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuth = async () => {
     try {
+      console.log('Checking auth at:', API_ENDPOINTS.CHECK_AUTH);
+      console.log('Full URL will be:', api.defaults.baseURL + API_ENDPOINTS.CHECK_AUTH);
       const response = await api.get(API_ENDPOINTS.CHECK_AUTH);
       if (response.data.authenticated) {
         setUser(response.data.user);

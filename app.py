@@ -63,10 +63,25 @@ def index():
         'name': 'Healthcare Directory v2 API',
         'version': '2.0',
         'endpoints': {
+            'auth': '/api/auth',
             'providers': '/api/providers',
             'dashboard': '/api/dashboard',
             'content': '/api/content',
             'sync': '/api/sync'
+        }
+    })
+
+@app.route('/api')
+def api_root():
+    return jsonify({
+        'status': 'ok',
+        'message': 'Healthcare Directory API v2',
+        'endpoints': {
+            'auth': {
+                'login': '/api/auth/login',
+                'logout': '/api/auth/logout',
+                'check': '/api/auth/check'
+            }
         }
     })
 

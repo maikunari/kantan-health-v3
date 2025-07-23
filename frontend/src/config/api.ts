@@ -1,41 +1,42 @@
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 export const API_ENDPOINTS = {
   // Auth
-  LOGIN: '/auth/login',
-  LOGOUT: '/auth/logout',
-  CHECK_AUTH: '/auth/check',
-  CURRENT_USER: '/auth/me',
+  LOGIN: '/api/auth/login',
+  LOGOUT: '/api/auth/logout',
+  CHECK_AUTH: '/api/auth/check',
+  CURRENT_USER: '/api/auth/me',
 
   // Providers
-  PROVIDERS: '/providers',
-  PROVIDER_STATS: '/providers/stats',
-  PROVIDER_BULK_UPDATE: '/providers/bulk-update',
+  PROVIDERS: '/api/providers',
+  PROVIDER_STATS: '/api/providers/stats',
+  PROVIDER_BULK_UPDATE: '/api/providers/bulk-update',
   
   // Add Providers
-  ADD_SPECIFIC_PROVIDER: '/providers/add-specific',
-  ADD_GEOGRAPHIC_PROVIDERS: '/providers/add-geographic',
-  VALIDATE_PLACE_ID: '/providers/validate-place-id',
-  SEARCH_PREVIEW: '/providers/search-preview',
+  ADD_SPECIFIC_PROVIDER: '/api/providers/add-specific',
+  ADD_GEOGRAPHIC_PROVIDERS: '/api/providers/add-geographic',
+  VALIDATE_PLACE_ID: '/api/providers/validate-place-id',
+  SEARCH_PREVIEW: '/api/providers/search-preview',
 
   // Dashboard
-  DASHBOARD_OVERVIEW: '/dashboard/overview',
-  DASHBOARD_TIMELINE: '/dashboard/metrics/timeline',
-  DASHBOARD_COSTS: '/dashboard/metrics/costs',
-  SYSTEM_HEALTH: '/dashboard/system/health',
+  DASHBOARD_OVERVIEW: '/api/dashboard/overview',
+  DASHBOARD_TIMELINE: '/api/dashboard/metrics/timeline',
+  DASHBOARD_COSTS: '/api/dashboard/metrics/costs',
+  SYSTEM_HEALTH: '/api/dashboard/system/health',
 
   // Content Generation
-  CONTENT_GENERATE: '/content/generate',
-  CONTENT_STATUS: '/content/status',
-  CONTENT_PREVIEW: '/content/preview',
-  CONTENT_REGENERATE: '/content/regenerate',
-  CONTENT_BATCH_STATUS: '/content/batch-status',
+  CONTENT_GENERATE: '/api/content/generate',
+  CONTENT_STATUS: '/api/content/status',
+  CONTENT_PREVIEW: '/api/content/preview',
+  CONTENT_REGENERATE: '/api/content/regenerate',
+  CONTENT_BATCH_STATUS: '/api/content/batch-status',
+  CONTENT_CHECK_PROVIDERS: '/api/content/check-providers',
 
   // WordPress Sync
-  SYNC: '/sync/sync',
-  SYNC_STATUS: '/sync/status',
-  SYNC_CHECK: '/sync/check',
-  SYNC_TEST_CONNECTION: '/sync/test-connection',
-  SYNC_FORCE_UPDATE: '/sync/force-update',
-  SYNC_BATCH_STATUS: '/sync/batch-status',
+  SYNC: '/api/sync/sync',
+  SYNC_STATUS: '/api/sync/status',
+  SYNC_CHECK: '/api/sync/check',
+  SYNC_TEST_CONNECTION: '/api/sync/test-connection',
+  SYNC_FORCE_UPDATE: '/api/sync/force-update',
+  SYNC_BATCH_STATUS: '/api/sync/batch-status',
 };
