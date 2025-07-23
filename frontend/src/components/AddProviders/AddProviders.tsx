@@ -14,9 +14,9 @@ import {
   Row,
   Col,
   Tag,
-  Divider,
   message,
   Progress,
+  Table,
 } from 'antd';
 import {
   PlusOutlined,
@@ -24,13 +24,12 @@ import {
   EnvironmentOutlined,
   MedicineBoxOutlined,
   PlayCircleOutlined,
-  StopOutlined,
 } from '@ant-design/icons';
 import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
+import { Provider } from '../../types';
 
 const { Title, Text, Paragraph } = Typography;
-const { TextArea } = Input;
 const { Option } = Select;
 const { TabPane } = Tabs;
 
@@ -39,6 +38,10 @@ interface AddResult {
   message: string;
   provider_id?: number;
   details?: any;
+  recent_providers?: Provider[];
+  providers_added?: number;
+  pipeline_results?: any;
+  pipeline_summary?: any;
 }
 
 const AddProviders: React.FC = () => {
@@ -47,6 +50,128 @@ const AddProviders: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<AddResult[]>([]);
   const [progress, setProgress] = useState(0);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'green';
+      case 'rejected': return 'red';
+      case 'pending': return 'orange';
+      default: return 'default';
+    }
+  };
+
+  const getProficiencyColor = (score: number) => {
+    if (score >= 4) return 'green';
+    if (score === 3) return 'orange';
+    return 'red';
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
+  const providerColumns = [
+    {
+      title: 'Provider Name',
+      dataIndex: 'provider_name',
+      key: 'provider_name',
+      width: 200,
+      ellipsis: true,
+      render: (text: string, record: Provider) => (
+        <div>
+          <div style={{ fontWeight: 'bold' }}>{text}</div>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            ID: {record.id}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: 'Location',
+      key: 'location',
+      width: 150,
+      render: (_: any, record: Provider) => (
+        <div>
+          <div>{record.city}</div>
+          {record.ward && <Text type="secondary">{record.ward}</Text>}
+        </div>
+      ),
+    },
+    {
+      title: 'Specialties',
+      dataIndex: 'specialties',
+      key: 'specialties',
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: 'English Proficiency',
+      key: 'proficiency',
+      width: 120,
+      render: (_: any, record: Provider) => (
+        <Tag color={getProficiencyColor(record.english_proficiency_score)}>
+          Score {record.english_proficiency_score}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => (
+        <Tag color={getStatusColor(status)}>
+          {status.toUpperCase()}
+        </Tag>
+      ),
+    },
+    {
+      title: 'AI Content',
+      key: 'ai_content',
+      width: 100,
+      render: (_: any, record: Provider) => {
+        const hasContent = !!(record.ai_description && record.seo_title);
+        return (
+          <Tag color={hasContent ? 'green' : 'orange'}>
+            {hasContent ? 'Generated' : 'Pending'}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'WordPress',
+      key: 'wordpress',
+      width: 100,
+      render: (_: any, record: Provider) => {
+        const isSynced = !!record.wordpress_id;
+        return (
+          <Tag color={isSynced ? 'green' : 'orange'}>
+            {isSynced ? 'Synced' : 'Pending'}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Created',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 120,
+      render: (dateString: string) => (
+        <div style={{ fontSize: '12px' }}>{formatDate(dateString)}</div>
+      ),
+    },
+  ];
 
   const handleAddSpecific = async (values: any) => {
     setLoading(true);
@@ -68,6 +193,9 @@ const AddProviders: React.FC = () => {
         message: response.data.message,
         provider_id: response.data.provider_id,
         details: response.data.details,
+        recent_providers: response.data.recent_providers || [],
+        providers_added: response.data.providers_added || 0,
+        pipeline_results: response.data.pipeline_results,
       }]);
       
       message.success('Provider added successfully!');
@@ -107,6 +235,9 @@ const AddProviders: React.FC = () => {
         success: true,
         message: response.data.message,
         details: response.data.details,
+        recent_providers: response.data.recent_providers || [],
+        providers_added: response.data.providers_added || 0,
+        pipeline_summary: response.data.pipeline_summary,
       }]);
       
       message.success('Geographic provider search completed!');
@@ -401,32 +532,73 @@ const AddProviders: React.FC = () => {
 
       {/* Results Section */}
       {results.length > 0 && (
-        <Card title="Results" style={{ marginTop: 24 }}>
+        <div style={{ marginTop: 24 }}>
           {results.map((result, index) => (
-            <Alert
-              key={index}
-              message={result.success ? 'Success' : 'Error'}
-              description={
-                <div>
-                  <div>{result.message}</div>
-                  {result.provider_id && (
-                    <div style={{ marginTop: 8 }}>
-                      <Tag>Provider ID: {result.provider_id}</Tag>
+            <div key={index}>
+              {/* Success/Error Alert */}
+              <Card title="Operation Results" style={{ marginBottom: 16 }}>
+                <Alert
+                  message={result.success ? 'Success' : 'Error'}
+                  description={
+                    <div>
+                      <div>{result.message}</div>
+                      {result.providers_added !== undefined && (
+                        <div style={{ marginTop: 8 }}>
+                          <Tag color="blue">Providers Added: {result.providers_added}</Tag>
+                          {result.pipeline_results && (
+                            <>
+                              <Tag color={result.pipeline_results.ai_content_success ? 'green' : 'red'}>
+                                AI Content: {result.pipeline_results.ai_content_success ? 'Success' : 'Failed'}
+                              </Tag>
+                              <Tag color={result.pipeline_results.wordpress_sync_success ? 'green' : 'red'}>
+                                WordPress: {result.pipeline_results.wordpress_sync_success ? 'Success' : 'Failed'}
+                              </Tag>
+                            </>
+                          )}
+                          {result.pipeline_summary && (
+                            <>
+                              <Tag color="green">
+                                AI Generated: {result.pipeline_summary.ai_success_count}/{result.pipeline_summary.total_processed}
+                              </Tag>
+                              <Tag color="green">
+                                WordPress Synced: {result.pipeline_summary.wp_success_count}/{result.pipeline_summary.total_processed}
+                              </Tag>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {result.details && (
-                    <pre style={{ marginTop: 8, fontSize: '12px', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                      {JSON.stringify(result.details, null, 2)}
-                    </pre>
-                  )}
-                </div>
-              }
-              type={result.success ? 'success' : 'error'}
-              style={{ marginBottom: 8 }}
-              showIcon
-            />
+                  }
+                  type={result.success ? 'success' : 'error'}
+                  showIcon
+                />
+              </Card>
+
+              {/* Recently Added Providers Table */}
+              {result.recent_providers && result.recent_providers.length > 0 && (
+                <Card 
+                  title={
+                    <div>
+                      <span>Recently Added Providers</span>
+                      <Tag color="blue" style={{ marginLeft: 8 }}>
+                        {result.recent_providers.length} provider{result.recent_providers.length !== 1 ? 's' : ''}
+                      </Tag>
+                    </div>
+                  }
+                >
+                  <Table
+                    columns={providerColumns}
+                    dataSource={result.recent_providers}
+                    rowKey="id"
+                    pagination={false}
+                    scroll={{ x: 1200 }}
+                    size="small"
+                  />
+                </Card>
+              )}
+            </div>
           ))}
-        </Card>
+        </div>
       )}
     </div>
   );

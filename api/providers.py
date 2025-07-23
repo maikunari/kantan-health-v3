@@ -38,6 +38,10 @@ def get_providers():
         proficiency = request.args.get('proficiency')
         search = request.args.get('search')
         
+        # Sorting parameters
+        sort_by = request.args.get('sort_by', 'created_at')  # Default sort by newest
+        sort_order = request.args.get('sort_order', 'desc')  # Default descending
+        
         # Build query
         query = session.query(Provider)
         
@@ -57,6 +61,26 @@ def get_providers():
         
         # Get total count
         total = query.count()
+        
+        # Apply sorting
+        valid_sort_fields = {
+            'created_at': Provider.created_at,
+            'provider_name': Provider.provider_name,
+            'city': Provider.city,
+            'status': Provider.status,
+            'proficiency_score': Provider.proficiency_score,
+            'last_synced': Provider.last_wordpress_sync
+        }
+        
+        if sort_by in valid_sort_fields:
+            sort_field = valid_sort_fields[sort_by]
+            if sort_order.lower() == 'asc':
+                query = query.order_by(sort_field.asc())
+            else:
+                query = query.order_by(sort_field.desc())
+        else:
+            # Default sorting by newest first
+            query = query.order_by(Provider.created_at.desc())
         
         # Apply pagination
         providers = query.offset((page - 1) * per_page).limit(per_page).all()

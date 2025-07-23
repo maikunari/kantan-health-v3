@@ -15,6 +15,10 @@ import {
   Popconfirm,
   Badge,
   Tooltip,
+  Popover,
+  Form,
+  DatePicker,
+  Switch,
 } from 'antd';
 import {
   SearchOutlined,
@@ -25,6 +29,9 @@ import {
   SyncOutlined,
   EyeOutlined,
   ReloadOutlined,
+  CaretUpOutlined,
+  CaretDownOutlined,
+  SortAscendingOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType, TableProps } from 'antd/es/table';
 import { Provider, ProvidersResponse } from '../../types';
@@ -43,6 +50,11 @@ interface Filters {
   specialty: string;
 }
 
+interface SortConfig {
+  sort_by: string;
+  sort_order: 'asc' | 'desc';
+}
+
 const ProviderList: React.FC = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,12 +71,17 @@ const ProviderList: React.FC = () => {
     proficiency: '',
     specialty: '',
   });
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    sort_by: 'created_at',
+    sort_order: 'desc'
+  });
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [advancedFiltersVisible, setAdvancedFiltersVisible] = useState(false);
 
   useEffect(() => {
     fetchProviders();
-  }, [pagination.current, pagination.pageSize, filters]);
+  }, [pagination.current, pagination.pageSize, filters, sortConfig]);
 
   const fetchProviders = async () => {
     setLoading(true);
@@ -80,6 +97,10 @@ const ProviderList: React.FC = () => {
           params.append(key, value);
         }
       });
+
+      // Add sorting
+      params.append('sort_by', sortConfig.sort_by);
+      params.append('sort_order', sortConfig.sort_order);
 
       const response = await api.get<ProvidersResponse>(`${API_ENDPOINTS.PROVIDERS}?${params}`);
       setProviders(response.data.providers);
@@ -104,6 +125,14 @@ const ProviderList: React.FC = () => {
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+    setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
+  };
+
+  const handleSortChange = (sort_by: string) => {
+    setSortConfig(prev => ({
+      sort_by,
+      sort_order: prev.sort_by === sort_by && prev.sort_order === 'desc' ? 'asc' : 'desc'
+    }));
     setPagination(prev => ({ ...prev, current: 1 })); // Reset to first page
   };
 
@@ -147,9 +176,40 @@ const ProviderList: React.FC = () => {
     return 'red';
   };
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig.sort_by !== columnKey) {
+      return <SortAscendingOutlined style={{ color: '#bfbfbf' }} />;
+    }
+    return sortConfig.sort_order === 'asc' ? 
+      <CaretUpOutlined style={{ color: '#1890ff' }} /> : 
+      <CaretDownOutlined style={{ color: '#1890ff' }} />;
+  };
+
   const columns: ColumnsType<Provider> = [
     {
-      title: 'Provider Name',
+      title: (
+        <div 
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => handleSortChange('provider_name')}
+        >
+          Provider Name {getSortIcon('provider_name')}
+        </div>
+      ),
       dataIndex: 'provider_name',
       key: 'provider_name',
       width: 250,
@@ -164,7 +224,14 @@ const ProviderList: React.FC = () => {
       ),
     },
     {
-      title: 'Location',
+      title: (
+        <div 
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => handleSortChange('city')}
+        >
+          Location {getSortIcon('city')}
+        </div>
+      ),
       key: 'location',
       width: 200,
       render: (_, record: Provider) => (
@@ -187,7 +254,14 @@ const ProviderList: React.FC = () => {
       ),
     },
     {
-      title: 'English Proficiency',
+      title: (
+        <div 
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => handleSortChange('proficiency_score')}
+        >
+          English Proficiency {getSortIcon('proficiency_score')}
+        </div>
+      ),
       key: 'proficiency',
       width: 150,
       render: (_, record: Provider) => (
@@ -197,7 +271,14 @@ const ProviderList: React.FC = () => {
       ),
     },
     {
-      title: 'Status',
+      title: (
+        <div 
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => handleSortChange('status')}
+        >
+          Status {getSortIcon('status')}
+        </div>
+      ),
       dataIndex: 'status',
       key: 'status',
       width: 120,
@@ -205,6 +286,24 @@ const ProviderList: React.FC = () => {
         <Tag color={getStatusColor(status)}>
           {status.toUpperCase()}
         </Tag>
+      ),
+    },
+    {
+      title: (
+        <div 
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => handleSortChange('created_at')}
+        >
+          Created Date {getSortIcon('created_at')}
+        </div>
+      ),
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 160,
+      render: (dateString: string) => (
+        <div>
+          <div style={{ fontSize: '13px' }}>{formatDate(dateString)}</div>
+        </div>
       ),
     },
     {
@@ -353,9 +452,69 @@ const ProviderList: React.FC = () => {
               >
                 Refresh
               </Button>
-              <Button icon={<FilterOutlined />}>
-                Advanced Filters
-              </Button>
+              <Popover
+                content={
+                  <div style={{ width: 300 }}>
+                    <Form layout="vertical" size="small">
+                      <Form.Item label="Sort By">
+                        <Select
+                          value={sortConfig.sort_by}
+                          onChange={(value) => handleSortChange(value)}
+                          style={{ width: '100%' }}
+                        >
+                          <Option value="created_at">Created Date (Default)</Option>
+                          <Option value="provider_name">Provider Name</Option>
+                          <Option value="city">City</Option>
+                          <Option value="status">Status</Option>
+                          <Option value="proficiency_score">English Proficiency</Option>
+                          <Option value="last_synced">Last Synced</Option>
+                        </Select>
+                      </Form.Item>
+                      <Form.Item label="Sort Order">
+                        <Select
+                          value={sortConfig.sort_order}
+                          onChange={(value) => setSortConfig(prev => ({ ...prev, sort_order: value }))}
+                          style={{ width: '100%' }}
+                        >
+                          <Option value="desc">Newest First (Default)</Option>
+                          <Option value="asc">Oldest First</Option>
+                        </Select>
+                      </Form.Item>
+                      <Form.Item label="Specialty Filter">
+                        <Select
+                          placeholder="Filter by specialty"
+                          value={filters.specialty || undefined}
+                          onChange={(value) => handleFilterChange('specialty', value || '')}
+                          style={{ width: '100%' }}
+                          allowClear
+                        >
+                          <Option value="general">General Medicine</Option>
+                          <Option value="cardiology">Cardiology</Option>
+                          <Option value="dermatology">Dermatology</Option>
+                          <Option value="gynecology">Gynecology</Option>
+                          <Option value="pediatrics">Pediatrics</Option>
+                          <Option value="psychiatry">Psychiatry</Option>
+                          <Option value="dentistry">Dentistry</Option>
+                          <Option value="ophthalmology">Ophthalmology</Option>
+                          <Option value="orthopedics">Orthopedics</Option>
+                          <Option value="ent">ENT</Option>
+                        </Select>
+                      </Form.Item>
+                    </Form>
+                  </div>
+                }
+                title="Advanced Filters & Sorting"
+                trigger="click"
+                open={advancedFiltersVisible}
+                onOpenChange={setAdvancedFiltersVisible}
+              >
+                <Button 
+                  icon={<FilterOutlined />}
+                  type={Object.values(filters).some(v => v) || sortConfig.sort_by !== 'created_at' ? 'primary' : 'default'}
+                >
+                  Advanced Filters
+                </Button>
+              </Popover>
             </Space>
           </Col>
         </Row>
@@ -408,7 +567,7 @@ const ProviderList: React.FC = () => {
           }}
           rowSelection={rowSelection}
           onChange={handleTableChange}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1600 }}
         />
       </Card>
 

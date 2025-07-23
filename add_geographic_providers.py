@@ -169,6 +169,7 @@ class GeographicProviderAdder:
         
         all_results = []
         total_added = 0
+        total_found = 0
         
         for i, city in enumerate(cities):
             city_limit = limit_per_city + (1 if i < remaining_limit else 0)
@@ -185,6 +186,7 @@ class GeographicProviderAdder:
             })
             
             total_added += result.get('providers_added', 0)
+            total_found += result.get('providers_found', 0)
             
             if total_added >= limit:
                 break
@@ -192,6 +194,7 @@ class GeographicProviderAdder:
         return {
             'success': True,
             'providers_added': total_added,
+            'providers_found': total_found,
             'cities_processed': len(all_results),
             'city_results': all_results
         }
@@ -621,6 +624,8 @@ def main():
                        help='Skip AI content generation (default: generate content)')
     parser.add_argument('--skip-wordpress-sync', action='store_true',
                        help='Skip WordPress sync (default: sync to WordPress)')
+    parser.add_argument('--json-output', action='store_true',
+                       help='Output results in JSON format for API consumption')
     
     # Legacy flags (for backward compatibility)
     parser.add_argument('--generate-content', action='store_true',
@@ -630,8 +635,9 @@ def main():
     
     args = parser.parse_args()
     
-    print("🗺️ GEOGRAPHIC PROVIDER ADDITION")
-    print("=" * 50)
+    if not args.json_output:
+        print("🗺️ GEOGRAPHIC PROVIDER ADDITION")
+        print("=" * 50)
     
     adder = GeographicProviderAdder()
     
@@ -644,8 +650,8 @@ def main():
             cities = args.cities.split(',')
             result = adder.add_by_cities(cities, args.limit, args.specialty, args.dry_run)
         
-        # Display results
-        if result['success']:
+        # Display results (only if not JSON mode)
+        if result['success'] and not args.json_output:
             if result.get('dry_run'):
                 print(f"\n✅ DRY RUN COMPLETE")
                 print(f"📊 Would find {result.get('providers_found', 0)} providers")
@@ -666,13 +672,15 @@ def main():
                 
                 # Generate AI content (default behavior)
                 if should_generate_content:
-                    print("\n" + "="*50)
-                    print("🤖 GENERATING AI CONTENT (default behavior)")
+                    if not args.json_output:
+                        print("\n" + "="*50)
+                        print("🤖 GENERATING AI CONTENT (default behavior)")
                     content_result = adder.generate_ai_content_bulk(providers_added)
-                    if content_result['success']:
-                        print(f"✅ {content_result['message']}")
-                    else:
-                        print(f"❌ AI Content Error: {content_result['error']}")
+                    if not args.json_output:
+                        if content_result['success']:
+                            print(f"✅ {content_result['message']}")
+                        else:
+                            print(f"❌ AI Content Error: {content_result['error']}")
                 
                 # Determine if we should sync to WordPress (default: yes, unless skipped)
                 should_sync_wordpress = (
@@ -683,29 +691,52 @@ def main():
                 
                 # Sync to WordPress (default behavior)
                 if should_sync_wordpress:
-                    print("\n" + "="*50)
-                    print("🌐 SYNCING TO WORDPRESS (default behavior)")
+                    if not args.json_output:
+                        print("\n" + "="*50)
+                        print("🌐 SYNCING TO WORDPRESS (default behavior)")
                     sync_result = adder.sync_to_wordpress_bulk(providers_added)
-                    if sync_result['success']:
-                        print(f"✅ {sync_result['message']}")
-                    else:
-                        print(f"❌ WordPress Error: {sync_result['error']}")
+                    if not args.json_output:
+                        if sync_result['success']:
+                            print(f"✅ {sync_result['message']}")
+                        else:
+                            print(f"❌ WordPress Error: {sync_result['error']}")
                         
                 # Show what was skipped (if anything)
-                if args.skip_content_generation:
-                    print("\n⏭️ Skipped AI content generation (--skip-content-generation)")
-                if args.skip_wordpress_sync:
-                    print("⏭️ Skipped WordPress sync (--skip-wordpress-sync)")
+                if not args.json_output:
+                    if args.skip_content_generation:
+                        print("\n⏭️ Skipped AI content generation (--skip-content-generation)")
+                    if args.skip_wordpress_sync:
+                        print("⏭️ Skipped WordPress sync (--skip-wordpress-sync)")
                     
         else:
-            print(f"❌ ERROR: {result.get('error', 'Unknown error')}")
-            sys.exit(1)
+            if not args.json_output:
+                print(f"❌ ERROR: {result.get('error', 'Unknown error')}")
+                sys.exit(1)
+        
+        # Output JSON result if requested
+        if args.json_output:
+            json_result = {
+                'success': result['success'],
+                'message': result.get('message', 'Geographic search completed'),
+                'dry_run': result.get('dry_run', False),
+                'providers_found': result.get('providers_found', 0),
+                'providers_added': result.get('providers_added', 0),
+                'error': result.get('error') if not result['success'] else None,
+                'provider_names': result.get('provider_names', []) if result.get('dry_run') else []
+            }
+            print(json.dumps(json_result, indent=2))
             
     except KeyboardInterrupt:
-        print("\n⏹️ Operation cancelled by user")
+        if not args.json_output:
+            print("\n⏹️ Operation cancelled by user")
+        else:
+            print(json.dumps({'success': False, 'error': 'Operation cancelled by user'}))
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
+        if not args.json_output:
+            print(f"❌ Unexpected error: {str(e)}")
+        else:
+            print(json.dumps({'success': False, 'error': str(e)}))
         sys.exit(1)
     finally:
         adder.close()
