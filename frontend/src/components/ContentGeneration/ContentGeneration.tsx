@@ -27,7 +27,6 @@ import {
   RobotOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { ContentGenerationStatus } from '../../types';
 import api from '../../utils/api';
@@ -234,24 +233,6 @@ const ContentGeneration: React.FC = () => {
 
       {/* Control Panel */}
       <Card title="Generation Control Panel">
-        {(status.batch_running || generating) && (
-          <Alert
-            message="Content Generation in Progress"
-            description={
-              <div>
-                <div>The AI batch processor is currently generating content. New requests will be queued.</div>
-                <div style={{ marginTop: 8 }}>
-                  <Spin size="small" style={{ marginRight: 8 }} />
-                  <Text type="secondary">Processing providers...</Text>
-                </div>
-              </div>
-            }
-            type="info"
-            showIcon
-            icon={<ThunderboltOutlined spin />}
-            style={{ marginBottom: 16 }}
-          />
-        )}
 
         <Form form={form} layout="vertical">
           <Row gutter={16}>
@@ -456,24 +437,77 @@ const ContentGeneration: React.FC = () => {
           </Space>
         }
       >
-        <div style={{ minHeight: 100 }}>
+        <div style={{ minHeight: 120 }}>
           {generating || status.batch_running ? (
             <div>
+              <div style={{ marginBottom: 16 }}>
+                <Text strong style={{ fontSize: 16, color: '#1890ff' }}>
+                  🤖 AI Content Generation Active
+                </Text>
+              </div>
+              
+              <div style={{ background: '#f6f8fa', padding: 16, borderRadius: 8, marginBottom: 16 }}>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>Processing Details:</Text>
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  <li>
+                    <Text>Batch Limit: <Text code>{form.getFieldValue('limit') || 20}</Text> providers</Text>
+                  </li>
+                  <li>
+                    <Text>Content Types: <Text code>All types</Text> (descriptions, SEO, reviews, images)</Text>
+                  </li>
+                  <li>
+                    <Text>Model: <Text code>claude-3-5-sonnet-20241022</Text></Text>
+                  </li>
+                  <li>
+                    <Text>Current Status: <Text type="warning">Processing providers that need content...</Text></Text>
+                  </li>
+                </ul>
+              </div>
+
               <Alert
-                message="Generation Started"
-                description={`Processing up to ${form.getFieldValue('limit') || 20} providers that need content...`}
+                message="⚡ Mega-Batch Processing"
+                description={
+                  <div>
+                    <div style={{ marginBottom: 8 }}>
+                      The system processes providers in batches of 2 for optimal API efficiency. 
+                      Each provider gets 4 content types generated in a single API call.
+                    </div>
+                    <div style={{ fontSize: 12, color: '#666' }}>
+                      💡 Monitor progress: Check Recent Activity badge above or run console command for detailed logs
+                    </div>
+                  </div>
+                }
                 type="info"
                 showIcon
-                style={{ marginBottom: 16 }}
+                style={{ border: '1px solid #d9f7be' }}
               />
-              <Text type="secondary">
-                Check the console or run `ps aux | grep run_mega_batch` to monitor progress.
-              </Text>
             </div>
           ) : (
-            <Text type="secondary">
-              Content generation activity will appear here when processing starts...
-            </Text>
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ marginBottom: 12 }}>
+                <Text type="secondary" style={{ fontSize: 16 }}>
+                  📊 Ready for Content Generation
+                </Text>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <Text type="secondary">
+                  Current completion rate: <Text strong style={{ color: '#52c41a' }}>{Math.round(completionRate)}%</Text>
+                </Text>
+              </div>
+              <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
+                <Text type="secondary" style={{ fontSize: 14 }}>
+                  When you start content generation, detailed progress information will appear here including:
+                </Text>
+                <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20, fontSize: 13, color: '#666' }}>
+                  <li>Real-time processing status</li>
+                  <li>Batch progress and provider details</li>
+                  <li>API usage and cost estimates</li>
+                  <li>Success/error statistics</li>
+                </ul>
+              </div>
+            </div>
           )}
         </div>
       </Card>
