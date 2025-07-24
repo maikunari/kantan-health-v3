@@ -100,7 +100,9 @@ export interface SyncStatus {
 export interface ContentGenerationStatus {
   batch_running: boolean;
   content_stats: {
+    total_providers: number;
     total_approved: number;
+    total_pending: number;
     with_description: number;
     with_experience: number;
     with_reviews: number;

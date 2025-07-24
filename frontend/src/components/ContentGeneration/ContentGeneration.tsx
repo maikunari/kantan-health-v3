@@ -123,8 +123,8 @@ const ContentGeneration: React.FC = () => {
     );
   }
 
-  const completionRate = status.content_stats.total_approved > 0 
-    ? (status.content_stats.fully_complete / status.content_stats.total_approved) * 100 
+  const completionRate = status.content_stats.total_providers > 0 
+    ? (status.content_stats.fully_complete / status.content_stats.total_providers) * 100 
     : 0;
 
   return (
@@ -139,8 +139,8 @@ const ContentGeneration: React.FC = () => {
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Total Approved"
-              value={status.content_stats.total_approved}
+              title="Total Providers"
+              value={status.content_stats.total_providers}
               prefix={<FileTextOutlined style={{ color: '#1890ff' }} />}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -367,56 +367,6 @@ const ContentGeneration: React.FC = () => {
               disabled={status.batch_running || generating || loading}
             >
               Preview (Dry Run)
-            </Button>
-            <Button 
-              size="small"
-              type="dashed"
-              onClick={async () => {
-                try {
-                  const response = await api.get(API_ENDPOINTS.CONTENT_CHECK_PROVIDERS);
-                  message.info(`Found ${response.data.providers_needing_content} providers needing content out of ${response.data.total_providers} total`);
-                  console.log('Providers needing content:', response.data);
-                  
-                  // Show sample providers in console
-                  if (response.data.sample_providers?.length > 0) {
-                    console.log('Sample providers missing content:');
-                    response.data.sample_providers.forEach((p: any) => {
-                      console.log(`- ${p.name} (ID: ${p.id}, Status: ${p.status})`);
-                      console.log(`  Has description: ${p.has_description}, Has SEO: ${p.has_seo_title}, Has image: ${p.has_featured_image}`);
-                    });
-                  }
-                } catch (error: any) {
-                  console.error('Check providers error:', error);
-                  message.error('Failed to check providers');
-                }
-              }}
-              disabled={loading}
-            >
-              Check Providers
-            </Button>
-            <Button 
-              size="small"
-              type="primary"
-              onClick={async () => {
-                try {
-                  // Run a test with just 1 provider
-                  const response = await api.post(API_ENDPOINTS.CONTENT_GENERATE, {
-                    limit: 1,
-                    test_mode: true
-                  });
-                  console.log('Test generation response:', response.data);
-                  if (response.data.full_output) {
-                    console.log('Full output:', response.data.full_output);
-                  }
-                  message.info('Test complete - check console for output');
-                } catch (error: any) {
-                  console.error('Test generation error:', error);
-                  message.error('Test failed - check console');
-                }
-              }}
-              disabled={loading}
-            >
-              Test 1 Provider
             </Button>
           </Space>
         </div>

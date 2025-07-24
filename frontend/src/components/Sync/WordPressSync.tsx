@@ -20,6 +20,10 @@ import {
   Spin,
   List,
   Timeline,
+  Modal,
+  Select,
+  Input,
+  Checkbox,
 } from 'antd';
 import {
   SyncOutlined,
@@ -30,6 +34,8 @@ import {
   ReloadOutlined,
   ThunderboltOutlined,
   WarningOutlined,
+  FilterOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { SyncStatus } from '../../types';
@@ -37,6 +43,8 @@ import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
 
 const { Title, Text } = Typography;
+const { Option } = Select;
+const { Search } = Input;
 
 interface SyncOperation {
   operation: string;
@@ -57,6 +65,17 @@ const WordPressSync: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showProviderModal, setShowProviderModal] = useState(false);
+  const [providers, setProviders] = useState<any[]>([]);
+  const [filteredProviders, setFilteredProviders] = useState<any[]>([]);
+  const [selectedProviders, setSelectedProviders] = useState<number[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(false);
+  const [providerFilters, setProviderFilters] = useState({
+    status: '',
+    city: '',
+    hasContent: '',
+    search: ''
+  });
 
   useEffect(() => {
     fetchStatus();
@@ -105,6 +124,128 @@ const WordPressSync: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchProviders = async () => {
+    try {
+      setLoadingProviders(true);
+      const response = await api.get(`${API_ENDPOINTS.PROVIDERS}?page=1&per_page=1000`);
+      setProviders(response.data.providers);
+      setFilteredProviders(response.data.providers);
+    } catch (error: any) {
+      console.error('Failed to fetch providers:', error);
+      message.error('Failed to load providers');
+    } finally {
+      setLoadingProviders(false);
+    }
+  };
+
+  const openProviderModal = () => {
+    setShowProviderModal(true);
+    if (providers.length === 0) {
+      fetchProviders();
+    }
+  };
+
+  const closeProviderModal = () => {
+    setShowProviderModal(false);
+    setSelectedProviders([]);
+    setProviderFilters({
+      status: '',
+      city: '',
+      hasContent: '',
+      search: ''
+    });
+  };
+
+  const applyFilters = () => {
+    let filtered = providers;
+
+    // Status filter
+    if (providerFilters.status) {
+      filtered = filtered.filter(p => p.status === providerFilters.status);
+    }
+
+    // City filter
+    if (providerFilters.city) {
+      filtered = filtered.filter(p => 
+        p.city?.toLowerCase().includes(providerFilters.city.toLowerCase())
+      );
+    }
+
+    // Content filter
+    if (providerFilters.hasContent === 'with_content') {
+      filtered = filtered.filter(p => p.ai_description && p.seo_title);
+    } else if (providerFilters.hasContent === 'without_content') {
+      filtered = filtered.filter(p => !p.ai_description || !p.seo_title);
+    }
+
+    // Search filter
+    if (providerFilters.search) {
+      const searchTerm = providerFilters.search.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.provider_name?.toLowerCase().includes(searchTerm) ||
+        p.address?.toLowerCase().includes(searchTerm) ||
+        p.city?.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    setFilteredProviders(filtered);
+  };
+
+  const handleProviderSelection = (providerId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedProviders([...selectedProviders, providerId]);
+    } else {
+      setSelectedProviders(selectedProviders.filter(id => id !== providerId));
+    }
+  };
+
+  const selectAllFiltered = () => {
+    const allIds = filteredProviders.map(p => p.id);
+    setSelectedProviders(allIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedProviders([]);
+  };
+
+  const syncSelectedProviders = async () => {
+    if (selectedProviders.length === 0) {
+      message.warning('Please select at least one provider to sync');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await api.post(API_ENDPOINTS.SYNC, {
+        provider_ids: selectedProviders,
+        limit: selectedProviders.length,
+        force: false,
+        dry_run: false
+      });
+
+      if (response.data.success) {
+        message.success(`Started sync for ${selectedProviders.length} selected providers`);
+        closeProviderModal();
+        setSyncing(true);
+        setTimeout(fetchStatus, 1000);
+      } else {
+        message.error(response.data.error || 'Failed to start sync');
+      }
+    } catch (error: any) {
+      console.error('Sync failed:', error);
+      message.error(error.response?.data?.error || 'Failed to start sync');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Apply filters when filter state changes
+  useEffect(() => {
+    if (providers.length > 0) {
+      applyFilters();
+    }
+  }, [providerFilters, providers]);
 
   if (!status) {
     return (
@@ -324,6 +465,15 @@ const WordPressSync: React.FC = () => {
             >
               Start Sync
             </Button>
+
+            <Button
+              icon={<FilterOutlined />}
+              onClick={openProviderModal}
+              disabled={status.batch_running}
+              size="large"
+            >
+              Select Providers
+            </Button>
             
             <Button
               icon={<ReloadOutlined />}
@@ -390,6 +540,165 @@ const WordPressSync: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Provider Selection Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <UserOutlined style={{ marginRight: 8 }} />
+            Select Providers to Sync
+          </div>
+        }
+        open={showProviderModal}
+        onCancel={closeProviderModal}
+        width={900}
+        footer={[
+          <div key="footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text type="secondary">
+              {selectedProviders.length} of {filteredProviders.length} providers selected
+            </Text>
+            <Space>
+              <Button onClick={closeProviderModal}>
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                onClick={syncSelectedProviders}
+                loading={loading}
+                disabled={selectedProviders.length === 0}
+              >
+                Sync Selected ({selectedProviders.length})
+              </Button>
+            </Space>
+          </div>
+        ]}
+        style={{ top: 20 }}
+      >
+        {/* Filters */}
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Row gutter={16}>
+            <Col xs={24} md={6}>
+              <Select
+                placeholder="Filter by status"
+                allowClear
+                style={{ width: '100%' }}
+                value={providerFilters.status}
+                onChange={(value) => setProviderFilters({...providerFilters, status: value || ''})}
+              >
+                <Option value="pending">Pending</Option>
+                <Option value="approved">Approved</Option>
+                <Option value="rejected">Rejected</Option>
+              </Select>
+            </Col>
+            <Col xs={24} md={6}>
+              <Select
+                placeholder="Content status"
+                allowClear
+                style={{ width: '100%' }}
+                value={providerFilters.hasContent}
+                onChange={(value) => setProviderFilters({...providerFilters, hasContent: value || ''})}
+              >
+                <Option value="with_content">Has Content</Option>
+                <Option value="without_content">Missing Content</Option>
+              </Select>
+            </Col>
+            <Col xs={24} md={6}>
+              <Input
+                placeholder="Filter by city"
+                allowClear
+                value={providerFilters.city}
+                onChange={(e) => setProviderFilters({...providerFilters, city: e.target.value})}
+              />
+            </Col>
+            <Col xs={24} md={6}>
+              <Search
+                placeholder="Search providers..."
+                allowClear
+                value={providerFilters.search}
+                onChange={(e) => setProviderFilters({...providerFilters, search: e.target.value})}
+              />
+            </Col>
+          </Row>
+          <div style={{ marginTop: 12 }}>
+            <Space>
+              <Button size="small" onClick={selectAllFiltered}>
+                Select All ({filteredProviders.length})
+              </Button>
+              <Button size="small" onClick={clearSelection}>
+                Clear Selection
+              </Button>
+            </Space>
+          </div>
+        </Card>
+
+        {/* Provider List */}
+        <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+          {loadingProviders ? (
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <Spin size="large" />
+              <div style={{ marginTop: 16 }}>Loading providers...</div>
+            </div>
+          ) : filteredProviders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <Text type="secondary">No providers match the current filters</Text>
+            </div>
+          ) : (
+            <List
+              itemLayout="horizontal"
+              dataSource={filteredProviders}
+              renderItem={(provider: any) => (
+                <List.Item
+                  style={{ 
+                    cursor: 'pointer',
+                    backgroundColor: selectedProviders.includes(provider.id) ? '#f6f8ff' : 'transparent'
+                  }}
+                  onClick={() => handleProviderSelection(provider.id, !selectedProviders.includes(provider.id))}
+                >
+                  <List.Item.Meta
+                    avatar={
+                      <Checkbox
+                        checked={selectedProviders.includes(provider.id)}
+                        onChange={(e) => handleProviderSelection(provider.id, e.target.checked)}
+                      />
+                    }
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <Text strong>{provider.provider_name}</Text>
+                        <Tag 
+                          color={
+                            provider.status === 'approved' ? 'green' : 
+                            provider.status === 'pending' ? 'orange' : 'red'
+                          }
+                          style={{ marginLeft: 8 }}
+                        >
+                          {provider.status}
+                        </Tag>
+                        {provider.wordpress_id && (
+                          <Tag color="blue" style={{ marginLeft: 4 }}>
+                            Synced
+                          </Tag>
+                        )}
+                      </div>
+                    }
+                    description={
+                      <div>
+                        <Text type="secondary">{provider.address}</Text>
+                        <br />
+                        <Text type="secondary">{provider.city}</Text>
+                        {provider.ai_description && provider.seo_title ? (
+                          <Badge status="success" text="Has Content" style={{ marginLeft: 8 }} />
+                        ) : (
+                          <Badge status="warning" text="Missing Content" style={{ marginLeft: 8 }} />
+                        )}
+                      </div>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };
