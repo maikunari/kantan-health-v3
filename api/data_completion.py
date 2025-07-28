@@ -56,24 +56,46 @@ def geocode_missing_locations():
                 'dry_run': True
             })
         
-        # Execute the geocoding script
+        # Execute the geocoding script (remove --automation flag that doesn't exist)
         script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'populate_provider_locations.py')
-        cmd = ['python3', script_path, '--automation']
+        cmd = ['python3', script_path]
         
         logger.info(f"Executing geocoding command: {' '.join(cmd)}")
         
-        # Run in background
-        process = subprocess.Popen(cmd, 
-                                 stdout=subprocess.PIPE, 
-                                 stderr=subprocess.PIPE,
-                                 cwd=os.path.dirname(os.path.dirname(__file__)))
-        
-        return jsonify({
-            'success': True,
-            'message': f'Geocoding started for up to {limit} providers',
-            'affected_count': min(missing_count, limit),
-            'process_id': process.pid
-        })
+        # Run in background with proper error handling
+        try:
+            process = subprocess.Popen(cmd, 
+                                     stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE,
+                                     cwd=os.path.dirname(os.path.dirname(__file__)))
+            
+            # Wait a moment to check if process starts successfully
+            time.sleep(0.5)
+            poll_result = process.poll()
+            
+            if poll_result is not None:
+                # Process already exited, capture error
+                stdout, stderr = process.communicate()
+                error_msg = stderr.decode('utf-8') if stderr else stdout.decode('utf-8')
+                logger.error(f"Geocoding script failed immediately: {error_msg}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Geocoding script failed: {error_msg[:200]}...' if len(error_msg) > 200 else error_msg
+                }), 500
+            
+            return jsonify({
+                'success': True,
+                'message': f'Geocoding started for up to {limit} providers',
+                'affected_count': min(missing_count, limit),
+                'process_id': process.pid
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to start geocoding process: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to start geocoding: {str(e)}'
+            }), 500
         
     except Exception as e:
         logger.error(f"Error starting geocoding: {str(e)}")
@@ -121,18 +143,40 @@ def fetch_google_places_data():
         
         logger.info(f"Executing Google Places command: {' '.join(cmd)}")
         
-        # Run in background
-        process = subprocess.Popen(cmd,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE,
-                                 cwd=os.path.dirname(os.path.dirname(__file__)))
-        
-        return jsonify({
-            'success': True,
-            'message': f'Google Places data fetch started for up to {limit} providers',
-            'affected_count': min(missing_count, limit),
-            'process_id': process.pid
-        })
+        # Run in background with proper error handling
+        try:
+            process = subprocess.Popen(cmd,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE,
+                                     cwd=os.path.dirname(os.path.dirname(__file__)))
+            
+            # Wait a moment to check if process starts successfully
+            time.sleep(0.5)
+            poll_result = process.poll()
+            
+            if poll_result is not None:
+                # Process already exited, capture error
+                stdout, stderr = process.communicate()
+                error_msg = stderr.decode('utf-8') if stderr else stdout.decode('utf-8')
+                logger.error(f"Google Places script failed immediately: {error_msg}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Google Places script failed: {error_msg[:200]}...' if len(error_msg) > 200 else error_msg
+                }), 500
+            
+            return jsonify({
+                'success': True,
+                'message': f'Google Places data fetch started for up to {limit} providers',
+                'affected_count': min(missing_count, limit),
+                'process_id': process.pid
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to start Google Places process: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to start Google Places fetch: {str(e)}'
+            }), 500
         
     except Exception as e:
         logger.error(f"Error starting Google Places data fetch: {str(e)}")
@@ -174,24 +218,17 @@ def generate_ai_content():
                 'dry_run': True
             })
         
-        # Execute the AI content generation script
-        script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'run_mega_batch_automation.py')
-        cmd = ['python3', script_path, '--limit', str(limit)]
-        
-        logger.info(f"Executing AI content generation command: {' '.join(cmd)}")
-        
-        # Run in background
-        process = subprocess.Popen(cmd,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE,
-                                 cwd=os.path.dirname(os.path.dirname(__file__)))
-        
+        # For now, disable mega-batch due to proxies error and use fallback message
+        logger.warning("AI content generation temporarily disabled due to configuration issues")
         return jsonify({
-            'success': True,
-            'message': f'AI content generation started for up to {limit} providers',
-            'affected_count': min(missing_count, limit),
-            'process_id': process.pid
-        })
+            'success': False,
+            'error': 'AI content generation is temporarily disabled due to configuration issues with the Anthropic client. Please use the command line tools directly or contact support.',
+            'affected_count': 0,
+            'troubleshooting': {
+                'command_line_alternative': f'python3 run_mega_batch_automation.py --limit {limit}',
+                'error_details': 'Anthropic client initialization fails with proxies parameter error'
+            }
+        }), 503
         
     except Exception as e:
         logger.error(f"Error starting AI content generation: {str(e)}")
@@ -218,31 +255,53 @@ def complete_all_missing_data():
                 'dry_run': True
             })
         
-        # Execute complete automation pipeline
+        # Execute complete automation pipeline (remove --dry-run that's not supported)
         script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'run_automation.py')
         cmd = ['python3', script_path, '--daily-limit', str(limit)]
         
         logger.info(f"Executing complete automation command: {' '.join(cmd)}")
         
-        # Run in background
-        process = subprocess.Popen(cmd,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE,
-                                 cwd=os.path.dirname(os.path.dirname(__file__)))
-        
-        return jsonify({
-            'success': True,
-            'message': f'Complete data completion workflow started for up to {limit} providers',
-            'process_id': process.pid,
-            'workflow': [
-                'Phase 1: Google Places data collection',
-                'Phase 2: Location geocoding',
-                'Phase 3: AI content generation',
-                'Phase 4: Data validation',
-                'Phase 5: WordPress sync preparation',
-                'Phase 6: Status updates'
-            ]
-        })
+        # Run in background with proper error handling
+        try:
+            process = subprocess.Popen(cmd,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE,
+                                     cwd=os.path.dirname(os.path.dirname(__file__)))
+            
+            # Wait a moment to check if process starts successfully
+            time.sleep(0.5)
+            poll_result = process.poll()
+            
+            if poll_result is not None:
+                # Process already exited, capture error
+                stdout, stderr = process.communicate()
+                error_msg = stderr.decode('utf-8') if stderr else stdout.decode('utf-8')
+                logger.error(f"Complete automation script failed immediately: {error_msg}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Complete automation failed: {error_msg[:200]}...' if len(error_msg) > 200 else error_msg
+                }), 500
+            
+            return jsonify({
+                'success': True,
+                'message': f'Complete data completion workflow started for up to {limit} providers',
+                'process_id': process.pid,
+                'workflow': [
+                    'Phase 1: Google Places data collection',
+                    'Phase 2: Location geocoding',
+                    'Phase 3: AI content generation',
+                    'Phase 4: Data validation',
+                    'Phase 5: WordPress sync preparation',
+                    'Phase 6: Status updates'
+                ]
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to start complete automation process: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to start complete automation: {str(e)}'
+            }), 500
         
     except Exception as e:
         logger.error(f"Error starting complete data completion: {str(e)}")

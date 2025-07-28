@@ -24,6 +24,7 @@ import {
 import { Provider } from '../../types';
 import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
+import { calculateGroupCompleteness, COMPLETENESS_FIELD_GROUPS, getCompletenessColor } from '../../utils/completeness';
 
 const { Text, Title } = Typography;
 
@@ -58,7 +59,7 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
       icon: <EnvironmentOutlined />,
       fields: [
         {
-          key: 'location',
+          key: 'latitude,longitude',
           label: 'Coordinates',
           value: provider.latitude && provider.longitude ? `${provider.latitude}, ${provider.longitude}` : null,
           canRegenerate: true,
@@ -116,7 +117,7 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
       ]
     },
     {
-      key: 'ai_content',
+      key: 'content',
       title: 'AI Generated Content',
       icon: <RobotOutlined />,
       fields: [
@@ -142,23 +143,23 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
           type: 'ai'
         },
         {
-          key: 'seo_meta_description',
+          key: 'seo_description',
           label: 'SEO Description',
           value: provider.seo_description,
           canRegenerate: true,
           type: 'ai'
         },
         {
-          key: 'english_experience_summary',
+          key: 'ai_english_experience',
           label: 'English Experience',
-          value: provider.english_experience_summary,
+          value: provider.ai_english_experience,
           canRegenerate: true,
           type: 'ai'
         },
         {
-          key: 'review_summary',
+          key: 'ai_review_summary',
           label: 'Review Summary',
-          value: provider.review_summary,
+          value: provider.ai_review_summary,
           canRegenerate: true,
           type: 'ai'
         }
@@ -192,12 +193,12 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
       return { status: 'error', text: 'Missing' };
     }
     
-    if (field.type === 'location' && field.key === 'location') {
-      // Special handling for coordinates
+    if (field.type === 'location' && field.key === 'latitude,longitude') {
+      // Special handling for coordinates - already combined in value
       return { status: 'success', text: 'Complete' };
     }
     
-    if (typeof field.value === 'object') {
+    if (typeof field.value === 'object' && field.value !== null) {
       return { status: 'success', text: 'Complete' };
     }
     
@@ -273,12 +274,9 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
     }
   };
 
-  const calculateGroupCompleteness = (group: FieldGroup) => {
-    const completedFields = group.fields.filter(field => {
-      const status = getFieldStatus(field);
-      return status.status === 'success';
-    });
-    return Math.round((completedFields.length / group.fields.length) * 100);
+  const getGroupCompleteness = (groupKey: string) => {
+    const completeness = calculateGroupCompleteness(provider, groupKey);
+    return completeness.percentage;
   };
 
   return (
@@ -320,7 +318,7 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
       {/* Field Groups */}
       <Row gutter={[16, 16]}>
         {fieldGroups.map(group => {
-          const completeness = calculateGroupCompleteness(group);
+          const completeness = getGroupCompleteness(group.key);
           return (
             <Col span={12} key={group.key}>
               <Card
@@ -332,7 +330,7 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
                     <Badge
                       count={`${completeness}%`}
                       style={{
-                        backgroundColor: completeness >= 90 ? '#52c41a' : completeness >= 60 ? '#faad14' : '#f5222d'
+                        backgroundColor: getCompletenessColor(completeness)
                       }}
                     />
                   </Space>
@@ -351,7 +349,7 @@ const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onU
                               disabled={!field.canRegenerate}
                             />
                             <Text style={{ fontSize: '12px' }}>{field.label}</Text>
-                            <Tag size="small" color={getTypeColor(field.type)}>
+                            <Tag color={getTypeColor(field.type)} style={{ fontSize: '11px', padding: '1px 4px', lineHeight: '14px' }}>
                               {field.type.toUpperCase()}
                             </Tag>
                           </Space>

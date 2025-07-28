@@ -28,6 +28,7 @@ import { Provider } from '../../types';
 import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
 import ProviderDataManager from '../DataQuality/ProviderDataManager';
+import { calculateProviderCompleteness, getCompletenessColor } from '../../utils/completeness';
 
 const { Text, Title, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -391,14 +392,7 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
                   <Text strong>Completeness Score: </Text>
                   <div style={{ marginLeft: 8, flex: 1 }}>
                     {(() => {
-                      const fields = [
-                        provider.provider_name, provider.address, provider.city,
-                        provider.phone, provider.website, provider.specialties,
-                        provider.latitude, provider.longitude, provider.ai_description,
-                        provider.seo_title, provider.seo_description
-                      ];
-                      const completed = fields.filter(f => f !== null && f !== undefined && f !== '').length;
-                      const percentage = (completed / fields.length) * 100;
+                      const completeness = calculateProviderCompleteness(provider);
                       return (
                         <div style={{ display: 'flex', alignItems: 'center' }}>
                           <div style={{ width: 100, marginRight: 8 }}>
@@ -410,15 +404,18 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
                               overflow: 'hidden'
                             }}>
                               <div style={{
-                                width: `${percentage}%`,
+                                width: `${completeness.percentage}%`,
                                 height: '100%',
-                                backgroundColor: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d',
+                                backgroundColor: getCompletenessColor(completeness.percentage),
                                 transition: 'width 0.3s ease'
                               }} />
                             </div>
                           </div>
-                          <Text strong style={{ color: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d' }}>
-                            {Math.round(percentage)}%
+                          <Text strong style={{ color: getCompletenessColor(completeness.percentage) }}>
+                            {completeness.percentage}%
+                          </Text>
+                          <Text type="secondary" style={{ marginLeft: 8, fontSize: '12px' }}>
+                            ({completeness.completed}/{completeness.total} fields)
                           </Text>
                         </div>
                       );
@@ -427,15 +424,38 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
                   </div>
                 </div>
                 <Row gutter={[8, 8]}>
-                  <Col><Badge status={provider.provider_name ? 'success' : 'error'} text="Name" /></Col>
-                  <Col><Badge status={provider.address ? 'success' : 'error'} text="Address" /></Col>
-                  <Col><Badge status={provider.city ? 'success' : 'error'} text="City" /></Col>
-                  <Col><Badge status={provider.phone ? 'success' : 'error'} text="Phone" /></Col>
-                  <Col><Badge status={provider.website ? 'success' : 'error'} text="Website" /></Col>
-                  <Col><Badge status={provider.latitude && provider.longitude ? 'success' : 'error'} text="Location" /></Col>
-                  <Col><Badge status={provider.ai_description ? 'success' : 'error'} text="Description" /></Col>
-                  <Col><Badge status={provider.seo_title ? 'success' : 'error'} text="SEO Title" /></Col>
-                  <Col><Badge status={provider.wheelchair_accessible ? 'success' : 'warning'} text="Accessibility" /></Col>
+                  {(() => {
+                    const completeness = calculateProviderCompleteness(provider);
+                    const fieldStatuses = [
+                      { field: 'provider_name', label: 'Name' },
+                      { field: 'address', label: 'Address' },
+                      { field: 'city', label: 'City' },
+                      { field: 'phone', label: 'Phone' },
+                      { field: 'website', label: 'Website' },
+                      { field: 'location', label: 'Location', check: provider.latitude && provider.longitude },
+                      { field: 'ai_description', label: 'Description' },
+                      { field: 'seo_title', label: 'SEO Title' },
+                      { field: 'wheelchair_accessible', label: 'Accessibility' }
+                    ];
+                    
+                    return fieldStatuses.map(({ field, label, check }) => {
+                      let isComplete;
+                      if (check !== undefined) {
+                        isComplete = check;
+                      } else {
+                        isComplete = completeness.completedFields.includes(field);
+                      }
+                      
+                      return (
+                        <Col key={field}>
+                          <Badge 
+                            status={isComplete ? 'success' : 'error'} 
+                            text={label} 
+                          />
+                        </Col>
+                      );
+                    });
+                  })()}
                 </Row>
               </Col>
             </Row>

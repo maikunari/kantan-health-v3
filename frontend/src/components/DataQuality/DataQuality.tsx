@@ -133,7 +133,20 @@ const DataQuality: React.FC = () => {
         // Refresh data after a short delay
         setTimeout(handleRefresh, 2000);
       } else {
-        message.error(response.data.message || `Failed to start ${actionName}`);
+        // Handle specific error cases
+        if (response.data.troubleshooting) {
+          message.error(
+            <div>
+              <div>{response.data.error}</div>
+              <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+                Alternative: <code>{response.data.troubleshooting.command_line_alternative}</code>
+              </div>
+            </div>,
+            10 // Show for 10 seconds
+          );
+        } else {
+          message.error(response.data.error || response.data.message || `Failed to start ${actionName}`);
+        }
       }
       
     } catch (error: any) {

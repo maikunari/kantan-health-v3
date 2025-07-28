@@ -38,6 +38,7 @@ import { Provider, ProvidersResponse } from '../../types';
 import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
 import ProviderDetail from './ProviderDetail';
+import { calculateProviderCompleteness, getCompletenessColor } from '../../utils/completeness';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -307,16 +308,43 @@ const ProviderList: React.FC = () => {
       ),
     },
     {
-      title: 'Content',
+      title: 'Content & Completeness',
       key: 'content',
-      width: 150,
+      width: 180,
       render: (_, record: Provider) => {
+        const completeness = calculateProviderCompleteness(record);
         const hasContent = !!(record.ai_description && record.seo_title);
+        
         return (
           <div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{
+                width: 60,
+                height: 6,
+                backgroundColor: '#f5f5f5',
+                borderRadius: 3,
+                overflow: 'hidden',
+                marginRight: 8
+              }}>
+                <div style={{
+                  width: `${completeness.percentage}%`,
+                  height: '100%',
+                  backgroundColor: getCompletenessColor(completeness.percentage),
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+              <Text style={{ 
+                fontSize: '12px', 
+                color: getCompletenessColor(completeness.percentage),
+                fontWeight: 500
+              }}>
+                {completeness.percentage}%
+              </Text>
+            </div>
             <Badge
               status={hasContent ? 'success' : 'default'}
-              text={hasContent ? 'Complete' : 'Pending'}
+              text={hasContent ? 'AI Content Ready' : 'Content Pending'}
+              style={{ fontSize: '11px' }}
             />
           </div>
         );
@@ -333,74 +361,6 @@ const ProviderList: React.FC = () => {
             status={isSynced ? 'success' : 'default'}
             text={isSynced ? 'Synced' : 'Not Synced'}
           />
-        );
-      },
-    },
-    {
-      title: 'Completeness',
-      key: 'completeness',
-      width: 120,
-      render: (_, record: Provider) => {
-        // Calculate completeness score based on key fields
-        const fields = [
-          record.provider_name,
-          record.address,
-          record.city,
-          record.phone,
-          record.website,
-          record.specialties,
-          record.latitude && record.longitude ? 'location' : null,
-          record.ai_description,
-          record.seo_title,
-          record.seo_description,
-          record.wheelchair_accessible,
-        ];
-        
-        const completed = fields.filter(f => f !== null && f !== undefined && f !== '').length;
-        const percentage = Math.round((completed / fields.length) * 100);
-        
-        const getColor = () => {
-          if (percentage >= 90) return '#52c41a';
-          if (percentage >= 70) return '#faad14';
-          if (percentage >= 50) return '#fa8c16';
-          return '#f5222d';
-        };
-        
-        const getStatus = () => {
-          if (percentage >= 90) return 'success';
-          if (percentage >= 70) return 'warning';
-          return 'error';
-        };
-        
-        return (
-          <Tooltip title={`${completed}/${fields.length} fields completed`}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{
-                width: 40,
-                height: 8,
-                backgroundColor: '#f5f5f5',
-                borderRadius: 4,
-                overflow: 'hidden',
-                marginRight: 8
-              }}>
-                <div style={{
-                  width: `${percentage}%`,
-                  height: '100%',
-                  backgroundColor: getColor(),
-                  transition: 'width 0.3s ease'
-                }} />
-              </div>
-              <Text 
-                style={{ 
-                  fontSize: '12px', 
-                  color: getColor(),
-                  fontWeight: 500
-                }}
-              >
-                {percentage}%
-              </Text>
-            </div>
-          </Tooltip>
         );
       },
     },
