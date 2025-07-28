@@ -39,6 +39,8 @@ export const API_ENDPOINTS = {
   SYNC_TEST_CONNECTION: '/api/sync/test-connection',
   SYNC_FORCE_UPDATE: '/api/sync/force-update',
   SYNC_BATCH_STATUS: '/api/sync/batch-status',
+  SYNC_DUPLICATES_SCAN: '/api/sync/duplicates/scan',
+  SYNC_DUPLICATES_CLEANUP: '/api/sync/duplicates/cleanup',
 
   // Settings
   SETTINGS_CONFIG: '/api/settings/config',

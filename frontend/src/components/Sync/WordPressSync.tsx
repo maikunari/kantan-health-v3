@@ -71,6 +71,8 @@ interface DuplicatePost {
   status: string;
   modified: string;
   link: string;
+  slug: string;
+  has_numbered_suffix: boolean;
   content_length: number;
   has_featured_image: boolean;
   db_provider_id: number | null;
@@ -109,6 +111,7 @@ const WordPressSync: React.FC = () => {
   const [scanningDuplicates, setScanningDuplicates] = useState(false);
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
   const [duplicateScanResults, setDuplicateScanResults] = useState<any>(null);
+  const [groupLoadingStates, setGroupLoadingStates] = useState<{[key: number]: boolean}>({});
 
   useEffect(() => {
     fetchStatus();
@@ -295,7 +298,7 @@ const WordPressSync: React.FC = () => {
   const scanForDuplicates = async () => {
     try {
       setScanningDuplicates(true);
-      const response = await api.get('/api/sync/duplicates/scan');
+      const response = await api.get(API_ENDPOINTS.SYNC_DUPLICATES_SCAN);
       
       setDuplicates(response.data.duplicates);
       setDuplicateScanResults(response.data);
@@ -315,37 +318,57 @@ const WordPressSync: React.FC = () => {
     }
   };
 
-  const cleanupDuplicates = async (wpIdsToDelete: number[], dryRun: boolean = false) => {
+  const cleanupDuplicates = async (wpIdsToDelete: number[], dryRun: boolean = false, groupIndex?: number) => {
     try {
-      setCleaningDuplicates(true);
+      if (groupIndex !== undefined) {
+        setGroupLoadingStates(prev => ({ ...prev, [groupIndex]: true }));
+      } else {
+        setCleaningDuplicates(true);
+      }
       
-      const response = await api.post('/api/sync/duplicates/cleanup', {
+      console.log('Starting cleanup with:', { wp_ids_to_delete: wpIdsToDelete, dry_run: dryRun });
+      
+      const response = await api.post(API_ENDPOINTS.SYNC_DUPLICATES_CLEANUP, {
         wp_ids_to_delete: wpIdsToDelete,
         dry_run: dryRun
       });
 
+      console.log('Cleanup response:', response.data);
+
       if (response.data.success) {
-        const { successful_deletions, failed_deletions, total_processed } = response.data;
+        const { successful_deletions, failed_deletions, total_processed, results } = response.data;
         
         if (dryRun) {
           message.info(
             `DRY RUN: Would delete ${total_processed} WordPress posts`
           );
+          console.log('Dry run results:', results);
         } else {
-          message.success(
-            `Successfully deleted ${successful_deletions} duplicates. ${failed_deletions} failed.`
-          );
-          // Refresh duplicates after cleanup
-          await scanForDuplicates();
+          if (successful_deletions > 0) {
+            message.success(
+              `Successfully deleted ${successful_deletions} duplicates. ${failed_deletions > 0 ? `${failed_deletions} failed.` : ''}`
+            );
+            // Refresh duplicates after cleanup
+            setTimeout(() => scanForDuplicates(), 1000);
+          } else {
+            message.warning(`No duplicates were deleted. ${failed_deletions} failed.`);
+            console.log('Failed results:', results);
+          }
         }
       } else {
         message.error('Cleanup operation failed');
+        console.error('Cleanup failed:', response.data);
       }
     } catch (error: any) {
       console.error('Duplicate cleanup failed:', error);
+      console.error('Error response:', error.response?.data);
       message.error(error.response?.data?.error || 'Failed to cleanup duplicates');
     } finally {
-      setCleaningDuplicates(false);
+      if (groupIndex !== undefined) {
+        setGroupLoadingStates(prev => ({ ...prev, [groupIndex]: false }));
+      } else {
+        setCleaningDuplicates(false);
+      }
     }
   };
 
@@ -359,13 +382,13 @@ const WordPressSync: React.FC = () => {
     await cleanupDuplicates(allRecommendedDeletes, dryRun);
   };
 
-  const cleanupGroup = async (group: DuplicateGroup, dryRun: boolean = false) => {
+  const cleanupGroup = async (group: DuplicateGroup, dryRun: boolean = false, groupIndex?: number) => {
     if (group.recommended_delete.length === 0) {
       message.warning('No posts recommended for deletion in this group');
       return;
     }
     
-    await cleanupDuplicates(group.recommended_delete, dryRun);
+    await cleanupDuplicates(group.recommended_delete, dryRun, groupIndex);
   };
 
   if (!status) {
@@ -674,8 +697,9 @@ const WordPressSync: React.FC = () => {
       >
         <div style={{ marginBottom: 16 }}>
           <Text type="secondary">
-            Scan for and remove duplicate WordPress posts. The system will analyze posts with identical titles 
-            and recommend which to keep based on database references and publication status.
+            Scan for and remove duplicate WordPress posts. The system prioritizes keeping posts with original slugs 
+            (no numbered suffixes like -2, -3) as these are typically the first/canonical versions. 
+            Additional factors include database references and publication status.
           </Text>
         </div>
 
@@ -775,15 +799,15 @@ const WordPressSync: React.FC = () => {
                       <Button
                         size="small"
                         icon={<ClearOutlined />}
-                        onClick={() => cleanupGroup(group, true)}
-                        loading={cleaningDuplicates}
+                        onClick={() => cleanupGroup(group, true, index)}
+                        loading={groupLoadingStates[index]}
                       >
                         Preview
                       </Button>
                       <Popconfirm
                         title="Delete Duplicates"
                         description={`Delete ${group.recommended_delete.length} duplicate posts for "${group.title}"?`}
-                        onConfirm={() => cleanupGroup(group, false)}
+                        onConfirm={() => cleanupGroup(group, false, index)}
                         okText="Delete"
                         cancelText="Cancel"
                         okButtonProps={{ danger: true }}
@@ -792,7 +816,7 @@ const WordPressSync: React.FC = () => {
                           size="small"
                           danger
                           icon={<DeleteOutlined />}
-                          loading={cleaningDuplicates}
+                          loading={groupLoadingStates[index]}
                         >
                           Delete ({group.recommended_delete.length})
                         </Button>
@@ -822,6 +846,16 @@ const WordPressSync: React.FC = () => {
                                 <Tag color={post.status === 'publish' ? 'green' : 'orange'} style={{ marginLeft: 8 }}>
                                   {post.status}
                                 </Tag>
+                                {post.has_numbered_suffix && (
+                                  <Tag color="warning" style={{ marginLeft: 4 }}>
+                                    DUPLICATE SLUG
+                                  </Tag>
+                                )}
+                                {!post.has_numbered_suffix && (
+                                  <Tag color="blue" style={{ marginLeft: 4 }}>
+                                    ORIGINAL SLUG
+                                  </Tag>
+                                )}
                                 {post.wp_id === group.recommended_keep && (
                                   <Tag color="success" style={{ marginLeft: 4 }}>
                                     KEEP
@@ -836,6 +870,7 @@ const WordPressSync: React.FC = () => {
                             }
                             description={
                               <div>
+                                <div><Text type="secondary">Slug: {post.slug}</Text></div>
                                 <div><Text type="secondary">Modified: {new Date(post.modified).toLocaleString()}</Text></div>
                                 <div><Text type="secondary">Content Length: {post.content_length} chars</Text></div>
                                 <div><Text type="secondary">Database Reference: {post.db_provider_id ? `Provider ${post.db_provider_id} (${post.db_status})` : 'None'}</Text></div>

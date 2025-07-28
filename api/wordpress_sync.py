@@ -465,12 +465,23 @@ def scan_wordpress_duplicates():
                             WHERE wordpress_post_id = :wp_id
                         '''), {'wp_id': post['id']}).fetchone()
                         
+                        # Extract slug from link or use slug field
+                        slug = post.get('slug', '')
+                        if not slug and post.get('link'):
+                            # Extract slug from URL (last part before trailing slash)
+                            slug = post['link'].rstrip('/').split('/')[-1]
+                        
+                        # Check if slug has numbered suffix (e.g., -2, -3, etc.)
+                        has_numbered_suffix = bool(slug and slug.split('-')[-1].isdigit())
+                        
                         post_info = {
                             'wp_id': post['id'],
                             'title': post['title']['rendered'],
                             'status': post['status'],
                             'modified': post['modified'],
                             'link': post['link'],
+                            'slug': slug,
+                            'has_numbered_suffix': has_numbered_suffix,
                             'content_length': len(post['content']['rendered']),
                             'has_featured_image': post.get('featured_media', 0) > 0,
                             'db_provider_id': db_provider.id if db_provider else None,
@@ -479,21 +490,65 @@ def scan_wordpress_duplicates():
                         }
                         analyzed_posts.append(post_info)
                     
-                    # Determine recommended actions
+                    # Determine recommended actions with updated priority:
+                    # 1. Original slug (no numbered suffix) + DB reference + published
+                    # 2. Original slug (no numbered suffix) + published
+                    # 3. Original slug (no numbered suffix) + DB reference
+                    # 4. Original slug (no numbered suffix)
+                    # 5. DB reference + published (old logic)
+                    # 6. DB reference (old logic)
+                    # 7. Newest overall (old logic)
+                    
                     keep_post = None
+                    
+                    # Priority 1: Original slug + DB reference + published
                     for post_info in analyzed_posts:
-                        if post_info['db_provider_id'] and post_info['status'] == 'publish':
+                        if (not post_info['has_numbered_suffix'] and 
+                            post_info['db_provider_id'] and 
+                            post_info['status'] == 'publish'):
                             keep_post = post_info
                             break
                     
+                    # Priority 2: Original slug + published
+                    if not keep_post:
+                        for post_info in analyzed_posts:
+                            if (not post_info['has_numbered_suffix'] and 
+                                post_info['status'] == 'publish'):
+                                keep_post = post_info
+                                break
+                    
+                    # Priority 3: Original slug + DB reference
+                    if not keep_post:
+                        for post_info in analyzed_posts:
+                            if (not post_info['has_numbered_suffix'] and 
+                                post_info['db_provider_id']):
+                                keep_post = post_info
+                                break
+                    
+                    # Priority 4: Original slug (any status)
+                    if not keep_post:
+                        for post_info in analyzed_posts:
+                            if not post_info['has_numbered_suffix']:
+                                keep_post = post_info
+                                break
+                    
+                    # Priority 5: DB reference + published (fallback to old logic)
+                    if not keep_post:
+                        for post_info in analyzed_posts:
+                            if post_info['db_provider_id'] and post_info['status'] == 'publish':
+                                keep_post = post_info
+                                break
+                    
+                    # Priority 6: DB reference (fallback to old logic)
                     if not keep_post:
                         for post_info in analyzed_posts:
                             if post_info['db_provider_id']:
                                 keep_post = post_info
                                 break
                     
+                    # Priority 7: Newest overall (final fallback)
                     if not keep_post:
-                        keep_post = analyzed_posts[0]  # Newest overall
+                        keep_post = analyzed_posts[0]
                     
                     duplicate_group = {
                         'title': post_group[0]['title']['rendered'],

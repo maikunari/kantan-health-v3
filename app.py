@@ -29,7 +29,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
 db = SQLAlchemy(app)
-CORS(app, supports_credentials=True, origins=['http://localhost:3001'])
+CORS(app, supports_credentials=True, origins=['http://localhost:3000', 'http://localhost:3001'])
 
 # Configure logging
 logging.basicConfig(
