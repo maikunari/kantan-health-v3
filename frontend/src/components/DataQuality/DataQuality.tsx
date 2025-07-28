@@ -86,31 +86,85 @@ const DataQuality: React.FC = () => {
     fetchMissingProviders(selectedFieldType);
   };
 
-  const handleBulkAction = async (actionType: 'geocode' | 'content') => {
+  const handleDataCompletion = async (actionType: 'geocode' | 'google-places' | 'ai-content' | 'complete-all', options: { limit?: number; dry_run?: boolean } = {}) => {
     try {
-      if (actionType === 'geocode') {
-        // This would integrate with the existing populate_provider_locations.py script
-        message.info('Geocoding missing locations... This may take a few minutes.');
-        // In a real implementation, you'd call an API endpoint that triggers the geocoding script
-        // await api.post('/api/providers/bulk-geocode');
-        console.log('Would trigger geocoding for providers missing location data');
-      } else if (actionType === 'content') {
-        // This would integrate with the existing content generation system  
-        message.info('Generating missing AI content... This may take several minutes.');
-        // In a real implementation, you'd call the content generation API
-        // await api.post('/api/content/generate-missing');
-        console.log('Would trigger content generation for providers missing AI content');
+      const { limit = 50, dry_run = false } = options;
+      
+      let endpoint;
+      let actionName;
+      
+      switch (actionType) {
+        case 'geocode':
+          endpoint = API_ENDPOINTS.DATA_COMPLETION_GEOCODE;
+          actionName = 'Geocoding';
+          break;
+        case 'google-places':
+          endpoint = API_ENDPOINTS.DATA_COMPLETION_GOOGLE_PLACES;
+          actionName = 'Google Places data fetch';
+          break;
+        case 'ai-content':
+          endpoint = API_ENDPOINTS.DATA_COMPLETION_AI_CONTENT;
+          actionName = 'AI content generation';
+          break;
+        case 'complete-all':
+          endpoint = API_ENDPOINTS.DATA_COMPLETION_COMPLETE_ALL;
+          actionName = 'Complete data completion';
+          break;
+        default:
+          throw new Error('Invalid action type');
       }
       
-      // Show success message and refresh data
-      setTimeout(() => {
-        message.success(`Bulk ${actionType} action completed successfully!`);
-        handleRefresh();
-      }, 2000);
+      message.info(`${actionName} starting... This may take several minutes.`);
+      
+      const response = await api.post(endpoint, { limit, dry_run });
+      
+      if (response.data.success) {
+        if (dry_run) {
+          message.info(response.data.message);
+        } else {
+          message.success(response.data.message);
+          
+          // Poll for completion status if we have a process ID
+          if (response.data.process_id) {
+            pollCompletionStatus(response.data.process_id, actionName);
+          }
+        }
+        
+        // Refresh data after a short delay
+        setTimeout(handleRefresh, 2000);
+      } else {
+        message.error(response.data.message || `Failed to start ${actionName}`);
+      }
       
     } catch (error: any) {
-      message.error(`Failed to execute bulk ${actionType} action: ${error.message}`);
+      const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred';
+      message.error(`Failed to execute ${actionType}: ${errorMessage}`);
     }
+  };
+
+  const pollCompletionStatus = async (processId: number, actionName: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await api.get(`${API_ENDPOINTS.DATA_COMPLETION_STATUS}/${processId}`);
+        
+        if (response.data.status === 'completed') {
+          clearInterval(pollInterval);
+          message.success(`${actionName} completed successfully!`);
+          handleRefresh();
+        } else if (response.data.status === 'failed') {
+          clearInterval(pollInterval);
+          message.error(`${actionName} failed. Check logs for details.`);
+        }
+      } catch (error) {
+        // Process might have completed before we could check
+        clearInterval(pollInterval);
+      }
+    }, 5000); // Check every 5 seconds
+    
+    // Stop polling after 10 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+    }, 600000);
   };
 
   const getCompletenessColor = (percentage: number) => {
@@ -355,56 +409,110 @@ const DataQuality: React.FC = () => {
           </Card>
         </Col>
         <Col span={12}>
-          <Card title="Critical Missing Data & Quick Actions">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text>Missing Location Data:</Text>
-                  <Badge count={overview.critical_missing.missing_location} style={{ backgroundColor: '#f5222d' }} />
-                </div>
+          <Card title="Data Completion Actions">
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              {/* Master Action */}
+              <div style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}>
                 <Button 
-                  size="small" 
-                  type="primary" 
-                  disabled={overview.critical_missing.missing_location === 0}
-                  onClick={() => handleBulkAction('geocode')}
-                >
-                  Geocode Missing Locations
-                </Button>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text>Missing AI Content:</Text>
-                  <Badge count={overview.critical_missing.missing_ai_content} style={{ backgroundColor: '#fa8c16' }} />
-                </div>
-                <Button 
-                  size="small" 
                   type="primary"
-                  disabled={overview.critical_missing.missing_ai_content === 0}
-                  onClick={() => handleBulkAction('content')}
+                  size="large"
+                  style={{ width: '100%', height: '48px' }}
+                  onClick={() => handleDataCompletion('complete-all', { limit: 25 })}
                 >
-                  Generate Missing Content
+                  🚀 Complete All Missing Data (25 providers)
                 </Button>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text>Missing Contact Info:</Text>
-                  <Badge count={overview.critical_missing.missing_contact} style={{ backgroundColor: '#faad14' }} />
-                </div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Requires manual data entry
+                <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: 4 }}>
+                  Runs: Google Places → Geocoding → AI Content → WordPress Ready
                 </Text>
               </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text>Missing Accessibility:</Text>
-                  <Badge count={overview.critical_missing.missing_accessibility} style={{ backgroundColor: '#1890ff' }} />
-                </div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Update via Provider Details
-                </Text>
+
+              {/* Individual Actions */}
+              <Row gutter={[8, 8]}>
+                <Col span={12}>
+                  <div style={{ marginBottom: 8 }}>
+                    <Badge count={overview.critical_missing.missing_location} style={{ backgroundColor: '#f5222d' }} />
+                    <Text style={{ marginLeft: 8 }}>Missing Locations</Text>
+                  </div>
+                  <Button 
+                    size="small" 
+                    block
+                    disabled={overview.critical_missing.missing_location === 0}
+                    onClick={() => handleDataCompletion('geocode')}
+                  >
+                    📍 Geocode Locations
+                  </Button>
+                </Col>
+                
+                <Col span={12}>
+                  <div style={{ marginBottom: 8 }}>
+                    <Badge count={overview.critical_missing.missing_ai_content} style={{ backgroundColor: '#fa8c16' }} />
+                    <Text style={{ marginLeft: 8 }}>Missing AI Content</Text>
+                  </div>
+                  <Button 
+                    size="small" 
+                    block
+                    disabled={overview.critical_missing.missing_ai_content === 0}
+                    onClick={() => handleDataCompletion('ai-content')}
+                  >
+                    🤖 Generate AI Content
+                  </Button>
+                </Col>
+                
+                <Col span={12}>
+                  <div style={{ marginBottom: 8 }}>
+                    <Text>Google Places Data</Text>
+                  </div>
+                  <Button 
+                    size="small" 
+                    block
+                    onClick={() => handleDataCompletion('google-places')}
+                  >
+                    🏪 Fetch Google Data
+                  </Button>
+                </Col>
+                
+                <Col span={12}>
+                  <div style={{ marginBottom: 8 }}>
+                    <Badge count={overview.critical_missing.missing_contact} style={{ backgroundColor: '#faad14' }} />
+                    <Text style={{ marginLeft: 8 }}>Missing Contact</Text>
+                  </div>
+                  <Button 
+                    size="small" 
+                    block
+                    disabled
+                    title="Requires manual data entry"
+                  >
+                    📞 Manual Entry
+                  </Button>
+                </Col>
+              </Row>
+
+              {/* Quick Test Actions */}
+              <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>Quick Test (Dry Run):</Text>
+                <Space size="small" wrap style={{ marginTop: 4 }}>
+                  <Button 
+                    size="small" 
+                    type="dashed"
+                    onClick={() => handleDataCompletion('geocode', { limit: 5, dry_run: true })}
+                  >
+                    Test Geocoding
+                  </Button>
+                  <Button 
+                    size="small" 
+                    type="dashed"
+                    onClick={() => handleDataCompletion('ai-content', { limit: 5, dry_run: true })}
+                  >
+                    Test AI Content
+                  </Button>
+                  <Button 
+                    size="small" 
+                    type="dashed"
+                    onClick={() => handleDataCompletion('complete-all', { limit: 3, dry_run: true })}
+                  >
+                    Test Complete Flow
+                  </Button>
+                </Space>
               </div>
             </Space>
           </Card>

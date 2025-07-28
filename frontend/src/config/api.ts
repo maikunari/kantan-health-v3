@@ -55,4 +55,12 @@ export const API_ENDPOINTS = {
   DATA_QUALITY_OVERVIEW: '/api/data-quality/overview',
   DATA_QUALITY_PROVIDER_COMPLETENESS: '/api/data-quality/provider',
   DATA_QUALITY_MISSING_FIELDS: '/api/data-quality/providers/missing-fields',
+
+  // Data Completion
+  DATA_COMPLETION_GEOCODE: '/api/data-completion/geocode',
+  DATA_COMPLETION_GOOGLE_PLACES: '/api/data-completion/google-places',
+  DATA_COMPLETION_AI_CONTENT: '/api/data-completion/ai-content',
+  DATA_COMPLETION_COMPLETE_ALL: '/api/data-completion/complete-all',
+  DATA_COMPLETION_PROVIDER_FIELDS: '/api/data-completion/provider',
+  DATA_COMPLETION_STATUS: '/api/data-completion/status',
 };

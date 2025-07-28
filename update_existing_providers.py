@@ -263,6 +263,115 @@ def clear_descriptions(providers: List[Provider]):
     print(f"\n📊 Cleared descriptions for {cleared_count} providers")
     print("💡 Run --descriptions next to regenerate with enhanced format")
 
+def update_google_places_data(providers: List[Provider], api_key: str):
+    """Update Google Places data (hours, ratings, accessibility) for providers"""
+    if not providers:
+        print("No providers to update")
+        return
+    
+    print(f"🏪 UPDATING GOOGLE PLACES DATA FOR {len(providers)} PROVIDERS")
+    print("=" * 60)
+    
+    collector = GooglePlacesHealthcareCollector()
+    session = collector.Session()
+    
+    updated_count = 0
+    skipped_count = 0
+    failed_count = 0
+    
+    for i, provider in enumerate(providers, 1):
+        print(f"🏪 {i}/{len(providers)}: Processing {provider.provider_name}")
+        
+        # Skip if no Google Place ID
+        if not provider.google_place_id:
+            print(f"   ⏭️ No Google Place ID found")
+            skipped_count += 1
+            continue
+        
+        try:
+            # Get place details from Google Places API
+            details = collector.get_place_details(provider.google_place_id)
+            
+            if not details:
+                print(f"   ❌ No details found for Place ID: {provider.google_place_id}")
+                failed_count += 1
+                continue
+            
+            # Re-query the provider to attach to current session
+            db_provider = session.query(Provider).filter_by(id=provider.id).first()
+            
+            if not db_provider:
+                print(f"   ❌ Provider not found in database")
+                failed_count += 1
+                continue
+            
+            updates_made = []
+            
+            # Update business hours
+            if 'opening_hours' in details and details['opening_hours']:
+                db_provider.business_hours = details['opening_hours']
+                updates_made.append('hours')
+            
+            # Update rating and review count
+            if 'rating' in details:
+                db_provider.rating = details['rating']
+                updates_made.append('rating')
+            
+            if 'user_ratings_total' in details:
+                db_provider.total_reviews = details['user_ratings_total']
+                updates_made.append('reviews')
+            
+            # Update accessibility info
+            if 'wheelchair_accessible_entrance' in details:
+                db_provider.wheelchair_accessible = str(details['wheelchair_accessible_entrance']).lower()
+                updates_made.append('wheelchair')
+            
+            # Update phone and website if missing
+            if not db_provider.phone and 'formatted_phone_number' in details:
+                db_provider.phone = details['formatted_phone_number']
+                updates_made.append('phone')
+            
+            if not db_provider.website and 'website' in details:
+                db_provider.website = details['website']
+                updates_made.append('website')
+            
+            # Update photo URLs
+            if 'photos' in details and details['photos']:
+                photo_urls = []
+                for photo in details['photos'][:5]:  # Limit to 5 photos
+                    if 'photo_reference' in photo:
+                        photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo['photo_reference']}&key={api_key}"
+                        photo_urls.append(photo_url)
+                
+                if photo_urls:
+                    db_provider.photo_urls = photo_urls
+                    updates_made.append('photos')
+            
+            if updates_made:
+                session.commit()
+                print(f"   ✅ Updated: {', '.join(updates_made)}")
+                updated_count += 1
+            else:
+                print(f"   ℹ️ No new data available")
+                skipped_count += 1
+            
+            # Rate limiting
+            time.sleep(0.1)  # Small delay to avoid rate limits
+            
+        except Exception as e:
+            print(f"   ❌ Failed to update: {str(e)}")
+            session.rollback()
+            failed_count += 1
+    
+    session.close()
+    
+    print(f"\n📊 GOOGLE PLACES DATA UPDATE SUMMARY:")
+    print(f"   ✅ Updated: {updated_count}")
+    print(f"   ⏭️ Skipped: {skipped_count}")
+    print(f"   ❌ Failed: {failed_count}")
+    if updated_count + failed_count > 0:
+        print(f"   📈 Success rate: {(updated_count/(updated_count+failed_count)*100):.1f}%")
+
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description="Update existing providers with fixes")
@@ -270,8 +379,9 @@ def main():
     # Update options
     parser.add_argument("--descriptions", action='store_true', help="Update AI descriptions and excerpts")
     parser.add_argument("--locations", action='store_true', help="Update latitude/longitude for Google Maps")
+    parser.add_argument("--google-data", action='store_true', help="Update Google Places data (hours, ratings, accessibility)")
     parser.add_argument("--clear", action='store_true', help="Clear existing descriptions to force regeneration")
-    parser.add_argument("--all", action='store_true', help="Update everything (descriptions + locations)")
+    parser.add_argument("--all", action='store_true', help="Update everything (descriptions + locations + google data)")
     
     # Filters
     parser.add_argument("--city", type=str, help="Filter by specific city")
@@ -285,8 +395,8 @@ def main():
     args = parser.parse_args()
     
     # Validate arguments
-    if not any([args.descriptions, args.locations, args.clear, args.all]):
-        print("❌ Please specify what to update: --descriptions, --locations, --clear, or --all")
+    if not any([args.descriptions, args.locations, getattr(args, 'google_data', False), args.clear, args.all]):
+        print("❌ Please specify what to update: --descriptions, --locations, --google-data, --clear, or --all")
         sys.exit(1)
     
     try:
@@ -322,6 +432,13 @@ def main():
                 print("❌ Google API key required for location updates")
                 sys.exit(1)
             update_locations(providers, api_key)
+        
+        if getattr(args, 'google_data', False) or args.all:
+            api_key = load_google_api_key()
+            if not api_key:
+                print("❌ Google API key required for Google Places data updates")
+                sys.exit(1)
+            update_google_places_data(providers, api_key)
         
         session.close()
         

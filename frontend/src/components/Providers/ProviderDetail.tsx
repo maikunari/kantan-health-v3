@@ -27,6 +27,7 @@ import {
 import { Provider } from '../../types';
 import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
+import ProviderDataManager from '../DataQuality/ProviderDataManager';
 
 const { Text, Title, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -380,64 +381,68 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
         </Card>
       </Form>
 
-      {/* Data Completeness Overview */}
+      {/* Data Completeness & Management */}
       {!editing && (
-        <Card title="Data Completeness">
-          <Row gutter={16}>
-            <Col span={24} style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-                <Text strong>Completeness Score: </Text>
-                <div style={{ marginLeft: 8, flex: 1 }}>
-                  {(() => {
-                    const fields = [
-                      provider.provider_name, provider.address, provider.city,
-                      provider.phone, provider.website, provider.specialties,
-                      provider.latitude, provider.longitude, provider.ai_description,
-                      provider.seo_title, provider.seo_description
-                    ];
-                    const completed = fields.filter(f => f !== null && f !== undefined && f !== '').length;
-                    const percentage = (completed / fields.length) * 100;
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <div style={{ width: 100, marginRight: 8 }}>
-                          <div style={{
-                            width: '100%',
-                            height: 8,
-                            backgroundColor: '#f5f5f5',
-                            borderRadius: 4,
-                            overflow: 'hidden'
-                          }}>
+        <>
+          <Card title="Data Completeness Overview" style={{ marginBottom: 16 }}>
+            <Row gutter={16}>
+              <Col span={24} style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                  <Text strong>Completeness Score: </Text>
+                  <div style={{ marginLeft: 8, flex: 1 }}>
+                    {(() => {
+                      const fields = [
+                        provider.provider_name, provider.address, provider.city,
+                        provider.phone, provider.website, provider.specialties,
+                        provider.latitude, provider.longitude, provider.ai_description,
+                        provider.seo_title, provider.seo_description
+                      ];
+                      const completed = fields.filter(f => f !== null && f !== undefined && f !== '').length;
+                      const percentage = (completed / fields.length) * 100;
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <div style={{ width: 100, marginRight: 8 }}>
                             <div style={{
-                              width: `${percentage}%`,
-                              height: '100%',
-                              backgroundColor: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d',
-                              transition: 'width 0.3s ease'
-                            }} />
+                              width: '100%',
+                              height: 8,
+                              backgroundColor: '#f5f5f5',
+                              borderRadius: 4,
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                width: `${percentage}%`,
+                                height: '100%',
+                                backgroundColor: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d',
+                                transition: 'width 0.3s ease'
+                              }} />
+                            </div>
                           </div>
+                          <Text strong style={{ color: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d' }}>
+                            {Math.round(percentage)}%
+                          </Text>
                         </div>
-                        <Text strong style={{ color: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d' }}>
-                          {Math.round(percentage)}%
-                        </Text>
-                      </div>
-                    );
-                  })()
-                }
+                      );
+                    })()
+                    }
+                  </div>
                 </div>
-              </div>
-              <Row gutter={[8, 8]}>
-                <Col><Badge status={provider.provider_name ? 'success' : 'error'} text="Name" /></Col>
-                <Col><Badge status={provider.address ? 'success' : 'error'} text="Address" /></Col>
-                <Col><Badge status={provider.city ? 'success' : 'error'} text="City" /></Col>
-                <Col><Badge status={provider.phone ? 'success' : 'error'} text="Phone" /></Col>
-                <Col><Badge status={provider.website ? 'success' : 'error'} text="Website" /></Col>
-                <Col><Badge status={provider.latitude && provider.longitude ? 'success' : 'error'} text="Location" /></Col>
-                <Col><Badge status={provider.ai_description ? 'success' : 'error'} text="Description" /></Col>
-                <Col><Badge status={provider.seo_title ? 'success' : 'error'} text="SEO Title" /></Col>
-                <Col><Badge status={provider.wheelchair_accessible ? 'success' : 'warning'} text="Accessibility" /></Col>
-              </Row>
-            </Col>
-          </Row>
-        </Card>
+                <Row gutter={[8, 8]}>
+                  <Col><Badge status={provider.provider_name ? 'success' : 'error'} text="Name" /></Col>
+                  <Col><Badge status={provider.address ? 'success' : 'error'} text="Address" /></Col>
+                  <Col><Badge status={provider.city ? 'success' : 'error'} text="City" /></Col>
+                  <Col><Badge status={provider.phone ? 'success' : 'error'} text="Phone" /></Col>
+                  <Col><Badge status={provider.website ? 'success' : 'error'} text="Website" /></Col>
+                  <Col><Badge status={provider.latitude && provider.longitude ? 'success' : 'error'} text="Location" /></Col>
+                  <Col><Badge status={provider.ai_description ? 'success' : 'error'} text="Description" /></Col>
+                  <Col><Badge status={provider.seo_title ? 'success' : 'error'} text="SEO Title" /></Col>
+                  <Col><Badge status={provider.wheelchair_accessible ? 'success' : 'warning'} text="Accessibility" /></Col>
+                </Row>
+              </Col>
+            </Row>
+          </Card>
+
+          <ProviderDataManager provider={provider} onUpdate={onUpdate} />
+        </>
       )}
 
       {/* Read-only Information */}
