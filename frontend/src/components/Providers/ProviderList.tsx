@@ -337,6 +337,74 @@ const ProviderList: React.FC = () => {
       },
     },
     {
+      title: 'Completeness',
+      key: 'completeness',
+      width: 120,
+      render: (_, record: Provider) => {
+        // Calculate completeness score based on key fields
+        const fields = [
+          record.provider_name,
+          record.address,
+          record.city,
+          record.phone,
+          record.website,
+          record.specialties,
+          record.latitude && record.longitude ? 'location' : null,
+          record.ai_description,
+          record.seo_title,
+          record.seo_description,
+          record.wheelchair_accessible,
+        ];
+        
+        const completed = fields.filter(f => f !== null && f !== undefined && f !== '').length;
+        const percentage = Math.round((completed / fields.length) * 100);
+        
+        const getColor = () => {
+          if (percentage >= 90) return '#52c41a';
+          if (percentage >= 70) return '#faad14';
+          if (percentage >= 50) return '#fa8c16';
+          return '#f5222d';
+        };
+        
+        const getStatus = () => {
+          if (percentage >= 90) return 'success';
+          if (percentage >= 70) return 'warning';
+          return 'error';
+        };
+        
+        return (
+          <Tooltip title={`${completed}/${fields.length} fields completed`}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{
+                width: 40,
+                height: 8,
+                backgroundColor: '#f5f5f5',
+                borderRadius: 4,
+                overflow: 'hidden',
+                marginRight: 8
+              }}>
+                <div style={{
+                  width: `${percentage}%`,
+                  height: '100%',
+                  backgroundColor: getColor(),
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+              <Text 
+                style={{ 
+                  fontSize: '12px', 
+                  color: getColor(),
+                  fontWeight: 500
+                }}
+              >
+                {percentage}%
+              </Text>
+            </div>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: 'Actions',
       key: 'actions',
       width: 150,

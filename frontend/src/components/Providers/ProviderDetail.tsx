@@ -275,6 +275,79 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
           </Collapse>
         </Card>
 
+        {/* Location & Navigation */}
+        <Card title="Location & Navigation" style={{ marginBottom: 16 }}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Latitude">
+                <Text>{provider?.latitude ? provider.latitude.toFixed(6) : 'Not geocoded'}</Text>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Longitude">
+                <Text>{provider?.longitude ? provider.longitude.toFixed(6) : 'Not geocoded'}</Text>
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Google Place ID">
+                <Text copyable={!!provider?.google_place_id}>{provider?.google_place_id || 'Not available'}</Text>
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Nearest Station">
+                <Text>{provider?.nearest_station || 'Not specified'}</Text>
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* Reviews & Ratings */}
+        <Card title="Reviews & Ratings" style={{ marginBottom: 16 }}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Google Rating">
+                <Text>{provider?.rating ? `${provider.rating}/5.0` : 'No rating available'}</Text>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Total Reviews">
+                <Text>{provider?.total_reviews || 0} reviews</Text>
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Review Content">
+                {provider?.review_content ? (
+                  <div style={{ maxHeight: '4.5em', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <Text>{provider.review_content}</Text>
+                  </div>
+                ) : (
+                  <Text type="secondary">No review content available</Text>
+                )}
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* Accessibility Information */}
+        <Card title="Accessibility Information" style={{ marginBottom: 16 }}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Wheelchair Accessible">
+                <Tag color={provider?.wheelchair_accessible === 'true' ? 'green' : provider?.wheelchair_accessible === 'false' ? 'red' : 'default'}>
+                  {provider?.wheelchair_accessible === 'true' ? 'Yes' : provider?.wheelchair_accessible === 'false' ? 'No' : 'Unknown'}
+                </Tag>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Parking Available">
+                <Tag color={provider?.parking_available === 'true' ? 'green' : provider?.parking_available === 'false' ? 'red' : 'default'}>
+                  {provider?.parking_available === 'true' ? 'Yes' : provider?.parking_available === 'false' ? 'No' : 'Unknown'}
+                </Tag>
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
         {/* SEO Information */}
         <Card title="SEO Information" style={{ marginBottom: 16 }}>
           <Row gutter={16}>
@@ -306,6 +379,66 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
           </Row>
         </Card>
       </Form>
+
+      {/* Data Completeness Overview */}
+      {!editing && (
+        <Card title="Data Completeness">
+          <Row gutter={16}>
+            <Col span={24} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                <Text strong>Completeness Score: </Text>
+                <div style={{ marginLeft: 8, flex: 1 }}>
+                  {(() => {
+                    const fields = [
+                      provider.provider_name, provider.address, provider.city,
+                      provider.phone, provider.website, provider.specialties,
+                      provider.latitude, provider.longitude, provider.ai_description,
+                      provider.seo_title, provider.seo_description
+                    ];
+                    const completed = fields.filter(f => f !== null && f !== undefined && f !== '').length;
+                    const percentage = (completed / fields.length) * 100;
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ width: 100, marginRight: 8 }}>
+                          <div style={{
+                            width: '100%',
+                            height: 8,
+                            backgroundColor: '#f5f5f5',
+                            borderRadius: 4,
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              width: `${percentage}%`,
+                              height: '100%',
+                              backgroundColor: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d',
+                              transition: 'width 0.3s ease'
+                            }} />
+                          </div>
+                        </div>
+                        <Text strong style={{ color: percentage >= 80 ? '#52c41a' : percentage >= 60 ? '#faad14' : '#f5222d' }}>
+                          {Math.round(percentage)}%
+                        </Text>
+                      </div>
+                    );
+                  })()
+                }
+                </div>
+              </div>
+              <Row gutter={[8, 8]}>
+                <Col><Badge status={provider.provider_name ? 'success' : 'error'} text="Name" /></Col>
+                <Col><Badge status={provider.address ? 'success' : 'error'} text="Address" /></Col>
+                <Col><Badge status={provider.city ? 'success' : 'error'} text="City" /></Col>
+                <Col><Badge status={provider.phone ? 'success' : 'error'} text="Phone" /></Col>
+                <Col><Badge status={provider.website ? 'success' : 'error'} text="Website" /></Col>
+                <Col><Badge status={provider.latitude && provider.longitude ? 'success' : 'error'} text="Location" /></Col>
+                <Col><Badge status={provider.ai_description ? 'success' : 'error'} text="Description" /></Col>
+                <Col><Badge status={provider.seo_title ? 'success' : 'error'} text="SEO Title" /></Col>
+                <Col><Badge status={provider.wheelchair_accessible ? 'success' : 'warning'} text="Accessibility" /></Col>
+              </Row>
+            </Col>
+          </Row>
+        </Card>
+      )}
 
       {/* Read-only Information */}
       {!editing && (

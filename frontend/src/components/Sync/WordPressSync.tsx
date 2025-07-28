@@ -215,17 +215,27 @@ const WordPressSync: React.FC = () => {
       return;
     }
 
+    console.log('Starting sync for selected providers:', selectedProviders);
+
     try {
       setLoading(true);
-      const response = await api.post(API_ENDPOINTS.SYNC, {
+      const syncData = {
         provider_ids: selectedProviders,
         limit: selectedProviders.length,
         force: false,
         dry_run: false
-      });
+      };
+      
+      console.log('Sync request data:', syncData);
+      console.log('API endpoint:', API_ENDPOINTS.SYNC);
 
-      if (response.data.success) {
-        message.success(`Started sync for ${selectedProviders.length} selected providers`);
+      const response = await api.post(API_ENDPOINTS.SYNC, syncData);
+      
+      console.log('Sync response:', response.data);
+
+      // Check if the response indicates success (has message and no error)
+      if (response.data.message && !response.data.error) {
+        message.success(response.data.message);
         closeProviderModal();
         setSyncing(true);
         setTimeout(fetchStatus, 1000);
@@ -234,6 +244,7 @@ const WordPressSync: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Sync failed:', error);
+      console.error('Error response:', error.response?.data);
       message.error(error.response?.data?.error || 'Failed to start sync');
     } finally {
       setLoading(false);

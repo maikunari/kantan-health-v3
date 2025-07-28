@@ -1,0 +1,4 @@
+- [] allow me to filter and choose which providers to sync on wordpress page - from a modal.
+- [] allow me to filter and choose which providers to generate content for on Content Generation page. 
+- [] api calls today on dashboard doesn't seem to be working. 
+- change model to claude-4

@@ -9,6 +9,8 @@ from sqlalchemy.orm import sessionmaker
 import subprocess
 import json
 import logging
+import psutil
+import time
 from datetime import datetime
 from postgres_integration import Provider, get_postgres_config
 
@@ -22,6 +24,39 @@ engine = create_engine(
     f"postgresql://{config['user']}:{config['password']}@{config['host']}:5432/{config['database']}"
 )
 Session = sessionmaker(bind=engine)
+
+# Simple in-memory process tracking
+active_sync_processes = {}
+
+def cleanup_completed_processes():
+    """Clean up completed sync processes"""
+    completed_processes = []
+    for sync_id, process_info in list(active_sync_processes.items()):
+        process = process_info['process']
+        if process.poll() is not None:
+            # Process has completed
+            completed_processes.append(sync_id)
+            process_info['status'] = 'COMPLETED' if process.returncode == 0 else 'ERROR'
+            if process.returncode != 0:
+                stderr = process.stderr.read().decode('utf-8')
+                process_info['error'] = stderr
+            
+    # Remove completed processes after a delay to allow status checks
+    for sync_id in completed_processes:
+        process_info = active_sync_processes[sync_id]
+        # Keep completed processes for 30 seconds for status reporting
+        if 'completed_at' not in process_info:
+            process_info['completed_at'] = datetime.now().isoformat()
+        else:
+            completed_time = datetime.fromisoformat(process_info['completed_at'])
+            if (datetime.now() - completed_time).seconds > 30:
+                del active_sync_processes[sync_id]
+
+def get_sync_running_status():
+    """Check if any sync processes are currently running"""
+    cleanup_completed_processes()
+    running_processes = [p for p in active_sync_processes.values() if p['status'] == 'RUNNING']
+    return len(running_processes) > 0, running_processes
 
 @sync_bp.route('/sync', methods=['POST'])
 def sync_providers():
@@ -64,13 +99,46 @@ def sync_providers():
         if dry_run:
             cmd.append('--dry-run')
         
+        # Get the correct working directory
+        import os
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
         # Run command
         if not dry_run:
-            subprocess.Popen(cmd)
+            logger.info(f"Starting WordPress sync with command: {' '.join(cmd)}")
+            logger.info(f"Working directory: {script_dir}")
+            
+            process = subprocess.Popen(
+                cmd,
+                cwd=script_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            # Track the process
+            sync_id = f"sync_{int(time.time())}"
+            active_sync_processes[sync_id] = {
+                'process': process,
+                'started_at': datetime.now().isoformat(),
+                'provider_ids': provider_ids,
+                'provider_count': len(provider_ids) if provider_ids else 'all',
+                'status': 'RUNNING'
+            }
+            
+            # Check if process started successfully
+            time.sleep(0.5)
+            if process.poll() is not None:
+                # Process ended immediately, probably an error
+                stderr = process.stderr.read().decode('utf-8')
+                stdout = process.stdout.read().decode('utf-8')
+                logger.error(f"Sync process ended immediately. Stdout: {stdout}, Stderr: {stderr}")
+                active_sync_processes[sync_id]['status'] = 'ERROR'
+                return jsonify({'error': f'Sync failed to start: {stderr or stdout}'}), 500
+            
             message = f"Started WordPress sync for {len(provider_ids) if provider_ids else 'all'} providers"
         else:
             # For dry run, execute synchronously
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=script_dir)
             message = result.stdout
         
         return jsonify({
@@ -259,11 +327,8 @@ def force_update_provider(provider_id):
 def get_batch_sync_status():
     """Get status of current batch sync operations"""
     try:
-        # Check if sync process is running
-        cmd = "ps aux | grep 'wordpress_sync_manager.py' | grep -v grep"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        
-        is_running = result.returncode == 0
+        # Use our new process tracking instead of ps grep
+        is_running, running_processes = get_sync_running_status()
         
         # Get sync queue size
         session = Session()
@@ -280,8 +345,18 @@ def get_batch_sync_status():
         
         session.close()
         
+        # Get details about running processes
+        active_sync_info = []
+        for process_info in running_processes:
+            active_sync_info.append({
+                'started_at': process_info['started_at'],
+                'provider_count': process_info['provider_count'],
+                'status': process_info['status']
+            })
+
         return jsonify({
             'sync_running': is_running,
+            'active_syncs': active_sync_info,
             'queue_stats': {
                 'total_eligible': queue_stats[0],
                 'not_synced': queue_stats[1],

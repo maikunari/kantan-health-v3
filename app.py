@@ -46,6 +46,7 @@ from api.wordpress_sync import sync_bp
 from api.auth import auth_bp, init_auth
 from api.add_providers import add_providers_bp
 from api.settings import settings_bp
+from api.data_quality import data_quality_bp
 
 # Initialize authentication
 init_auth(app)
@@ -58,6 +59,7 @@ app.register_blueprint(content_bp, url_prefix='/api/content')
 app.register_blueprint(sync_bp, url_prefix='/api/sync')
 app.register_blueprint(add_providers_bp, url_prefix='/api/providers')
 app.register_blueprint(settings_bp, url_prefix='/api/settings')
+app.register_blueprint(data_quality_bp, url_prefix='/api/data-quality')
 
 @app.route('/')
 def index():

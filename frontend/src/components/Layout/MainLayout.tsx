@@ -12,6 +12,7 @@ import {
   SettingOutlined,
   ApiOutlined,
   PlusOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -45,6 +46,11 @@ const MainLayout: React.FC = () => {
       key: '/content',
       icon: <FileTextOutlined />,
       label: 'Content Generation',
+    },
+    {
+      key: '/data-quality',
+      icon: <CheckCircleOutlined />,
+      label: 'Data Quality',
     },
     {
       key: '/sync',

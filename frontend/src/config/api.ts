@@ -50,4 +50,9 @@ export const API_ENDPOINTS = {
   SETTINGS_TEST_GOOGLE: '/api/settings/test/google',
   SETTINGS_TEST_CLAUDE: '/api/settings/test/claude',
   SETTINGS_BACKUP: '/api/settings/backup',
+
+  // Data Quality
+  DATA_QUALITY_OVERVIEW: '/api/data-quality/overview',
+  DATA_QUALITY_PROVIDER_COMPLETENESS: '/api/data-quality/provider',
+  DATA_QUALITY_MISSING_FIELDS: '/api/data-quality/providers/missing-fields',
 };
