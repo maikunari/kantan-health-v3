@@ -24,6 +24,8 @@ import {
   Select,
   Input,
   Checkbox,
+  Collapse,
+  Popconfirm,
 } from 'antd';
 import {
   SyncOutlined,
@@ -36,6 +38,9 @@ import {
   WarningOutlined,
   FilterOutlined,
   UserOutlined,
+  DeleteOutlined,
+  ScanOutlined,
+  ClearOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { SyncStatus } from '../../types';
@@ -45,6 +50,7 @@ import { API_ENDPOINTS } from '../../config/api';
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { Search } = Input;
+const { Panel } = Collapse;
 
 interface SyncOperation {
   operation: string;
@@ -57,6 +63,27 @@ interface SyncError {
   provider_id: number;
   error: string;
   timestamp: string;
+}
+
+interface DuplicatePost {
+  wp_id: number;
+  title: string;
+  status: string;
+  modified: string;
+  link: string;
+  content_length: number;
+  has_featured_image: boolean;
+  db_provider_id: number | null;
+  db_provider_name: string | null;
+  db_status: string | null;
+}
+
+interface DuplicateGroup {
+  title: string;
+  total_posts: number;
+  posts: DuplicatePost[];
+  recommended_keep: number;
+  recommended_delete: number[];
 }
 
 const WordPressSync: React.FC = () => {
@@ -76,6 +103,12 @@ const WordPressSync: React.FC = () => {
     hasContent: '',
     search: ''
   });
+  
+  // Duplicate management state
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
+  const [scanningDuplicates, setScanningDuplicates] = useState(false);
+  const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
+  const [duplicateScanResults, setDuplicateScanResults] = useState<any>(null);
 
   useEffect(() => {
     fetchStatus();
@@ -257,6 +290,83 @@ const WordPressSync: React.FC = () => {
       applyFilters();
     }
   }, [providerFilters, providers]);
+
+  // Duplicate management functions
+  const scanForDuplicates = async () => {
+    try {
+      setScanningDuplicates(true);
+      const response = await api.get('/api/sync/duplicates/scan');
+      
+      setDuplicates(response.data.duplicates);
+      setDuplicateScanResults(response.data);
+      
+      if (response.data.duplicate_groups === 0) {
+        message.success('No duplicates found!');
+      } else {
+        message.info(
+          `Found ${response.data.duplicate_groups} duplicate groups with ${response.data.total_duplicates} posts to delete`
+        );
+      }
+    } catch (error: any) {
+      console.error('Duplicate scan failed:', error);
+      message.error(error.response?.data?.error || 'Failed to scan for duplicates');
+    } finally {
+      setScanningDuplicates(false);
+    }
+  };
+
+  const cleanupDuplicates = async (wpIdsToDelete: number[], dryRun: boolean = false) => {
+    try {
+      setCleaningDuplicates(true);
+      
+      const response = await api.post('/api/sync/duplicates/cleanup', {
+        wp_ids_to_delete: wpIdsToDelete,
+        dry_run: dryRun
+      });
+
+      if (response.data.success) {
+        const { successful_deletions, failed_deletions, total_processed } = response.data;
+        
+        if (dryRun) {
+          message.info(
+            `DRY RUN: Would delete ${total_processed} WordPress posts`
+          );
+        } else {
+          message.success(
+            `Successfully deleted ${successful_deletions} duplicates. ${failed_deletions} failed.`
+          );
+          // Refresh duplicates after cleanup
+          await scanForDuplicates();
+        }
+      } else {
+        message.error('Cleanup operation failed');
+      }
+    } catch (error: any) {
+      console.error('Duplicate cleanup failed:', error);
+      message.error(error.response?.data?.error || 'Failed to cleanup duplicates');
+    } finally {
+      setCleaningDuplicates(false);
+    }
+  };
+
+  const cleanupAllRecommended = async (dryRun: boolean = false) => {
+    const allRecommendedDeletes = duplicates.flatMap(group => group.recommended_delete);
+    if (allRecommendedDeletes.length === 0) {
+      message.warning('No duplicates recommended for deletion');
+      return;
+    }
+    
+    await cleanupDuplicates(allRecommendedDeletes, dryRun);
+  };
+
+  const cleanupGroup = async (group: DuplicateGroup, dryRun: boolean = false) => {
+    if (group.recommended_delete.length === 0) {
+      message.warning('No posts recommended for deletion in this group');
+      return;
+    }
+    
+    await cleanupDuplicates(group.recommended_delete, dryRun);
+  };
 
   if (!status) {
     return (
@@ -551,6 +661,198 @@ const WordPressSync: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* WordPress Duplicate Management */}
+      <Card 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <DeleteOutlined style={{ marginRight: 8, color: '#f5222d' }} />
+            WordPress Duplicate Management
+          </div>
+        }
+        style={{ marginTop: 24 }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            Scan for and remove duplicate WordPress posts. The system will analyze posts with identical titles 
+            and recommend which to keep based on database references and publication status.
+          </Text>
+        </div>
+
+        <Space style={{ marginBottom: 16 }}>
+          <Button
+            icon={<ScanOutlined />}
+            onClick={scanForDuplicates}
+            loading={scanningDuplicates}
+            disabled={status.batch_running}
+          >
+            Scan for Duplicates
+          </Button>
+
+          {duplicates.length > 0 && (
+            <>
+              <Popconfirm
+                title="Preview Cleanup"
+                description="This will show what would be deleted without making changes."
+                onConfirm={() => cleanupAllRecommended(true)}
+                okText="Preview"
+                cancelText="Cancel"
+              >
+                <Button
+                  icon={<ClearOutlined />}
+                  loading={cleaningDuplicates}
+                  disabled={status.batch_running}
+                >
+                  Preview Cleanup ({duplicates.flatMap(g => g.recommended_delete).length} posts)
+                </Button>
+              </Popconfirm>
+
+              <Popconfirm
+                title="Delete All Recommended Duplicates"
+                description={`This will permanently delete ${duplicates.flatMap(g => g.recommended_delete).length} WordPress posts. This action cannot be undone.`}
+                onConfirm={() => cleanupAllRecommended(false)}
+                okText="Delete"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true }}
+              >
+                <Button
+                  type="primary"
+                  danger
+                  icon={<DeleteOutlined />}
+                  loading={cleaningDuplicates}
+                  disabled={status.batch_running}
+                >
+                  Cleanup All Duplicates
+                </Button>
+              </Popconfirm>
+            </>
+          )}
+        </Space>
+
+        {/* Scan Results Summary */}
+        {duplicateScanResults && (
+          <Alert
+            message="Duplicate Scan Results"
+            description={
+              <div>
+                <div>Total WordPress posts: {duplicateScanResults.total_posts}</div>
+                <div>Duplicate groups found: {duplicateScanResults.duplicate_groups}</div>
+                <div>Posts recommended for deletion: {duplicateScanResults.total_duplicates}</div>
+              </div>
+            }
+            type={duplicateScanResults.duplicate_groups > 0 ? 'warning' : 'success'}
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {/* Duplicate Groups */}
+        {duplicates.length > 0 && (
+          <div>
+            <Title level={4} style={{ marginTop: 16, marginBottom: 16 }}>
+              Duplicate Groups ({duplicates.length})
+            </Title>
+            
+            <Collapse size="small">
+              {duplicates.map((group, index) => (
+                <Panel
+                  header={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <Text strong>{group.title}</Text>
+                        <Tag color="orange" style={{ marginLeft: 8 }}>
+                          {group.total_posts} posts
+                        </Tag>
+                        <Tag color="red" style={{ marginLeft: 4 }}>
+                          {group.recommended_delete.length} to delete
+                        </Tag>
+                      </div>
+                    </div>
+                  }
+                  key={index}
+                  extra={
+                    <Space onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="small"
+                        icon={<ClearOutlined />}
+                        onClick={() => cleanupGroup(group, true)}
+                        loading={cleaningDuplicates}
+                      >
+                        Preview
+                      </Button>
+                      <Popconfirm
+                        title="Delete Duplicates"
+                        description={`Delete ${group.recommended_delete.length} duplicate posts for "${group.title}"?`}
+                        onConfirm={() => cleanupGroup(group, false)}
+                        okText="Delete"
+                        cancelText="Cancel"
+                        okButtonProps={{ danger: true }}
+                      >
+                        <Button
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          loading={cleaningDuplicates}
+                        >
+                          Delete ({group.recommended_delete.length})
+                        </Button>
+                      </Popconfirm>
+                    </Space>
+                  }
+                >
+                  <div>
+                    <List
+                      size="small"
+                      dataSource={group.posts}
+                      renderItem={(post) => (
+                        <List.Item
+                          style={{
+                            backgroundColor: post.wp_id === group.recommended_keep ? '#f6ffed' : 
+                                           group.recommended_delete.includes(post.wp_id) ? '#fff2f0' : 'transparent',
+                            border: post.wp_id === group.recommended_keep ? '1px solid #b7eb8f' :
+                                   group.recommended_delete.includes(post.wp_id) ? '1px solid #ffccc7' : 'none',
+                            padding: '8px',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <List.Item.Meta
+                            title={
+                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <Text strong>WordPress ID: {post.wp_id}</Text>
+                                <Tag color={post.status === 'publish' ? 'green' : 'orange'} style={{ marginLeft: 8 }}>
+                                  {post.status}
+                                </Tag>
+                                {post.wp_id === group.recommended_keep && (
+                                  <Tag color="success" style={{ marginLeft: 4 }}>
+                                    KEEP
+                                  </Tag>
+                                )}
+                                {group.recommended_delete.includes(post.wp_id) && (
+                                  <Tag color="error" style={{ marginLeft: 4 }}>
+                                    DELETE
+                                  </Tag>
+                                )}
+                              </div>
+                            }
+                            description={
+                              <div>
+                                <div><Text type="secondary">Modified: {new Date(post.modified).toLocaleString()}</Text></div>
+                                <div><Text type="secondary">Content Length: {post.content_length} chars</Text></div>
+                                <div><Text type="secondary">Database Reference: {post.db_provider_id ? `Provider ${post.db_provider_id} (${post.db_status})` : 'None'}</Text></div>
+                                <div><a href={post.link} target="_blank" rel="noopener noreferrer">View Post</a></div>
+                              </div>
+                            }
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                </Panel>
+              ))}
+            </Collapse>
+          </div>
+        )}
+      </Card>
 
       {/* Provider Selection Modal */}
       <Modal

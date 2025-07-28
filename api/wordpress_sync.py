@@ -11,7 +11,11 @@ import json
 import logging
 import psutil
 import time
+import requests
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+from collections import defaultdict
 from postgres_integration import Provider, get_postgres_config
 
 logger = logging.getLogger(__name__)
@@ -367,4 +371,236 @@ def get_batch_sync_status():
         
     except Exception as e:
         logger.error(f"Error getting batch sync status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def get_wordpress_credentials():
+    """Get WordPress credentials from environment"""
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', '.env')
+    load_dotenv(config_path)
+    
+    return {
+        'url': os.getenv('WORDPRESS_URL', 'https://care-compass.jp'),
+        'username': os.getenv('WORDPRESS_USERNAME'),
+        'password': os.getenv('WORDPRESS_APPLICATION_PASSWORD')
+    }
+
+def get_all_wordpress_posts():
+    """Fetch all healthcare provider posts from WordPress"""
+    wp_creds = get_wordpress_credentials()
+    if not all([wp_creds['url'], wp_creds['username'], wp_creds['password']]):
+        raise ValueError("Missing WordPress credentials")
+    
+    session = requests.Session()
+    session.auth = (wp_creds['username'], wp_creds['password'])
+    
+    all_posts = []
+    page = 1
+    per_page = 100
+    
+    while True:
+        try:
+            response = session.get(
+                f"{wp_creds['url']}/wp-json/wp/v2/healthcare_provider",
+                params={
+                    'per_page': per_page,
+                    'page': page,
+                    'status': 'any'
+                },
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                posts = response.json()
+                if not posts:
+                    break
+                all_posts.extend(posts)
+                page += 1
+            else:
+                break
+                
+        except Exception:
+            break
+    
+    return all_posts
+
+@sync_bp.route('/duplicates/scan', methods=['GET'])
+def scan_wordpress_duplicates():
+    """Scan for duplicate WordPress posts"""
+    try:
+        logger.info("Scanning for WordPress duplicates...")
+        
+        # Get all WordPress posts
+        all_posts = get_all_wordpress_posts()
+        if not all_posts:
+            return jsonify({
+                'success': True,
+                'duplicates': [],
+                'total_posts': 0,
+                'message': 'No WordPress posts found'
+            }), 200
+        
+        # Group posts by normalized title
+        title_groups = defaultdict(list)
+        for post in all_posts:
+            title = post['title']['rendered'].strip().lower()
+            title_groups[title].append(post)
+        
+        # Find duplicates
+        duplicate_groups = []
+        session = Session()
+        
+        try:
+            for title, post_group in title_groups.items():
+                if len(post_group) > 1:
+                    # Sort by modification date (newest first)
+                    sorted_posts = sorted(post_group, key=lambda p: p['modified'], reverse=True)
+                    
+                    # Analyze each post in the group
+                    analyzed_posts = []
+                    for post in sorted_posts:
+                        # Check database reference
+                        db_provider = session.execute(text('''
+                            SELECT id, provider_name, status
+                            FROM providers 
+                            WHERE wordpress_post_id = :wp_id
+                        '''), {'wp_id': post['id']}).fetchone()
+                        
+                        post_info = {
+                            'wp_id': post['id'],
+                            'title': post['title']['rendered'],
+                            'status': post['status'],
+                            'modified': post['modified'],
+                            'link': post['link'],
+                            'content_length': len(post['content']['rendered']),
+                            'has_featured_image': post.get('featured_media', 0) > 0,
+                            'db_provider_id': db_provider.id if db_provider else None,
+                            'db_provider_name': db_provider.provider_name if db_provider else None,
+                            'db_status': db_provider.status if db_provider else None
+                        }
+                        analyzed_posts.append(post_info)
+                    
+                    # Determine recommended actions
+                    keep_post = None
+                    for post_info in analyzed_posts:
+                        if post_info['db_provider_id'] and post_info['status'] == 'publish':
+                            keep_post = post_info
+                            break
+                    
+                    if not keep_post:
+                        for post_info in analyzed_posts:
+                            if post_info['db_provider_id']:
+                                keep_post = post_info
+                                break
+                    
+                    if not keep_post:
+                        keep_post = analyzed_posts[0]  # Newest overall
+                    
+                    duplicate_group = {
+                        'title': post_group[0]['title']['rendered'],
+                        'total_posts': len(analyzed_posts),
+                        'posts': analyzed_posts,
+                        'recommended_keep': keep_post['wp_id'],
+                        'recommended_delete': [p['wp_id'] for p in analyzed_posts if p['wp_id'] != keep_post['wp_id']]
+                    }
+                    duplicate_groups.append(duplicate_group)
+                    
+        finally:
+            session.close()
+        
+        return jsonify({
+            'success': True,
+            'duplicates': duplicate_groups,
+            'total_posts': len(all_posts),
+            'duplicate_groups': len(duplicate_groups),
+            'total_duplicates': sum(len(group['recommended_delete']) for group in duplicate_groups)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error scanning for duplicates: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@sync_bp.route('/duplicates/cleanup', methods=['POST'])
+def cleanup_wordpress_duplicates():
+    """Clean up WordPress duplicate posts"""
+    try:
+        data = request.json or {}
+        wp_ids_to_delete = data.get('wp_ids_to_delete', [])
+        dry_run = data.get('dry_run', False)
+        
+        if not wp_ids_to_delete:
+            return jsonify({'error': 'No WordPress post IDs provided for deletion'}), 400
+        
+        wp_creds = get_wordpress_credentials()
+        if not all([wp_creds['url'], wp_creds['username'], wp_creds['password']]):
+            return jsonify({'error': 'Missing WordPress credentials'}), 500
+        
+        wp_session = requests.Session()
+        wp_session.auth = (wp_creds['username'], wp_creds['password'])
+        
+        results = []
+        session = Session()
+        
+        try:
+            for wp_id in wp_ids_to_delete:
+                result = {
+                    'wp_id': wp_id,
+                    'success': False,
+                    'message': '',
+                    'db_updated': False
+                }
+                
+                if dry_run:
+                    result['success'] = True
+                    result['message'] = f'DRY RUN: Would delete post {wp_id}'
+                else:
+                    try:
+                        # Delete from WordPress
+                        response = wp_session.delete(
+                            f"{wp_creds['url']}/wp-json/wp/v2/healthcare_provider/{wp_id}",
+                            timeout=30
+                        )
+                        
+                        if response.status_code == 200:
+                            result['success'] = True
+                            result['message'] = f'Successfully deleted WordPress post {wp_id}'
+                            
+                            # Update database - remove wordpress_post_id reference
+                            session.execute(text('''
+                                UPDATE providers 
+                                SET wordpress_post_id = NULL, wordpress_status = 'deleted'
+                                WHERE wordpress_post_id = :wp_id
+                            '''), {'wp_id': wp_id})
+                            result['db_updated'] = True
+                            
+                        else:
+                            result['message'] = f'Failed to delete post {wp_id}: HTTP {response.status_code}'
+                            
+                    except Exception as e:
+                        result['message'] = f'Error deleting post {wp_id}: {str(e)}'
+                
+                results.append(result)
+            
+            if not dry_run:
+                session.commit()
+                
+        except Exception as e:
+            if not dry_run:
+                session.rollback()
+            raise e
+        finally:
+            session.close()
+        
+        successful_deletions = sum(1 for r in results if r['success'])
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'total_processed': len(wp_ids_to_delete),
+            'successful_deletions': successful_deletions,
+            'failed_deletions': len(wp_ids_to_delete) - successful_deletions,
+            'dry_run': dry_run
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error cleaning up duplicates: {str(e)}")
         return jsonify({'error': str(e)}), 500
