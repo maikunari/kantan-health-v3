@@ -14,7 +14,7 @@ from google_places_integration import GooglePlacesHealthcareCollector
 from claude_mega_batch_processor import ClaudeMegaBatchProcessor
 from wordpress_sync_manager import WordPressSyncManager
 from populate_provider_locations import populate_missing_locations
-from update_existing_providers import enhance_existing_providers_from_google
+from update_existing_providers import update_google_places_data, load_google_api_key
 from activity_logger import activity_logger
 
 # Set up logging
@@ -205,10 +205,15 @@ class EnhancedHealthcareAutomation:
     def _enhance_google_data(self, provider: Provider) -> bool:
         """Enhance provider with Google Places data"""
         try:
-            # This would call the existing update_existing_providers functionality
-            # for a single provider
-            result = enhance_existing_providers_from_google([provider.id])
-            return result.get('success', False)
+            # Get Google API key
+            api_key = load_google_api_key()
+            if not api_key:
+                logger.error("Google API key not found")
+                return False
+            
+            # Update Google Places data for the provider
+            update_google_places_data([provider], api_key)
+            return True
         except Exception as e:
             logger.error(f"Google data enhancement failed: {str(e)}")
             return False
@@ -216,9 +221,29 @@ class EnhancedHealthcareAutomation:
     def _populate_location_data(self, provider: Provider) -> bool:
         """Populate location data for provider"""
         try:
-            # Call existing location population for single provider
-            result = populate_missing_locations(provider_ids=[provider.id])
-            return result.get('success', False)
+            # Check if provider already has location data
+            if provider.latitude and provider.longitude:
+                return True
+            
+            # Use the existing location population function
+            # Since it processes all providers without coordinates, we'll run it
+            # and then check if our provider got updated
+            populate_missing_locations()
+            
+            # Refresh provider data from database to check if location was populated
+            session = self.db.Session()
+            try:
+                updated_provider = session.query(Provider).filter_by(id=provider.id).first()
+                if updated_provider and updated_provider.latitude and updated_provider.longitude:
+                    # Update our provider object
+                    provider.latitude = updated_provider.latitude
+                    provider.longitude = updated_provider.longitude
+                    return True
+                else:
+                    return False
+            finally:
+                session.close()
+                
         except Exception as e:
             logger.error(f"Location population failed: {str(e)}")
             return False
@@ -357,8 +382,13 @@ def main():
                 provider_failures[failure['provider_id']].append(failure)
             
             for provider_id in provider_failures.keys():
+                providers = automation._get_providers_by_ids([provider_id])
+                if not providers:
+                    logger.warning(f"Provider {provider_id} not found for retry")
+                    continue
+                    
                 success = automation._process_provider_pipeline(
-                    automation._get_providers_by_ids([provider_id])[0], 
+                    providers[0], 
                     args.max_retries
                 )
                 if success:

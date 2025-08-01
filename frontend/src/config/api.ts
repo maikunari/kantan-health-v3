@@ -70,4 +70,13 @@ export const API_ENDPOINTS = {
   ACTIVITY_LOG_LIST: '/api/activity-log/activities',
   ACTIVITY_LOG_SUMMARY: '/api/activity-log/activities/summary',
   ACTIVITY_LOG_CATEGORIES: '/api/activity-log/activities/categories',
+
+  // Pipeline Management
+  PIPELINE_FAILURES: '/api/pipeline/failures',
+  PIPELINE_FAILURES_SUMMARY: '/api/pipeline/failures/summary',
+  PIPELINE_FAILURES_RETRY: '/api/pipeline/failures',
+  PIPELINE_FAILURES_BULK_RETRY: '/api/pipeline/failures/bulk-retry',
+  PIPELINE_PROVIDERS_REPROCESS: '/api/pipeline/providers/reprocess',
+  PIPELINE_PROVIDERS_MISSING_FIELDS: '/api/pipeline/providers/missing-fields',
+  PIPELINE_RUNS: '/api/pipeline/runs',
 };

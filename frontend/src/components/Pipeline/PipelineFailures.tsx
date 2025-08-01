@@ -27,6 +27,8 @@ import {
   CheckCircleOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { showRetryNotification, showReprocessNotification, showBulkRetryNotification } from '../Notifications/ProcessNotification';
 
 const { Option } = Select;
 const { Search } = Input;
@@ -112,7 +114,7 @@ const PipelineFailures: React.FC = () => {
       if (reasonFilter) params.append('failure_reason', reasonFilter);
       params.append('limit', '100');
 
-      const response = await fetch(`/api/pipeline/failures?${params}`);
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PIPELINE_FAILURES}?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -130,7 +132,7 @@ const PipelineFailures: React.FC = () => {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch('/api/pipeline/failures/summary');
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PIPELINE_FAILURES_SUMMARY}`);
       const data = await response.json();
       
       if (data.success) {
@@ -145,7 +147,7 @@ const PipelineFailures: React.FC = () => {
 
   const loadMissingFieldProviders = async () => {
     try {
-      const response = await fetch('/api/pipeline/providers/missing-fields?limit=50');
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PIPELINE_PROVIDERS_MISSING_FIELDS}?limit=50`);
       const data = await response.json();
       
       if (data.success) {
@@ -160,14 +162,15 @@ const PipelineFailures: React.FC = () => {
     setRetryingIds(prev => new Set(prev).add(failureId));
     
     try {
-      const response = await fetch(`/api/pipeline/failures/${failureId}/retry`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PIPELINE_FAILURES_RETRY}/${failureId}/retry`, {
         method: 'POST'
       });
       
       const data = await response.json();
       
       if (data.success) {
-        message.success(`Retry initiated for failure ID ${failureId}`);
+        // Show rich notification for retry
+        showRetryNotification('Pipeline Step', `Provider ${failureId}`, data.process_id);
         loadFailures();
       } else {
         message.error(`Failed to retry: ${data.error}`);
@@ -179,6 +182,41 @@ const PipelineFailures: React.FC = () => {
       setRetryingIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(failureId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleReprocessProvider = async (providerId: number, providerName: string) => {
+    setRetryingIds(prev => new Set(prev).add(providerId));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PIPELINE_PROVIDERS_REPROCESS}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider_ids: [providerId]
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Show rich notification for reprocessing
+        showReprocessNotification(providerName, data.process_id);
+        loadFailures();
+      } else {
+        message.error(`Failed to reprocess: ${data.error}`);
+      }
+    } catch (error) {
+      message.error('Error reprocessing provider');
+      console.error('Error:', error);
+    } finally {
+      setRetryingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(providerId);
         return newSet;
       });
     }
@@ -196,7 +234,7 @@ const PipelineFailures: React.FC = () => {
       icon: <ExclamationCircleOutlined />,
       onOk: async () => {
         try {
-          const response = await fetch('/api/pipeline/failures/bulk-retry', {
+          const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PIPELINE_FAILURES_BULK_RETRY}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -209,7 +247,8 @@ const PipelineFailures: React.FC = () => {
           const data = await response.json();
           
           if (data.success) {
-            message.success(`Bulk retry initiated for ${data.provider_count} providers`);
+            // Show rich notification for bulk retry
+            showBulkRetryNotification(data.provider_count, data.process_id);
             setSelectedRowKeys([]);
             loadFailures();
           } else {
@@ -357,17 +396,28 @@ const PipelineFailures: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       render: (_, record: PipelineFailure) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<ReloadOutlined />}
-          loading={retryingIds.has(record.id)}
-          onClick={() => handleRetryFailure(record.id)}
-        >
-          Retry
-        </Button>
+        <Space size="small">
+          <Button
+            type="primary"
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={retryingIds.has(record.id)}
+            onClick={() => handleRetryFailure(record.id)}
+          >
+            Retry Step
+          </Button>
+          <Button
+            type="default"
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={retryingIds.has(record.provider_id)}
+            onClick={() => handleReprocessProvider(record.provider_id, record.current_provider_name || record.provider_name)}
+          >
+            Reprocess All
+          </Button>
+        </Space>
       ),
-      width: 100,
+      width: 180,
     },
   ];
 
@@ -597,7 +647,7 @@ const PipelineFailures: React.FC = () => {
               showTotal: (total, range) => 
                 `${range[0]}-${range[1]} of ${total} failures`,
             }}
-            scroll={{ x: 1400 }}
+            scroll={{ x: 1480 }}
           />
         )}
       </Card>

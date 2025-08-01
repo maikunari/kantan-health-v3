@@ -4,27 +4,27 @@ import {
   Row,
   Col,
   Button,
-  Checkbox,
   Space,
   Typography,
-  Divider,
-  message,
-  Badge,
+  Alert,
   Tag,
+  Progress,
+  message,
 } from 'antd';
 import {
-  ReloadOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   RobotOutlined,
   EnvironmentOutlined,
-  PhoneOutlined,
   GlobalOutlined,
+  BugOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { Provider } from '../../types';
-import api from '../../utils/api';
-import { API_ENDPOINTS } from '../../config/api';
 import { calculateGroupCompleteness, COMPLETENESS_FIELD_GROUPS, getCompletenessColor } from '../../utils/completeness';
+import { API_BASE_URL, API_ENDPOINTS } from '../../config/api';
+import { showReprocessNotification } from '../Notifications/SimpleProcessNotification';
 
 const { Text, Title } = Typography;
 
@@ -33,341 +33,177 @@ interface ProviderDataManagerProps {
   onUpdate?: () => void;
 }
 
-interface FieldGroup {
-  key: string;
-  title: string;
-  icon: React.ReactNode;
-  fields: FieldInfo[];
-}
-
-interface FieldInfo {
-  key: string;
-  label: string;
-  value: any;
-  canRegenerate: boolean;
-  type: 'ai' | 'google' | 'location' | 'manual';
-}
-
 const ProviderDataManager: React.FC<ProviderDataManagerProps> = ({ provider, onUpdate }) => {
-  const [selectedFields, setSelectedFields] = useState<string[]>([]);
-  const [regenerating, setRegenerating] = useState(false);
+  const navigate = useNavigate();
+  const [reprocessing, setReprocessing] = useState(false);
 
-  const fieldGroups: FieldGroup[] = [
+  const fieldGroups = [
     {
       key: 'location',
       title: 'Location Data',
       icon: <EnvironmentOutlined />,
-      fields: [
-        {
-          key: 'latitude,longitude',
-          label: 'Coordinates',
-          value: provider.latitude && provider.longitude ? `${provider.latitude}, ${provider.longitude}` : null,
-          canRegenerate: true,
-          type: 'location'
-        },
-        {
-          key: 'nearest_station',
-          label: 'Nearest Station',
-          value: provider.nearest_station,
-          canRegenerate: false,
-          type: 'google'
-        }
-      ]
+      hasData: provider.latitude && provider.longitude,
     },
     {
       key: 'google_data',
       title: 'Google Places Data',
       icon: <GlobalOutlined />,
-      fields: [
-        {
-          key: 'business_hours',
-          label: 'Business Hours',
-          value: provider.business_hours,
-          canRegenerate: true,
-          type: 'google'
-        },
-        {
-          key: 'rating',
-          label: 'Google Rating',
-          value: provider.rating,
-          canRegenerate: true,
-          type: 'google'
-        },
-        {
-          key: 'total_reviews',
-          label: 'Review Count',
-          value: provider.total_reviews,
-          canRegenerate: true,
-          type: 'google'
-        },
-        {
-          key: 'wheelchair_accessible',
-          label: 'Wheelchair Access',
-          value: provider.wheelchair_accessible,
-          canRegenerate: true,
-          type: 'google'
-        },
-        {
-          key: 'parking_available',
-          label: 'Parking Available',
-          value: provider.parking_available,
-          canRegenerate: true,
-          type: 'google'
-        }
-      ]
+      hasData: provider.business_hours && provider.rating,
     },
     {
       key: 'content',
       title: 'AI Generated Content',
       icon: <RobotOutlined />,
-      fields: [
-        {
-          key: 'ai_description',
-          label: 'Description',
-          value: provider.ai_description,
-          canRegenerate: true,
-          type: 'ai'
-        },
-        {
-          key: 'ai_excerpt',
-          label: 'Excerpt',
-          value: provider.ai_excerpt,
-          canRegenerate: true,
-          type: 'ai'
-        },
-        {
-          key: 'seo_title',
-          label: 'SEO Title',
-          value: provider.seo_title,
-          canRegenerate: true,
-          type: 'ai'
-        },
-        {
-          key: 'seo_description',
-          label: 'SEO Description',
-          value: provider.seo_description,
-          canRegenerate: true,
-          type: 'ai'
-        },
-        {
-          key: 'ai_english_experience',
-          label: 'English Experience',
-          value: provider.ai_english_experience,
-          canRegenerate: true,
-          type: 'ai'
-        },
-        {
-          key: 'ai_review_summary',
-          label: 'Review Summary',
-          value: provider.ai_review_summary,
-          canRegenerate: true,
-          type: 'ai'
-        }
-      ]
+      hasData: provider.ai_description && provider.seo_title && provider.featured_image_url,
     },
-    {
-      key: 'contact',
-      title: 'Contact Information',
-      icon: <PhoneOutlined />,
-      fields: [
-        {
-          key: 'phone',
-          label: 'Phone Number',
-          value: provider.phone,
-          canRegenerate: false,
-          type: 'manual'
-        },
-        {
-          key: 'website',
-          label: 'Website',
-          value: provider.website,
-          canRegenerate: false,
-          type: 'manual'
-        }
-      ]
-    }
   ];
 
-  const getFieldStatus = (field: FieldInfo) => {
-    if (field.value === null || field.value === undefined || field.value === '') {
-      return { status: 'error', text: 'Missing' };
-    }
-    
-    if (field.type === 'location' && field.key === 'latitude,longitude') {
-      // Special handling for coordinates - already combined in value
-      return { status: 'success', text: 'Complete' };
-    }
-    
-    if (typeof field.value === 'object' && field.value !== null) {
-      return { status: 'success', text: 'Complete' };
-    }
-    
-    if (typeof field.value === 'string' && field.value.length > 0) {
-      return { status: 'success', text: 'Complete' };
-    }
-    
-    if (typeof field.value === 'number' && field.value > 0) {
-      return { status: 'success', text: 'Complete' };
-    }
-    
-    return { status: 'warning', text: 'Partial' };
-  };
+  const locationCompleteness = calculateGroupCompleteness(provider, 'location');
+  const contactCompleteness = calculateGroupCompleteness(provider, 'contact');
+  const contentCompleteness = calculateGroupCompleteness(provider, 'content');
+  
+  const overallCompleteness = Math.round(
+    (locationCompleteness.percentage + contactCompleteness.percentage + contentCompleteness.percentage) / 3
+  );
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'ai': return 'purple';
-      case 'google': return 'blue';
-      case 'location': return 'green';
-      case 'manual': return 'orange';
-      default: return 'default';
-    }
-  };
+  const missingData = fieldGroups.filter(group => !group.hasData);
+  
+  console.log('📊 ProviderDataManager rendered for provider:', provider.provider_name);
+  console.log('📊 Provider missing data:', missingData.map(g => g.title));
 
-  const handleFieldSelection = (fieldKey: string, checked: boolean) => {
-    if (checked) {
-      setSelectedFields([...selectedFields, fieldKey]);
-    } else {
-      setSelectedFields(selectedFields.filter(key => key !== fieldKey));
-    }
-  };
-
-  const handleSelectByType = (type: string) => {
-    const fieldsOfType = fieldGroups
-      .flatMap(group => group.fields)
-      .filter(field => field.type === type && field.canRegenerate)
-      .map(field => field.key);
+  const handleReprocessProvider = async () => {
+    console.log('🔄 Reprocess Provider clicked for:', provider.provider_name);
+    console.log('🔄 Provider ID:', provider.id);
+    console.log('🔄 API URL:', `${API_BASE_URL}${API_ENDPOINTS.PIPELINE_PROVIDERS_REPROCESS}`);
     
-    setSelectedFields(prev => {
-      const newFields = new Set([...prev, ...fieldsOfType]);
-      return Array.from(newFields);
-    });
-  };
-
-  const handleRegenerateSelected = async () => {
-    if (selectedFields.length === 0) {
-      message.warning('Please select fields to regenerate');
-      return;
-    }
-
+    setReprocessing(true);
     try {
-      setRegenerating(true);
-      message.info(`Regenerating ${selectedFields.length} fields...`);
-
-      const response = await api.post(`${API_ENDPOINTS.DATA_COMPLETION_PROVIDER_FIELDS}/${provider.id}/fields`, {
-        fields: selectedFields
+      // Trigger the enhanced pipeline for this specific provider
+      const requestBody = {
+        provider_ids: [provider.id]
+      };
+      console.log('🔄 Request body:', requestBody);
+      
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PIPELINE_PROVIDERS_REPROCESS}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
       });
 
-      if (response.data.success) {
-        message.success(response.data.message);
-        setSelectedFields([]);
+      console.log('🔄 Response status:', response.status);
+      const data = await response.json();
+      console.log('🔄 Response data:', data);
+
+      if (data.success) {
+        console.log('🎯 About to show notification for:', provider.provider_name);
+        console.log('🎯 Process ID:', data.process_id);
+        
+        // Show rich notification with progress tracking
+        showReprocessNotification(provider.provider_name, data.process_id);
+        
+        console.log('🎯 Notification function called');
+        
+        // Call onUpdate after a brief delay to allow the pipeline to start
         if (onUpdate) {
-          onUpdate();
+          setTimeout(() => onUpdate(), 1000);
         }
       } else {
-        message.error(response.data.message || 'Failed to regenerate fields');
+        console.log('❌ API call failed:', data.error);
+        message.error(`Failed to start pipeline: ${data.error}`);
       }
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred';
-      message.error(`Failed to regenerate fields: ${errorMessage}`);
+    } catch (error) {
+      console.error('❌ Error reprocessing provider:', error);
+      message.error('Failed to start provider reprocessing');
     } finally {
-      setRegenerating(false);
+      setReprocessing(false);
     }
-  };
-
-  const getGroupCompleteness = (groupKey: string) => {
-    const completeness = calculateGroupCompleteness(provider, groupKey);
-    return completeness.percentage;
   };
 
   return (
-    <Card title="Data Manager" extra={
-      <Space>
-        <Text type="secondary">{selectedFields.length} fields selected</Text>
-        <Button
-          type="primary"
-          icon={<ReloadOutlined />}
-          onClick={handleRegenerateSelected}
-          loading={regenerating}
-          disabled={selectedFields.length === 0}
-        >
-          Regenerate Selected
-        </Button>
-      </Space>
-    }>
-      {/* Quick Selection */}
-      <div style={{ marginBottom: 16 }}>
-        <Text strong>Quick Select: </Text>
-        <Space size="small">
-          <Button size="small" onClick={() => handleSelectByType('ai')}>
-            All AI Fields
-          </Button>
-          <Button size="small" onClick={() => handleSelectByType('google')}>
-            All Google Fields
-          </Button>
-          <Button size="small" onClick={() => handleSelectByType('location')}>
-            Location Data
-          </Button>
-          <Button size="small" type="dashed" onClick={() => setSelectedFields([])}>
-            Clear Selection
-          </Button>
-        </Space>
-      </div>
+    <Card>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div>
+          <Title level={4}>Data Completeness</Title>
+          <Progress
+            percent={overallCompleteness}
+            strokeColor={getCompletenessColor(overallCompleteness)}
+            format={percent => `${percent}% Complete`}
+          />
+        </div>
 
-      <Divider />
-
-      {/* Field Groups */}
-      <Row gutter={[16, 16]}>
-        {fieldGroups.map(group => {
-          const completeness = getGroupCompleteness(group.key);
-          return (
-            <Col span={12} key={group.key}>
-              <Card
-                size="small"
-                title={
-                  <Space>
-                    {group.icon}
-                    <span>{group.title}</span>
-                    <Badge
-                      count={`${completeness}%`}
-                      style={{
-                        backgroundColor: getCompletenessColor(completeness)
-                      }}
-                    />
-                  </Space>
-                }
-              >
-                <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                  {group.fields.map(field => {
-                    const status = getFieldStatus(field);
-                    return (
-                      <div key={field.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ flex: 1 }}>
-                          <Space>
-                            <Checkbox
-                              checked={selectedFields.includes(field.key)}
-                              onChange={(e) => handleFieldSelection(field.key, e.target.checked)}
-                              disabled={!field.canRegenerate}
-                            />
-                            <Text style={{ fontSize: '12px' }}>{field.label}</Text>
-                            <Tag color={getTypeColor(field.type)} style={{ fontSize: '11px', padding: '1px 4px', lineHeight: '14px' }}>
-                              {field.type.toUpperCase()}
-                            </Tag>
-                          </Space>
-                        </div>
-                        <Badge
-                          status={status.status as any}
-                          text={status.text}
-                          style={{ fontSize: '11px' }}
-                        />
-                      </div>
-                    );
-                  })}
+        <Row gutter={16}>
+          {fieldGroups.map(group => (
+            <Col span={8} key={group.key}>
+              <Card size="small">
+                <Space direction="vertical" size="small" style={{ width: '100%', textAlign: 'center' }}>
+                  {group.icon}
+                  <Text strong>{group.title}</Text>
+                  {group.hasData ? (
+                    <Tag color="green" icon={<CheckCircleOutlined />}>Complete</Tag>
+                  ) : (
+                    <Tag color="orange" icon={<ExclamationCircleOutlined />}>Missing</Tag>
+                  )}
                 </Space>
               </Card>
             </Col>
-          );
-        })}
-      </Row>
+          ))}
+        </Row>
+
+        {missingData.length > 0 && (
+          <Alert
+            message="Data Generation Has Been Streamlined"
+            description={
+              <div>
+                <p>Individual field regeneration has been replaced with a comprehensive pipeline system that handles all provider data processing automatically.</p>
+                <p><strong>Missing data for this provider:</strong> {missingData.map(g => g.title.toLowerCase()).join(', ')}</p>
+              </div>
+            }
+            type="info"
+            showIcon
+            action={
+              <Space direction="vertical" size="small">
+                <Button 
+                  type="primary" 
+                  icon={<BugOutlined />}
+                  onClick={() => navigate('/pipeline-failures')}
+                >
+                  Check Pipeline Failures
+                </Button>
+                <Button 
+                  type="default" 
+                  icon={<ReloadOutlined />}
+                  loading={reprocessing}
+                  onClick={handleReprocessProvider}
+                >
+                  Re-process Provider
+                </Button>
+              </Space>
+            }
+          />
+        )}
+
+        {missingData.length === 0 && (
+          <Alert
+            message="Provider Data Complete"
+            description="This provider has all required data fields. You can sync it to WordPress when ready."
+            type="success"
+            showIcon
+          />
+        )}
+
+        <div style={{ background: '#f6ffed', padding: '16px', borderRadius: '6px', border: '1px solid #b7eb8f' }}>
+          <Title level={5} style={{ color: '#52c41a', marginBottom: '8px' }}>
+            ✅ New Streamlined Workflow
+          </Title>
+          <Text>
+            <strong>1.</strong> Providers are automatically processed through the complete pipeline when added<br />
+            <strong>2.</strong> Any failures are tracked and can be retried from the Pipeline Failures page<br />
+            <strong>3.</strong> Complete providers are ready for WordPress sync
+          </Text>
+        </div>
+      </Space>
     </Card>
   );
 };

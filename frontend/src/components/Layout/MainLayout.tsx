@@ -45,16 +45,6 @@ const MainLayout: React.FC = () => {
       label: 'Add Providers',
     },
     {
-      key: '/content',
-      icon: <FileTextOutlined />,
-      label: 'Content Generation',
-    },
-    {
-      key: '/data-quality',
-      icon: <CheckCircleOutlined />,
-      label: 'Data Quality',
-    },
-    {
       key: '/pipeline-failures',
       icon: <BugOutlined />,
       label: 'Pipeline Failures',

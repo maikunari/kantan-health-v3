@@ -23,6 +23,7 @@ googlemaps==4.10.0
 # Utilities
 python-dateutil==2.8.2
 pytz==2023.3
+psutil==5.9.8
 
 # Production server
 gunicorn==21.2.0

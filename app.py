@@ -41,13 +41,10 @@ logger = logging.getLogger(__name__)
 # Import and register blueprints
 from api.providers import providers_bp
 from api.dashboard import dashboard_bp
-from api.content_generation import content_bp
 from api.wordpress_sync import sync_bp
 from api.auth import auth_bp, init_auth
 from api.add_providers import add_providers_bp
 from api.settings import settings_bp
-from api.data_quality import data_quality_bp
-from api.data_completion import data_completion_bp
 from api.activity_log import activity_log_bp
 from api.pipeline_status import pipeline_bp
 
@@ -58,12 +55,9 @@ init_auth(app)
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(providers_bp, url_prefix='/api/providers')
 app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
-app.register_blueprint(content_bp, url_prefix='/api/content')
 app.register_blueprint(sync_bp, url_prefix='/api/sync')
 app.register_blueprint(add_providers_bp, url_prefix='/api/providers')
 app.register_blueprint(settings_bp, url_prefix='/api/settings')
-app.register_blueprint(data_quality_bp, url_prefix='/api/data-quality')
-app.register_blueprint(data_completion_bp, url_prefix='/api/data-completion')
 app.register_blueprint(activity_log_bp, url_prefix='/api/activity-log')
 app.register_blueprint(pipeline_bp, url_prefix='/api/pipeline')
 

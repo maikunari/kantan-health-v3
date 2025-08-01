@@ -202,7 +202,8 @@ def retry_single_failure(failure_id):
         session.close()
         
         # Execute retry using the enhanced automation script
-        script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'run_enhanced_automation.py')
+        project_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        script_path = os.path.join(project_root, 'run_enhanced_automation.py')
         cmd = [
             'python3', script_path,
             '--provider-ids', str(failure.provider_id),
@@ -212,11 +213,16 @@ def retry_single_failure(failure_id):
         
         logger.info(f"Retrying failure {failure_id}: {' '.join(cmd)}")
         
-        # Run in background
-        process = subprocess.Popen(cmd,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE,
-                                 cwd=os.path.dirname(os.path.dirname(__file__)))
+        # Run in background with timeout
+        try:
+            process = subprocess.Popen(cmd,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE,
+                                     cwd=project_root,
+                                     start_new_session=True)  # Prevent zombie processes
+        except Exception as e:
+            logger.error(f"Failed to start retry process: {str(e)}")
+            return jsonify({'error': f'Failed to start retry process: {str(e)}'}), 500
         
         # Log the retry activity
         activity_logger.log_activity(
@@ -311,7 +317,8 @@ def bulk_retry_failures():
         
         # Execute bulk retry
         provider_ids = [str(p.provider_id) for p in providers_to_retry]
-        script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'run_enhanced_automation.py')
+        project_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        script_path = os.path.join(project_root, 'run_enhanced_automation.py')
         cmd = [
             'python3', script_path,
             '--provider-ids'] + provider_ids + [
@@ -321,11 +328,16 @@ def bulk_retry_failures():
         
         logger.info(f"Bulk retry for {len(provider_ids)} providers: {' '.join(cmd)}")
         
-        # Run in background
-        process = subprocess.Popen(cmd,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE,
-                                 cwd=os.path.dirname(os.path.dirname(__file__)))
+        # Run in background with timeout
+        try:
+            process = subprocess.Popen(cmd,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE,
+                                     cwd=project_root,
+                                     start_new_session=True)  # Prevent zombie processes
+        except Exception as e:
+            logger.error(f"Failed to start bulk retry process: {str(e)}")
+            return jsonify({'error': f'Failed to start bulk retry process: {str(e)}'}), 500
         
         # Log the bulk retry activity
         activity_logger.log_activity(
@@ -390,6 +402,89 @@ def get_pipeline_runs():
         
     except Exception as e:
         logger.error(f"Error getting pipeline runs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@pipeline_bp.route('/providers/reprocess', methods=['POST'])
+def reprocess_providers():
+    """Reprocess specific providers through the enhanced pipeline"""
+    try:
+        data = request.json or {}
+        provider_ids = data.get('provider_ids', [])
+        
+        if not provider_ids:
+            return jsonify({'error': 'provider_ids is required'}), 400
+        
+        if not isinstance(provider_ids, list):
+            return jsonify({'error': 'provider_ids must be a list'}), 400
+        
+        # Convert to integers and validate
+        try:
+            provider_ids = [int(pid) for pid in provider_ids]
+        except (ValueError, TypeError):
+            return jsonify({'error': 'All provider_ids must be integers'}), 400
+        
+        # Execute reprocessing using the enhanced automation script
+        project_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        script_path = os.path.join(project_root, 'run_enhanced_automation.py')
+        provider_id_strings = [str(pid) for pid in provider_ids]
+        cmd = [
+            'python3', script_path,
+            '--provider-ids'] + provider_id_strings + [
+            '--run-type', 'reprocess',
+            '--max-retries', '2'
+        ]
+        
+        logger.info(f"Reprocessing {len(provider_ids)} providers: {' '.join(cmd)}")
+        
+        # Run in background with proper process management
+        try:
+            # For debugging: run with output visible in terminal
+            # Check if we're in development mode by looking for debug environment
+            debug_mode = os.environ.get('FLASK_DEBUG', '0') == '1' or os.environ.get('DEBUG', '').lower() == 'true'
+            
+            if debug_mode:
+                logger.info("Running in debug mode - subprocess output will be visible")
+                process = subprocess.run(cmd, cwd=project_root, timeout=300)
+                logger.info(f"Subprocess completed with return code: {process.returncode}")
+                # Create a mock process object for consistency
+                class MockProcess:
+                    def __init__(self, returncode):
+                        self.pid = -1
+                        self.returncode = returncode
+                process = MockProcess(process.returncode)
+            else:
+                process = subprocess.Popen(cmd,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE,
+                                         cwd=project_root,
+                                         start_new_session=True)  # Prevent zombie processes
+        except Exception as e:
+            logger.error(f"Failed to start reprocessing: {str(e)}")
+            return jsonify({'error': f'Failed to start reprocessing: {str(e)}'}), 500
+        
+        # Log the reprocessing activity
+        activity_logger.log_activity(
+            activity_type='reprocess_providers',
+            activity_category='pipeline',
+            description=f'Reprocessing {len(provider_ids)} providers through enhanced pipeline',
+            details={
+                'provider_ids': provider_ids,
+                'provider_count': len(provider_ids),
+                'run_type': 'reprocess'
+            },
+            status='success'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Reprocessing initiated for {len(provider_ids)} providers',
+            'provider_ids': provider_ids,
+            'provider_count': len(provider_ids),
+            'process_id': process.pid
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in reprocess_providers: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @pipeline_bp.route('/providers/missing-fields', methods=['GET'])
