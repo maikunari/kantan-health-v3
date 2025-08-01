@@ -65,4 +65,9 @@ export const API_ENDPOINTS = {
   DATA_COMPLETION_COMPLETE_ALL: '/api/data-completion/complete-all',
   DATA_COMPLETION_PROVIDER_FIELDS: '/api/data-completion/provider',
   DATA_COMPLETION_STATUS: '/api/data-completion/status',
+
+  // Activity Log
+  ACTIVITY_LOG_LIST: '/api/activity-log/activities',
+  ACTIVITY_LOG_SUMMARY: '/api/activity-log/activities/summary',
+  ACTIVITY_LOG_CATEGORIES: '/api/activity-log/activities/categories',
 };

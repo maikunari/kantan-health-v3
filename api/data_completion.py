@@ -11,6 +11,7 @@ import subprocess
 import logging
 import time
 from postgres_integration import Provider, get_postgres_config
+from activity_logger import activity_logger
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +309,7 @@ def complete_all_missing_data():
         return jsonify({'error': str(e)}), 500
 
 @data_completion_bp.route('/provider/<int:provider_id>/fields', methods=['POST'])
-def regenerate_provider_fields():
+def regenerate_provider_fields(provider_id):
     """Regenerate specific fields for a single provider"""
     try:
         data = request.json or {}
@@ -323,29 +324,86 @@ def regenerate_provider_fields():
         if not provider:
             return jsonify({'error': 'Provider not found'}), 404
         
+        provider_name = provider.provider_name
         session.close()
         
         # Map field types to appropriate scripts/methods
         results = {}
+        processes = []
         
-        if 'location' in fields or 'geocoding' in fields:
-            # Geocode this specific provider
-            results['location'] = 'Geocoding triggered for provider'
+        # Check which fields need regeneration - match frontend field keys
+        location_fields = ['latitude,longitude', 'coordinates', 'nearest_station']
+        google_fields = ['business_hours', 'rating', 'google_rating', 'total_reviews', 'review_count', 'wheelchair_accessible', 'parking_available']
+        ai_fields = ['ai_description', 'ai_excerpt', 'seo_title', 'seo_description', 'seo_meta_description', 'ai_english_experience', 'ai_review_summary', 'english_proficiency', 'english_experience_summary', 'review_summary']
         
-        if any(field in fields for field in ['ai_description', 'ai_excerpt', 'seo_title', 'seo_meta_description']):
-            # Generate AI content for this provider
-            results['ai_content'] = 'AI content generation triggered for provider'
+        # Determine which scripts to run based on requested fields
+        needs_location = any(field in fields for field in location_fields)
+        needs_google = any(field in fields for field in google_fields)
+        needs_ai = any(field in fields for field in ai_fields)
         
-        if any(field in fields for field in ['business_hours', 'rating', 'wheelchair_accessible', 'parking_available']):
-            # Fetch Google Places data for this provider
-            results['google_data'] = 'Google Places data fetch triggered for provider'
+        # Execute geocoding if needed
+        if needs_location:
+            # For now, return a message that location updates need to be run manually
+            logger.info(f"Location update requested for provider {provider_id}")
+            results['location'] = f'Location update requested for {provider_name}. Please run: python3 populate_provider_locations.py'
+            
+            # Future: implement direct geocoding here when populate_provider_locations.py supports single provider
+        
+        # Execute Google Places data fetch if needed
+        if needs_google:
+            # For now, return a message that Google data updates need to be run manually
+            logger.info(f"Google Places update requested for provider {provider_id}")
+            results['google_data'] = f'Google Places data requested for {provider_name}. Please run: python3 update_existing_providers.py --google-data'
+            
+            # Future: implement direct Google Places fetch here when script supports single provider
+        
+        # Execute AI content generation if needed
+        if needs_ai:
+            # For AI content, we'll use a simpler approach due to mega-batch complexity
+            script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'generate_provider_content.py')
+            cmd = ['python3', script_path, '--provider-id', str(provider_id)]
+            
+            logger.info(f"Executing AI content generation for provider {provider_id}: {' '.join(cmd)}")
+            
+            try:
+                process = subprocess.Popen(cmd,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE,
+                                         cwd=os.path.dirname(os.path.dirname(__file__)))
+                processes.append(('ai', process))
+                results['ai_content'] = f'AI content generation started for {provider_name}'
+            except Exception as e:
+                logger.error(f"Failed to start AI content generation: {str(e)}")
+                results['ai_content'] = f'Failed to start AI content generation: {str(e)}'
+        
+        # Log the activity
+        activity_logger.log_activity(
+            activity_type='regenerate_provider_fields',
+            activity_category='data_quality',
+            description=f'Regenerating {len(fields)} fields for {provider_name}',
+            provider_id=provider_id,
+            provider_name=provider_name,
+            details={
+                'fields_requested': fields,
+                'actions_triggered': list(results.keys())
+            },
+            status='success' if results else 'error'
+        )
+        
+        if not results:
+            return jsonify({
+                'success': False,
+                'message': 'No matching regeneration actions found for the selected fields',
+                'fields_requested': fields
+            }), 400
         
         return jsonify({
             'success': True,
-            'message': f'Field regeneration started for provider {provider_id}',
+            'message': f'Field regeneration started for {provider_name}',
             'provider_id': provider_id,
             'fields_requested': fields,
-            'actions_triggered': results
+            'actions_triggered': results,
+            'process_count': len(processes)
         })
         
     except Exception as e:

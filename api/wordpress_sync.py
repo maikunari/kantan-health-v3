@@ -17,6 +17,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from collections import defaultdict
 from postgres_integration import Provider, get_postgres_config
+from activity_logger import activity_logger
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,28 @@ def sync_providers():
                 stdout = process.stdout.read().decode('utf-8')
                 logger.error(f"Sync process ended immediately. Stdout: {stdout}, Stderr: {stderr}")
                 active_sync_processes[sync_id]['status'] = 'ERROR'
+                
+                # Log failed sync
+                activity_logger.log_wordpress_sync(
+                    sync_type='sync',
+                    provider_ids=provider_ids if provider_ids else [],
+                    provider_names=[],
+                    sync_count=len(provider_ids) if provider_ids else 0,
+                    status='error',
+                    error_message=stderr or stdout
+                )
+                
                 return jsonify({'error': f'Sync failed to start: {stderr or stdout}'}), 500
+            
+            # Log successful sync start
+            activity_logger.log_wordpress_sync(
+                sync_type='sync',
+                provider_ids=provider_ids if provider_ids else [],
+                provider_names=[],
+                sync_count=len(provider_ids) if provider_ids else 0,
+                status='started',
+                details={'sync_all': sync_all, 'limit': limit, 'force': force}
+            )
             
             message = f"Started WordPress sync for {len(provider_ids) if provider_ids else 'all'} providers"
         else:
@@ -428,6 +450,7 @@ def scan_wordpress_duplicates():
     """Scan for duplicate WordPress posts"""
     try:
         logger.info("Scanning for WordPress duplicates...")
+        start_time = time.time()
         
         # Get all WordPress posts
         all_posts = get_all_wordpress_posts()
@@ -562,6 +585,21 @@ def scan_wordpress_duplicates():
         finally:
             session.close()
         
+        duration_ms = int((time.time() - start_time) * 1000)
+        
+        # Log the duplicate scan
+        activity_logger.log_duplicate_cleanup(
+            action='scan',
+            duplicate_count=len(duplicate_groups),
+            details={
+                'total_posts': len(all_posts),
+                'duplicate_groups': len(duplicate_groups),
+                'total_duplicates': sum(len(group['recommended_delete']) for group in duplicate_groups),
+                'duration_ms': duration_ms
+            },
+            status='success'
+        )
+        
         return jsonify({
             'success': True,
             'duplicates': duplicate_groups,
@@ -646,6 +684,21 @@ def cleanup_wordpress_duplicates():
             session.close()
         
         successful_deletions = sum(1 for r in results if r['success'])
+        
+        # Log the cleanup operation
+        activity_logger.log_duplicate_cleanup(
+            action='cleanup',
+            duplicate_count=successful_deletions,
+            details={
+                'total_processed': len(wp_ids_to_delete),
+                'successful_deletions': successful_deletions,
+                'failed_deletions': len(wp_ids_to_delete) - successful_deletions,
+                'dry_run': dry_run,
+                'wp_ids': wp_ids_to_delete
+            },
+            status='success' if successful_deletions > 0 else 'partial',
+            error_message=None if successful_deletions == len(wp_ids_to_delete) else f"{len(wp_ids_to_delete) - successful_deletions} deletions failed"
+        )
         
         return jsonify({
             'success': True,

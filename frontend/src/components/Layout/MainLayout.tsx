@@ -13,6 +13,7 @@ import {
   ApiOutlined,
   PlusOutlined,
   CheckCircleOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -56,6 +57,11 @@ const MainLayout: React.FC = () => {
       key: '/sync',
       icon: <SyncOutlined />,
       label: 'WordPress Sync',
+    },
+    {
+      key: '/activity-log',
+      icon: <HistoryOutlined />,
+      label: 'Activity Log',
     },
     {
       key: '/settings',

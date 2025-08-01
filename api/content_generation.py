@@ -10,6 +10,7 @@ import subprocess
 import json
 import logging
 from postgres_integration import Provider, get_postgres_config
+from activity_logger import activity_logger
 
 logger = logging.getLogger(__name__)
 

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from postgres_integration import Provider, get_postgres_config
+from activity_logger import activity_logger
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,22 @@ def add_specific_provider():
                 
                 output_data = json.loads(json_line)
                 provider_id = output_data.get('provider_id')
+                provider_name = output_data.get('provider_name', name)
+                
+                # Log the provider creation
+                if provider_id and not data.get('dry_run', False):
+                    activity_logger.log_provider_creation(
+                        provider_name=provider_name,
+                        provider_id=provider_id,
+                        method='specific_provider',
+                        details={
+                            'name_query': name,
+                            'location': location,
+                            'place_id': place_id,
+                            'user_notes': user_notes
+                        },
+                        status='success'
+                    )
                 
                 # Run full pipeline if not skipped and not dry run
                 pipeline_results = {}
@@ -240,6 +257,22 @@ def add_specific_provider():
         else:
             logger.error(f"Command failed with return code {result.returncode}")
             logger.error(f"STDERR: {result.stderr}")
+            
+            # Log failed attempt
+            activity_logger.log_provider_creation(
+                provider_name=name,
+                provider_id=None,
+                method='specific_provider',
+                details={
+                    'name_query': name,
+                    'location': location,
+                    'place_id': place_id,
+                    'error': result.stderr or result.stdout
+                },
+                status='error',
+                error_message=result.stderr or 'Command failed'
+            )
+            
             return jsonify({
                 'error': f'Provider addition failed: {result.stderr or result.stdout}',
                 'command': ' '.join(cmd),

@@ -11,6 +11,7 @@ import WordPressSync from './components/Sync/WordPressSync';
 import AddProviders from './components/AddProviders/AddProviders';
 import Settings from './components/Settings/Settings';
 import DataQuality from './components/DataQuality/DataQuality';
+import ActivityLog from './components/ActivityLog/ActivityLog';
 import LoginTest from './components/LoginTest';
 import './App.css';
 
@@ -45,6 +46,7 @@ const AppRoutes: React.FC = () => {
         <Route path="content" element={<ContentGeneration />} />
         <Route path="sync" element={<WordPressSync />} />
         <Route path="data-quality" element={<DataQuality />} />
+        <Route path="activity-log" element={<ActivityLog />} />
         <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
