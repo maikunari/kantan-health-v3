@@ -14,6 +14,7 @@ import {
   PlusOutlined,
   CheckCircleOutlined,
   HistoryOutlined,
+  BugOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,6 +53,11 @@ const MainLayout: React.FC = () => {
       key: '/data-quality',
       icon: <CheckCircleOutlined />,
       label: 'Data Quality',
+    },
+    {
+      key: '/pipeline-failures',
+      icon: <BugOutlined />,
+      label: 'Pipeline Failures',
     },
     {
       key: '/sync',

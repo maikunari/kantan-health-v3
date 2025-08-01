@@ -315,6 +315,8 @@ def regenerate_provider_fields(provider_id):
         data = request.json or {}
         fields = data.get('fields', [])
         
+        logger.info(f"Received regeneration request for provider {provider_id} with fields: {fields}")
+        
         if not fields:
             return jsonify({'error': 'No fields specified for regeneration'}), 400
         
@@ -341,6 +343,11 @@ def regenerate_provider_fields(provider_id):
         needs_google = any(field in fields for field in google_fields)
         needs_ai = any(field in fields for field in ai_fields)
         
+        logger.info(f"Field analysis - Location: {needs_location}, Google: {needs_google}, AI: {needs_ai}")
+        logger.info(f"Location fields to check: {location_fields}")
+        logger.info(f"Google fields to check: {google_fields}")
+        logger.info(f"AI fields to check: {ai_fields}")
+        
         # Execute geocoding if needed
         if needs_location:
             # For now, return a message that location updates need to be run manually
@@ -351,11 +358,21 @@ def regenerate_provider_fields(provider_id):
         
         # Execute Google Places data fetch if needed
         if needs_google:
-            # For now, return a message that Google data updates need to be run manually
-            logger.info(f"Google Places update requested for provider {provider_id}")
-            results['google_data'] = f'Google Places data requested for {provider_name}. Please run: python3 update_existing_providers.py --google-data'
+            script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'update_single_provider.py')
+            cmd = ['python3', script_path, '--provider-id', str(provider_id)]
             
-            # Future: implement direct Google Places fetch here when script supports single provider
+            logger.info(f"Executing Google Places update for provider {provider_id}: {' '.join(cmd)}")
+            
+            try:
+                process = subprocess.Popen(cmd,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE,
+                                         cwd=os.path.dirname(os.path.dirname(__file__)))
+                processes.append(('google', process))
+                results['google_data'] = f'Google Places data fetch started for {provider_name}'
+            except Exception as e:
+                logger.error(f"Failed to start Google Places fetch: {str(e)}")
+                results['google_data'] = f'Failed to start Google Places fetch: {str(e)}'
         
         # Execute AI content generation if needed
         if needs_ai:

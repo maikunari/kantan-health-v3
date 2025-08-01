@@ -71,79 +71,70 @@ def get_recently_added_providers(since_minutes=5):
         logger.error(f"Error getting recently added providers: {str(e)}")
         return []
 
-def run_full_pipeline_for_newly_added_providers(num_providers):
-    """Run AI content generation and WordPress sync for newly added providers"""
+def run_enhanced_pipeline_for_providers(provider_ids, run_type='add_provider'):
+    """Run the enhanced automation pipeline for specific providers with failure tracking"""
     try:
         pipeline_results = {
-            'ai_content_success': False,
-            'wordpress_sync_success': False,
-            'ai_output': '',
-            'wp_output': '',
-            'providers_processed': 0
+            'pipeline_success': False,
+            'pipeline_output': '',
+            'run_id': None,
+            'providers_processed': len(provider_ids),
+            'error': None
         }
         
         # Get the correct working directory
         import os
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-        # Generate AI content for newly added providers (mega batch will process providers without AI content)
-        logger.info(f"Running mega batch AI content generation for up to {num_providers} providers...")
+        # Use the enhanced automation script with specific provider IDs
+        logger.info(f"Running enhanced pipeline for {len(provider_ids)} providers...")
         logger.info(f"Working directory: {script_dir}")
         
-        ai_cmd = ['python', 'run_mega_batch_automation.py', '--limit', str(num_providers)]
-        logger.info(f"Running command: {' '.join(ai_cmd)}")
+        provider_id_strings = [str(pid) for pid in provider_ids]
+        pipeline_cmd = [
+            'python3', 'run_enhanced_automation.py',
+            '--provider-ids'] + provider_id_strings + [
+            '--run-type', run_type,
+            '--max-retries', '2'
+        ]
+        logger.info(f"Running command: {' '.join(pipeline_cmd)}")
         
-        ai_result = subprocess.run(
-            ai_cmd, 
+        pipeline_result = subprocess.run(
+            pipeline_cmd, 
             capture_output=True, 
             text=True, 
-            timeout=600,
+            timeout=900,  # 15 minute timeout for full pipeline
             cwd=script_dir
         )
         
-        pipeline_results['ai_content_success'] = ai_result.returncode == 0
-        pipeline_results['ai_output'] = ai_result.stdout
+        pipeline_results['pipeline_success'] = pipeline_result.returncode == 0
+        pipeline_results['pipeline_output'] = pipeline_result.stdout
         
-        if ai_result.returncode != 0:
-            logger.error(f"AI content generation failed with return code {ai_result.returncode}")
-            logger.error(f"STDERR: {ai_result.stderr}")
-            logger.error(f"STDOUT: {ai_result.stdout}")
+        # Extract run_id from output if available
+        if pipeline_result.stdout:
+            import re
+            run_id_match = re.search(r'run ID: ([a-f0-9-]+)', pipeline_result.stdout)
+            if run_id_match:
+                pipeline_results['run_id'] = run_id_match.group(1)
+        
+        if pipeline_result.returncode != 0:
+            logger.error(f"Enhanced pipeline failed with return code {pipeline_result.returncode}")
+            logger.error(f"STDERR: {pipeline_result.stderr}")
+            logger.error(f"STDOUT: {pipeline_result.stdout}")
+            pipeline_results['error'] = pipeline_result.stderr or pipeline_result.stdout
         else:
-            logger.info(f"AI content generation completed successfully")
-            logger.info(f"Output preview: {ai_result.stdout[:500]}")
-        
-        # Sync to WordPress (will sync providers that have content but aren't synced)
-        logger.info(f"Running WordPress sync for up to {num_providers} providers...")
-        wp_cmd = ['python', 'wordpress_sync_manager.py', '--sync-all', '--limit', str(num_providers)]
-        logger.info(f"Running command: {' '.join(wp_cmd)}")
-        
-        wp_result = subprocess.run(
-            wp_cmd, 
-            capture_output=True, 
-            text=True, 
-            timeout=600,
-            cwd=script_dir
-        )
-        
-        pipeline_results['wordpress_sync_success'] = wp_result.returncode == 0
-        pipeline_results['wp_output'] = wp_result.stdout
-        
-        if wp_result.returncode != 0:
-            logger.error(f"WordPress sync failed with return code {wp_result.returncode}")
-            logger.error(f"STDERR: {wp_result.stderr}")
-        else:
-            logger.info(f"WordPress sync completed successfully")
-        
-        pipeline_results['providers_processed'] = num_providers
+            logger.info(f"Enhanced pipeline completed successfully")
+            logger.info(f"Output preview: {pipeline_result.stdout[:500]}")
         
         return pipeline_results
     except Exception as e:
-        logger.error(f"Error running full pipeline: {str(e)}")
+        logger.error(f"Error running enhanced pipeline: {str(e)}")
         return {
-            'ai_content_success': False,
-            'wordpress_sync_success': False,
-            'error': str(e),
-            'providers_processed': 0
+            'pipeline_success': False,
+            'pipeline_output': '',
+            'run_id': None,
+            'providers_processed': len(provider_ids),
+            'error': str(e)
         }
 
 @add_providers_bp.route('/add-specific', methods=['POST'])
@@ -224,12 +215,12 @@ def add_specific_provider():
                         status='success'
                     )
                 
-                # Run full pipeline if not skipped and not dry run
+                # Run enhanced pipeline if not skipped and not dry run
                 pipeline_results = {}
                 if provider_id and not data.get('dry_run', False):
                     if not data.get('skip_content_generation', False) or not data.get('skip_wordpress_sync', False):
-                        # Run the pipeline for the newly added provider
-                        pipeline_results = run_full_pipeline_for_newly_added_providers(1)
+                        # Run the enhanced pipeline for the newly added provider
+                        pipeline_results = run_enhanced_pipeline_for_providers([provider_id], 'add_specific_provider')
                 
                 # Get recently added providers to return (use longer time window for reliability)
                 recent_providers = get_recently_added_providers(10) if not data.get('dry_run', False) else []
@@ -361,18 +352,20 @@ def add_geographic_providers():
                 recent_providers = get_recently_added_providers(10) if not data.get('dry_run', False) else []
                 logger.info(f"Retrieved recent providers: {len(recent_providers)} providers")
                 
-                # If providers were added and pipeline not skipped, run full pipeline
+                # If providers were added and pipeline not skipped, run enhanced pipeline
                 pipeline_summary = {}
                 if providers_added > 0 and not data.get('dry_run', False):
                     if not data.get('skip_content_generation', False) or not data.get('skip_wordpress_sync', False):
-                        # Run the pipeline for all newly added providers at once
-                        pipeline_result = run_full_pipeline_for_newly_added_providers(providers_added)
-                        
-                        pipeline_summary['total_processed'] = providers_added
-                        pipeline_summary['ai_success_count'] = providers_added if pipeline_result.get('ai_content_success') else 0
-                        pipeline_summary['wp_success_count'] = providers_added if pipeline_result.get('wordpress_sync_success') else 0
-                        pipeline_summary['ai_content_success'] = pipeline_result.get('ai_content_success', False)
-                        pipeline_summary['wordpress_sync_success'] = pipeline_result.get('wordpress_sync_success', False)
+                        # Get the IDs of recently added providers to run pipeline on them
+                        recent_provider_ids = [p['id'] for p in recent_providers[:providers_added]]
+                        if recent_provider_ids:
+                            # Run the enhanced pipeline for newly added providers
+                            pipeline_result = run_enhanced_pipeline_for_providers(recent_provider_ids, 'add_geographic_providers')
+                            
+                            pipeline_summary['total_processed'] = len(recent_provider_ids)
+                            pipeline_summary['pipeline_success'] = pipeline_result.get('pipeline_success', False)
+                            pipeline_summary['run_id'] = pipeline_result.get('run_id')
+                            pipeline_summary['error'] = pipeline_result.get('error')
                 
                 return jsonify({
                     'message': 'Geographic provider search completed successfully',

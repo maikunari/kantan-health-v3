@@ -49,6 +49,7 @@ from api.settings import settings_bp
 from api.data_quality import data_quality_bp
 from api.data_completion import data_completion_bp
 from api.activity_log import activity_log_bp
+from api.pipeline_status import pipeline_bp
 
 # Initialize authentication
 init_auth(app)
@@ -64,6 +65,7 @@ app.register_blueprint(settings_bp, url_prefix='/api/settings')
 app.register_blueprint(data_quality_bp, url_prefix='/api/data-quality')
 app.register_blueprint(data_completion_bp, url_prefix='/api/data-completion')
 app.register_blueprint(activity_log_bp, url_prefix='/api/activity-log')
+app.register_blueprint(pipeline_bp, url_prefix='/api/pipeline')
 
 @app.route('/')
 def index():
