@@ -253,7 +253,7 @@ class EnhancedHealthcareAutomation:
         try:
             # Use the mega batch processor for single provider
             processor = ClaudeMegaBatchProcessor()
-            results = processor.process_providers([provider])
+            results = processor.generate_mega_batch_content([provider])
             
             if results and len(results) > 0:
                 # Update provider with generated content
@@ -266,8 +266,8 @@ class EnhancedHealthcareAutomation:
                         db_provider.ai_excerpt = result.excerpt
                         db_provider.seo_title = result.seo_title
                         db_provider.seo_meta_description = result.seo_meta_description
-                        db_provider.review_summary = result.review_summary
-                        db_provider.english_experience_summary = result.english_experience_summary
+                        db_provider.ai_review_summary = result.review_summary
+                        db_provider.ai_english_experience = result.english_experience_summary
                         db_provider.selected_featured_image = result.selected_featured_image
                         session.commit()
                         return True

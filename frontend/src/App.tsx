@@ -10,7 +10,6 @@ import WordPressSync from './components/Sync/WordPressSync';
 import AddProviders from './components/AddProviders/AddProviders';
 import Settings from './components/Settings/Settings';
 import ActivityLog from './components/ActivityLog/ActivityLog';
-import PipelineFailures from './components/Pipeline/PipelineFailures';
 import LoginTest from './components/LoginTest';
 import './App.css';
 
@@ -43,7 +42,6 @@ const AppRoutes: React.FC = () => {
         <Route path="providers" element={<ProviderList />} />
         <Route path="add-providers" element={<AddProviders />} />
         <Route path="sync" element={<WordPressSync />} />
-        <Route path="pipeline-failures" element={<PipelineFailures />} />
         <Route path="activity-log" element={<ActivityLog />} />
         <Route path="settings" element={<Settings />} />
       </Route>

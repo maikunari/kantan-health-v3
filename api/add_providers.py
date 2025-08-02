@@ -72,7 +72,7 @@ def get_recently_added_providers(since_minutes=5):
         return []
 
 def run_enhanced_pipeline_for_providers(provider_ids, run_type='add_provider'):
-    """Run the enhanced automation pipeline for specific providers with failure tracking"""
+    """Run the unified pipeline for specific providers with failure tracking"""
     try:
         pipeline_results = {
             'pipeline_success': False,
@@ -86,16 +86,18 @@ def run_enhanced_pipeline_for_providers(provider_ids, run_type='add_provider'):
         import os
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-        # Use the enhanced automation script with specific provider IDs
-        logger.info(f"Running enhanced pipeline for {len(provider_ids)} providers...")
+        # Use the unified pipeline script with specific provider IDs
+        logger.info(f"Running unified pipeline for {len(provider_ids)} providers...")
         logger.info(f"Working directory: {script_dir}")
         
         provider_id_strings = [str(pid) for pid in provider_ids]
         pipeline_cmd = [
-            'python3', 'run_enhanced_automation.py',
+            'python3', 'run_unified_pipeline.py',
             '--provider-ids'] + provider_id_strings + [
+            '--mode', 'full',
             '--run-type', run_type,
-            '--max-retries', '2'
+            '--max-retries', '2',
+            '--skip-collection'  # Skip collection since we're processing existing providers
         ]
         logger.info(f"Running command: {' '.join(pipeline_cmd)}")
         

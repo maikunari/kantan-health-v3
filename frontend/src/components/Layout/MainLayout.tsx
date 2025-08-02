@@ -3,7 +3,6 @@ import { Layout, Menu, Avatar, Dropdown, Button, Space, Typography, Badge } from
 import {
   DashboardOutlined,
   UserOutlined,
-  FileTextOutlined,
   SyncOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -12,9 +11,7 @@ import {
   SettingOutlined,
   ApiOutlined,
   PlusOutlined,
-  CheckCircleOutlined,
   HistoryOutlined,
-  BugOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,7 +25,7 @@ const MainLayout: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const menuItems = [
+  const mainMenuItems = [
     {
       key: '/',
       icon: <DashboardOutlined />,
@@ -45,15 +42,13 @@ const MainLayout: React.FC = () => {
       label: 'Add Providers',
     },
     {
-      key: '/pipeline-failures',
-      icon: <BugOutlined />,
-      label: 'Pipeline Failures',
-    },
-    {
       key: '/sync',
       icon: <SyncOutlined />,
       label: 'WordPress Sync',
     },
+  ];
+
+  const utilityMenuItems = [
     {
       key: '/activity-log',
       icon: <HistoryOutlined />,
@@ -93,13 +88,14 @@ const MainLayout: React.FC = () => {
         style={{
           background: '#fff',
           boxShadow: '2px 0 8px rgba(0,0,0,0.15)',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <div style={{ 
           padding: '16px', 
           textAlign: 'center',
           borderBottom: '1px solid #f0f0f0',
-          marginBottom: '8px'
         }}>
           <HeartOutlined 
             style={{ 
@@ -120,13 +116,30 @@ const MainLayout: React.FC = () => {
           )}
         </div>
         
-        <Menu
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={handleMenuClick}
-          style={{ border: 'none' }}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            items={mainMenuItems}
+            onClick={handleMenuClick}
+            style={{ border: 'none', flex: 1 }}
+          />
+          
+          <div style={{ 
+            borderTop: '1px solid #f0f0f0', 
+            marginTop: 'auto',
+            paddingTop: '8px',
+            paddingBottom: '8px'
+          }}>
+            <Menu
+              mode="inline"
+              selectedKeys={[location.pathname]}
+              items={utilityMenuItems}
+              onClick={handleMenuClick}
+              style={{ border: 'none' }}
+            />
+          </div>
+        </div>
       </Sider>
 
       <Layout>

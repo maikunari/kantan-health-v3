@@ -27,7 +27,6 @@ import {
 import { Provider } from '../../types';
 import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
-import ProviderDataManager from '../DataQuality/ProviderDataManager';
 import { calculateProviderCompleteness, getCompletenessColor } from '../../utils/completeness';
 
 const { Text, Title, Paragraph } = Typography;
@@ -460,8 +459,6 @@ const ProviderDetail: React.FC<ProviderDetailProps> = ({ provider, onUpdate }) =
               </Col>
             </Row>
           </Card>
-
-          <ProviderDataManager provider={provider} onUpdate={onUpdate} />
         </>
       )}
 

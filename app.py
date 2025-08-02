@@ -46,7 +46,7 @@ from api.auth import auth_bp, init_auth
 from api.add_providers import add_providers_bp
 from api.settings import settings_bp
 from api.activity_log import activity_log_bp
-from api.pipeline_status import pipeline_bp
+from api.pipeline_progress import pipeline_progress_bp
 
 # Initialize authentication
 init_auth(app)
@@ -59,7 +59,7 @@ app.register_blueprint(sync_bp, url_prefix='/api/sync')
 app.register_blueprint(add_providers_bp, url_prefix='/api/providers')
 app.register_blueprint(settings_bp, url_prefix='/api/settings')
 app.register_blueprint(activity_log_bp, url_prefix='/api/activity-log')
-app.register_blueprint(pipeline_bp, url_prefix='/api/pipeline')
+app.register_blueprint(pipeline_progress_bp, url_prefix='/api/pipeline')
 
 @app.route('/')
 def index():

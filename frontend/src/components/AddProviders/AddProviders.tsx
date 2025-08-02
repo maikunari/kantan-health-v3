@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Tabs,
@@ -17,6 +17,8 @@ import {
   message,
   Progress,
   Table,
+  Timeline,
+  Statistic,
 } from 'antd';
 import {
   PlusOutlined,
@@ -24,6 +26,10 @@ import {
   EnvironmentOutlined,
   MedicineBoxOutlined,
   PlayCircleOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LoadingOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import api from '../../utils/api';
 import { API_ENDPOINTS } from '../../config/api';
@@ -44,18 +50,46 @@ interface AddResult {
   pipeline_summary?: any;
 }
 
+interface PipelineStatus {
+  run_id: string;
+  run_type: string;
+  status: string;
+  started_at: string;
+  completed_at?: string;
+  progress: {
+    percentage: number;
+    total_providers: number;
+    completed_providers: number;
+    failed_providers: number;
+    steps_breakdown: Record<string, { success: number; failed: number; pending: number }>;
+  };
+  recent_activity: Array<{
+    provider_name: string;
+    step_name: string;
+    status: string;
+    error_message?: string;
+    created_at: string;
+  }>;
+}
+
 const AddProviders: React.FC = () => {
   const [specificForm] = Form.useForm();
   const [geographicForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<AddResult[]>([]);
   const [progress, setProgress] = useState(0);
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
+  const [pipelineRunId, setPipelineRunId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('specific');
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved': return 'green';
       case 'rejected': return 'red';
       case 'pending': return 'orange';
+      case 'success': return 'green';
+      case 'failed': return 'red';
+      case 'running': return 'blue';
       default: return 'default';
     }
   };
@@ -78,6 +112,40 @@ const AddProviders: React.FC = () => {
       });
     } catch {
       return 'Invalid Date';
+    }
+  };
+
+  // Poll pipeline status
+  useEffect(() => {
+    if (!pipelineRunId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await api.get(`/api/pipeline/status/${pipelineRunId}`);
+        setPipelineStatus(response.data);
+        
+        // Stop polling if pipeline is completed or failed
+        if (response.data.status === 'completed' || response.data.status === 'failed') {
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Error polling pipeline status:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [pipelineRunId]);
+
+  const getStepIcon = (status: string) => {
+    switch (status) {
+      case 'success':
+        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
+      case 'failed':
+        return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />;
+      case 'running':
+        return <LoadingOutlined style={{ color: '#1890ff' }} />;
+      default:
+        return <ClockCircleOutlined style={{ color: '#8c8c8c' }} />;
     }
   };
 
@@ -188,7 +256,7 @@ const AddProviders: React.FC = () => {
 
       const response = await api.post(API_ENDPOINTS.ADD_SPECIFIC_PROVIDER, payload);
       
-      setResults([{
+      const result = {
         success: true,
         message: response.data.message,
         provider_id: response.data.provider_id,
@@ -196,7 +264,13 @@ const AddProviders: React.FC = () => {
         recent_providers: response.data.recent_providers || [],
         providers_added: response.data.providers_added || 0,
         pipeline_results: response.data.pipeline_results,
-      }]);
+      };
+      setResults([result]);
+      
+      // Start tracking pipeline if run_id is available
+      if (response.data.pipeline_results?.run_id) {
+        setPipelineRunId(response.data.pipeline_results.run_id);
+      }
       
       message.success('Provider added successfully!');
       if (!values.dry_run) {
@@ -231,14 +305,20 @@ const AddProviders: React.FC = () => {
       // For geographic addition, we'll need to implement progress tracking
       const response = await api.post(API_ENDPOINTS.ADD_GEOGRAPHIC_PROVIDERS, payload);
       
-      setResults([{
+      const result = {
         success: true,
         message: response.data.message,
         details: response.data.details,
         recent_providers: response.data.recent_providers || [],
         providers_added: response.data.providers_added || 0,
         pipeline_summary: response.data.pipeline_summary,
-      }]);
+      };
+      setResults([result]);
+      
+      // Start tracking pipeline if run_id is available
+      if (response.data.pipeline_summary?.run_id) {
+        setPipelineRunId(response.data.pipeline_summary.run_id);
+      }
       
       message.success('Geographic provider search completed!');
       if (!values.dry_run) {
@@ -268,7 +348,7 @@ const AddProviders: React.FC = () => {
         </Paragraph>
       </div>
 
-      <Tabs defaultActiveKey="specific" size="large">
+      <Tabs defaultActiveKey="specific" size="large" onChange={setActiveTab}>
         {/* Add Specific Provider Tab */}
         <TabPane 
           tab={
@@ -529,6 +609,108 @@ const AddProviders: React.FC = () => {
           </Card>
         </TabPane>
       </Tabs>
+
+      {/* Pipeline Progress Section */}
+      {pipelineStatus && (
+        <Card 
+          title="Pipeline Progress" 
+          style={{ marginTop: 24, marginBottom: 16 }}
+          extra={
+            <Tag color={getStatusColor(pipelineStatus.status)}>
+              {pipelineStatus.status.toUpperCase()}
+            </Tag>
+          }
+        >
+          <Row gutter={[16, 16]}>
+            <Col span={24}>
+              <Progress 
+                percent={pipelineStatus.progress.percentage} 
+                status={pipelineStatus.status === 'failed' ? 'exception' : 'active'}
+                strokeColor={{
+                  '0%': '#108ee9',
+                  '100%': '#87d068',
+                }}
+              />
+            </Col>
+            
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Total Providers"
+                value={pipelineStatus.progress.total_providers}
+                prefix={<MedicineBoxOutlined />}
+              />
+            </Col>
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Completed"
+                value={pipelineStatus.progress.completed_providers}
+                valueStyle={{ color: '#3f8600' }}
+                prefix={<CheckCircleOutlined />}
+              />
+            </Col>
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Failed"
+                value={pipelineStatus.progress.failed_providers}
+                valueStyle={{ color: '#cf1322' }}
+                prefix={<CloseCircleOutlined />}
+              />
+            </Col>
+          </Row>
+
+          {/* Steps Breakdown */}
+          {Object.keys(pipelineStatus.progress.steps_breakdown).length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <Title level={5}>Pipeline Steps Progress</Title>
+              <Row gutter={[16, 16]}>
+                {Object.entries(pipelineStatus.progress.steps_breakdown).map(([step, counts]) => (
+                  <Col xs={24} sm={12} md={6} key={step}>
+                    <Card size="small">
+                      <Text strong>{step.replace('_', ' ').toUpperCase()}</Text>
+                      <div style={{ marginTop: 8 }}>
+                        <Space size="small">
+                          <Tag color="green">{counts.success} ✓</Tag>
+                          <Tag color="red">{counts.failed} ✗</Tag>
+                          <Tag>{counts.pending} ⏳</Tag>
+                        </Space>
+                      </div>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </div>
+          )}
+
+          {/* Recent Activity Timeline */}
+          {pipelineStatus.recent_activity.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <Title level={5}>Recent Activity</Title>
+              <Timeline>
+                {pipelineStatus.recent_activity.slice(0, 5).map((activity, index) => (
+                  <Timeline.Item
+                    key={index}
+                    dot={getStepIcon(activity.status)}
+                    color={getStatusColor(activity.status)}
+                  >
+                    <Space direction="vertical" size="small">
+                      <Text strong>{activity.provider_name}</Text>
+                      <Space>
+                        <Tag>{activity.step_name.replace('_', ' ')}</Tag>
+                        <Text type="secondary">{formatDate(activity.created_at)}</Text>
+                      </Space>
+                      {activity.error_message && (
+                        <Text type="danger" style={{ fontSize: '12px' }}>
+                          {activity.error_message}
+                        </Text>
+                      )}
+                    </Space>
+                  </Timeline.Item>
+                ))}
+              </Timeline>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Results Section */}
       {results.length > 0 && (
