@@ -98,10 +98,14 @@ class EnhancedHealthcareAutomation:
         session = self.db.Session()
         try:
             # Get providers added today or recently that need AI content
+            # Check for both None and empty strings
             providers = session.query(Provider).filter(
                 (Provider.ai_description.is_(None)) |
+                (Provider.ai_description == '') |
                 (Provider.seo_title.is_(None)) |
-                (Provider.selected_featured_image.is_(None))
+                (Provider.seo_title == '') |
+                (Provider.selected_featured_image.is_(None)) |
+                (Provider.selected_featured_image == '')
             ).limit(50).all()  # Reasonable limit for processing
             
             return providers

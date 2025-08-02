@@ -80,7 +80,7 @@ const AddProviders: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
   const [pipelineRunId, setPipelineRunId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('specific');
+  const [activeTab, setActiveTab] = useState('geographic');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -348,31 +348,32 @@ const AddProviders: React.FC = () => {
         </Paragraph>
       </div>
 
-      <Tabs defaultActiveKey="specific" size="large" onChange={setActiveTab}>
-        {/* Add Specific Provider Tab */}
+      <Tabs defaultActiveKey="geographic" size="large" onChange={setActiveTab}>
+        {/* Add Geographic Providers Tab */}
         <TabPane 
           tab={
             <span>
-              <MedicineBoxOutlined />
-              Add Specific Provider
+              <EnvironmentOutlined />
+              Add by Geographic Area
             </span>
           } 
-          key="specific"
+          key="geographic"
         >
           <Card>
             <Form
-              form={specificForm}
+              form={geographicForm}
               layout="vertical"
-              onFinish={handleAddSpecific}
+              onFinish={handleAddGeographic}
               initialValues={{
+                limit: 10,
                 skip_content_generation: false,
                 skip_wordpress_sync: false,
                 dry_run: false,
               }}
             >
               <Alert
-                message="Add Individual Healthcare Provider"
-                description="Add a specific provider by Google Place ID (most reliable) or by name and location search."
+                message="Bulk Add Providers by Geographic Area"
+                description="Add multiple providers from specific cities, wards, or regions. Automatically finds healthcare providers in the specified areas."
                 type="info"
                 style={{ marginBottom: 24 }}
                 showIcon
@@ -453,33 +454,32 @@ const AddProviders: React.FC = () => {
                   type="primary" 
                   htmlType="submit" 
                   loading={loading}
-                  icon={<PlusOutlined />}
+                  icon={<PlayCircleOutlined />}
                   size="large"
                 >
-                  Add Provider
+                  Start Geographic Search
                 </Button>
               </Form.Item>
             </Form>
           </Card>
         </TabPane>
 
-        {/* Add Geographic Providers Tab */}
+        {/* Add Specific Provider Tab */}
         <TabPane 
           tab={
             <span>
-              <EnvironmentOutlined />
-              Add by Geographic Area
+              <MedicineBoxOutlined />
+              Add Specific Provider
             </span>
           } 
-          key="geographic"
+          key="specific"
         >
           <Card>
             <Form
-              form={geographicForm}
+              form={specificForm}
               layout="vertical"
-              onFinish={handleAddGeographic}
+              onFinish={handleAddSpecific}
               initialValues={{
-                limit: 10,
                 skip_content_generation: false,
                 skip_wordpress_sync: false,
                 dry_run: false,
@@ -592,10 +592,10 @@ const AddProviders: React.FC = () => {
                   type="primary" 
                   htmlType="submit" 
                   loading={loading}
-                  icon={<PlayCircleOutlined />}
+                  icon={<PlusOutlined />}
                   size="large"
                 >
-                  Start Geographic Search
+                  Add Provider
                 </Button>
               </Form.Item>
             </Form>

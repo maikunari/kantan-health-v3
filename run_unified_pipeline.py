@@ -402,12 +402,17 @@ class UnifiedPipeline:
         session = self.db.Session()
         try:
             query = session.query(Provider).filter(
-                # Need AI content
+                # Need AI content (check for None or empty string)
                 (Provider.ai_description.is_(None)) |
+                (Provider.ai_description == '') |
                 (Provider.seo_title.is_(None)) |
+                (Provider.seo_title == '') |
                 (Provider.selected_featured_image.is_(None)) |
+                (Provider.selected_featured_image == '') |
                 # Have content but not synced
-                ((Provider.ai_description.isnot(None)) & (Provider.wordpress_post_id.is_(None)))
+                ((Provider.ai_description.isnot(None)) & 
+                 (Provider.ai_description != '') & 
+                 (Provider.wordpress_post_id.is_(None)))
             )
             
             if limit:
