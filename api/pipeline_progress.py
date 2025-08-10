@@ -8,9 +8,16 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import json
 import logging
+import os
+import sys
 from datetime import datetime, timedelta
-from postgres_integration import Provider, get_postgres_config
-from pipeline_tracker import PipelineTracker
+
+# Add src to path for new modules
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+
+# Import from new unified modules
+from src.core.database import Provider, get_postgres_config
+from src.utils.pipeline_tracker import PipelineTracker
 
 logger = logging.getLogger(__name__)
 

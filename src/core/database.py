@@ -19,6 +19,15 @@ logger = logging.getLogger(__name__)
 config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', '.env')
 load_dotenv(config_path)
 
+def get_postgres_config():
+    """Get PostgreSQL configuration from environment variables (backwards compatibility)"""
+    return {
+        'user': os.getenv("POSTGRES_USER", "postgres"),
+        'password': os.getenv("POSTGRES_PASSWORD", "password"),
+        'host': os.getenv("POSTGRES_HOST", "localhost"),
+        'database': os.getenv("POSTGRES_DB", "directory")
+    }
+
 Base = declarative_base()
 
 

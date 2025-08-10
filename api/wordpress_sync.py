@@ -13,11 +13,20 @@ import psutil
 import time
 import requests
 import os
+import sys
 from datetime import datetime
 from dotenv import load_dotenv
 from collections import defaultdict
-from postgres_integration import Provider, get_postgres_config
-from activity_logger import activity_logger
+
+# Add src to path for new modules
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+
+# Import from new unified modules
+from src.core.database import Provider, get_postgres_config
+from src.utils.activity_logger import ActivityLogger
+
+# Create activity logger instance
+activity_logger = ActivityLogger()
 
 logger = logging.getLogger(__name__)
 

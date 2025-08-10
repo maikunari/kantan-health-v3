@@ -7,8 +7,14 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import os
+import sys
 import logging
-from postgres_integration import Provider, get_postgres_config
+
+# Add src to path for new modules
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+
+# Import from new unified modules
+from src.core.database import Provider, get_postgres_config
 
 logger = logging.getLogger(__name__)
 

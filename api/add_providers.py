@@ -8,11 +8,20 @@ import subprocess
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from postgres_integration import Provider, get_postgres_config
-from activity_logger import activity_logger
+
+# Add src to path for new modules
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+
+# Import from new unified modules
+from src.core.database import Provider, get_postgres_config
+from src.utils.activity_logger import ActivityLogger
+
+# Create activity logger instance
+activity_logger = ActivityLogger()
 
 logger = logging.getLogger(__name__)
 
@@ -86,18 +95,17 @@ def run_enhanced_pipeline_for_providers(provider_ids, run_type='add_provider'):
         import os
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-        # Use the unified pipeline script with specific provider IDs
+        # Use the new unified pipeline script with specific provider IDs
         logger.info(f"Running unified pipeline for {len(provider_ids)} providers...")
         logger.info(f"Working directory: {script_dir}")
         
         provider_id_strings = [str(pid) for pid in provider_ids]
         pipeline_cmd = [
-            'python3', 'run_unified_pipeline.py',
+            'python3', 'scripts/run_pipeline.py',
             '--provider-ids'] + provider_id_strings + [
             '--mode', 'full',
-            '--run-type', run_type,
-            '--max-retries', '2',
-            '--skip-collection'  # Skip collection since we're processing existing providers
+            '--regenerate',  # Process even if they have content
+            '--limit', str(len(provider_ids))  # Limit to the specific providers
         ]
         logger.info(f"Running command: {' '.join(pipeline_cmd)}")
         

@@ -4,8 +4,18 @@ Provides endpoints for retrieving system activity logs
 """
 
 from flask import Blueprint, request, jsonify
-from activity_logger import activity_logger
 import logging
+import os
+import sys
+
+# Add src to path for new modules
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+
+# Import from new unified modules
+from src.utils.activity_logger import ActivityLogger
+
+# Create activity logger instance
+activity_logger = ActivityLogger()
 
 logger = logging.getLogger(__name__)
 
