@@ -380,40 +380,58 @@ const AddProviders: React.FC = () => {
               />
 
               <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    label="Google Place ID"
-                    name="place_id"
-                    help="Most reliable method. Format: ChIJN1t_tDeuEmsRUsoyG83frY4"
-                  >
-                    <Input 
-                      placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4" 
-                      prefix={<SearchOutlined />}
-                    />
+                <Col span={8}>
+                  <Form.Item label="City" name="city">
+                    <Select 
+                      placeholder="Select city"
+                      mode="multiple"
+                      allowClear
+                    >
+                      <Option value="Tokyo">Tokyo</Option>
+                      <Option value="Osaka">Osaka</Option>
+                      <Option value="Yokohama">Yokohama</Option>
+                      <Option value="Kyoto">Kyoto</Option>
+                      <Option value="Kobe">Kobe</Option>
+                      <Option value="Nagoya">Nagoya</Option>
+                      <Option value="Fukuoka">Fukuoka</Option>
+                      <Option value="Sendai">Sendai</Option>
+                    </Select>
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item label="OR Provider Name" name="name">
-                    <Input 
-                      placeholder="Tokyo Medical University Hospital" 
-                      prefix={<MedicineBoxOutlined />}
+                <Col span={8}>
+                  <Form.Item label="Tokyo Wards (if Tokyo selected)" name="wards">
+                    <Select 
+                      placeholder="Select wards (optional)"
+                      mode="multiple"
+                      allowClear
+                    >
+                      <Option value="Shibuya">Shibuya</Option>
+                      <Option value="Shinjuku">Shinjuku</Option>
+                      <Option value="Minato">Minato</Option>
+                      <Option value="Chiyoda">Chiyoda</Option>
+                      <Option value="Ginza">Ginza</Option>
+                      <Option value="Harajuku">Harajuku</Option>
+                      <Option value="Roppongi">Roppongi</Option>
+                      <Option value="Akihabara">Akihabara</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="Provider Limit" name="limit">
+                    <InputNumber 
+                      min={1} 
+                      max={50} 
+                      placeholder="10"
+                      style={{ width: '100%' }}
                     />
                   </Form.Item>
                 </Col>
               </Row>
 
               <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item label="Location" name="location">
-                    <Input 
-                      placeholder="Tokyo, Shibuya, etc." 
-                      prefix={<EnvironmentOutlined />}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="Specialty" name="specialty">
-                    <Select placeholder="Select specialty (optional)">
+                <Col span={12}>
+                  <Form.Item label="Specialty Filter" name="specialty">
+                    <Select placeholder="Filter by specialty (optional)">
                       <Option value="general">General Medicine</Option>
                       <Option value="cardiology">Cardiology</Option>
                       <Option value="dermatology">Dermatology</Option>
@@ -427,23 +445,29 @@ const AddProviders: React.FC = () => {
                     </Select>
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col span={12}>
                   <Form.Item label="Pipeline Options">
                     <Space direction="vertical">
-                      <Form.Item name="skip_content_generation" valuePropName="checked" noStyle>
-                        <Switch size="small" />
-                      </Form.Item>
-                      <Text style={{ fontSize: '12px' }}>Skip AI Content Generation</Text>
+                      <div>
+                        <Form.Item name="skip_content_generation" valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                        <Text style={{ fontSize: '12px', marginLeft: 8 }}>Skip AI Content Generation</Text>
+                      </div>
                       
-                      <Form.Item name="skip_wordpress_sync" valuePropName="checked" noStyle>
-                        <Switch size="small" />
-                      </Form.Item>
-                      <Text style={{ fontSize: '12px' }}>Skip WordPress Sync</Text>
+                      <div>
+                        <Form.Item name="skip_wordpress_sync" valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                        <Text style={{ fontSize: '12px', marginLeft: 8 }}>Skip WordPress Sync</Text>
+                      </div>
                       
-                      <Form.Item name="dry_run" valuePropName="checked" noStyle>
-                        <Switch size="small" />
-                      </Form.Item>
-                      <Text style={{ fontSize: '12px' }}>Dry Run (Preview Only)</Text>
+                      <div>
+                        <Form.Item name="dry_run" valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                        <Text style={{ fontSize: '12px', marginLeft: 8 }}>Dry Run (Preview Only)</Text>
+                      </div>
                     </Space>
                   </Form.Item>
                 </Col>
@@ -461,6 +485,13 @@ const AddProviders: React.FC = () => {
                 </Button>
               </Form.Item>
             </Form>
+
+            {progress > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <Text>Progress:</Text>
+                <Progress percent={progress} status="active" />
+              </div>
+            )}
           </Card>
         </TabPane>
 
@@ -486,34 +517,28 @@ const AddProviders: React.FC = () => {
               }}
             >
               <Alert
-                message="Bulk Add Providers by Geographic Area"
-                description="Add multiple providers from specific cities, wards, or regions. Automatically finds healthcare providers in the specified areas."
+                message="Add Individual Healthcare Provider"
+                description="Add a specific provider by Google Place ID (most reliable) or by name and location search."
                 type="info"
                 style={{ marginBottom: 24 }}
                 showIcon
               />
 
               <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item label="City" name="city">
-                    <Select 
-                      placeholder="Select city"
-                      mode="multiple"
-                      allowClear
-                    >
-                      <Option value="Tokyo">Tokyo</Option>
-                      <Option value="Osaka">Osaka</Option>
-                      <Option value="Yokohama">Yokohama</Option>
-                      <Option value="Kyoto">Kyoto</Option>
-                      <Option value="Kobe">Kobe</Option>
-                      <Option value="Nagoya">Nagoya</Option>
-                      <Option value="Fukuoka">Fukuoka</Option>
-                      <Option value="Sendai">Sendai</Option>
-                    </Select>
+                <Col span={12}>
+                  <Form.Item
+                    label="Google Place ID"
+                    name="place_id"
+                    help="Most reliable method. Format: ChIJN1t_tDeuEmsRUsoyG83frY4"
+                  >
+                    <Input 
+                      placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4" 
+                      prefix={<SearchOutlined />}
+                    />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
-                  <Form.Item label="Tokyo Wards (if Tokyo selected)" name="wards">
+                <Col span={12}>
+                  <Form.Item label="OR Provider Name" name="name">
                     <Select 
                       placeholder="Select wards (optional)"
                       mode="multiple"

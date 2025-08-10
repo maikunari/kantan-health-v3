@@ -111,9 +111,15 @@ const Settings: React.FC = () => {
   const updateWordPressConfig = async (values: any) => {
     try {
       setSaving('wordpress');
-      await api.put(API_ENDPOINTS.SETTINGS_UPDATE_WORDPRESS, values);
+      console.log('Saving WordPress config with values:', values);
+      const response = await api.put(API_ENDPOINTS.SETTINGS_UPDATE_WORDPRESS, values);
+      console.log('WordPress config update response:', response.data);
       message.success('WordPress configuration updated successfully');
-      fetchConfig();
+      
+      // Add a small delay before fetching to ensure the file is written
+      setTimeout(() => {
+        fetchConfig();
+      }, 500);
     } catch (error: any) {
       console.error('WordPress config update failed:', error);
       message.error(error.response?.data?.error || 'Failed to update WordPress configuration');

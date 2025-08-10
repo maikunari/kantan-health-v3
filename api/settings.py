@@ -22,8 +22,8 @@ ENV_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 def get_configuration():
     """Get current configuration settings (without sensitive data)"""
     try:
-        # Load current environment
-        load_dotenv(ENV_FILE_PATH)
+        # Load current environment with override to get fresh values
+        load_dotenv(ENV_FILE_PATH, override=True)
         
         # Mask sensitive information
         def mask_key(key):
@@ -64,6 +64,7 @@ def update_wordpress_config():
     """Update WordPress configuration"""
     try:
         data = request.json
+        logger.info(f"Received WordPress config update: {data}")
         
         # Validate required fields
         if not data.get('url') or not data.get('username'):
@@ -75,14 +76,28 @@ def update_wordpress_config():
             return jsonify({'error': 'URL must start with http:// or https://'}), 400
         
         # Update .env file
+        logger.info(f"Updating WORDPRESS_URL to: {url}")
         set_key(ENV_FILE_PATH, 'WORDPRESS_URL', url)
+        
+        logger.info(f"Updating WORDPRESS_USERNAME to: {data['username'].strip()}")
         set_key(ENV_FILE_PATH, 'WORDPRESS_USERNAME', data['username'].strip())
         
         # Only update password if provided
         if data.get('password') and data['password'].strip():
+            logger.info("Updating WORDPRESS_APPLICATION_PASSWORD")
             set_key(ENV_FILE_PATH, 'WORDPRESS_APPLICATION_PASSWORD', data['password'].strip())
         
-        return jsonify({'message': 'WordPress configuration updated successfully'}), 200
+        # Force reload of environment variables
+        load_dotenv(ENV_FILE_PATH, override=True)
+        
+        # Verify the update
+        new_url = os.getenv('WORDPRESS_URL')
+        logger.info(f"After update, WORDPRESS_URL is: {new_url}")
+        
+        return jsonify({
+            'message': 'WordPress configuration updated successfully',
+            'updated_url': new_url
+        }), 200
     except Exception as e:
         logger.error(f"Error updating WordPress config: {str(e)}")
         return jsonify({'error': str(e)}), 500
