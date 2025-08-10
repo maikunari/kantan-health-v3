@@ -1,0 +1,501 @@
+#!/usr/bin/env python3
+"""
+Enhanced Google Places API Integration
+With persistent caching, cost tracking, and deduplication
+"""
+
+import os
+import time
+import json
+import logging
+import requests
+from typing import List, Dict, Optional, Any, Set
+from datetime import datetime
+
+from ..core.cache import PersistentCache
+from ..core.cost_tracker import CostTracker
+from ..core.database import DatabaseManager, Provider
+from .deduplication import ProviderDeduplicator
+
+logger = logging.getLogger(__name__)
+
+
+class GooglePlacesCollector:
+    """Enhanced Google Places collector with cost optimization"""
+    
+    # Optimized field selection (only what we need)
+    REQUIRED_FIELDS = [
+        'place_id', 'name', 'formatted_address', 'rating', 
+        'user_ratings_total', 'reviews', 'opening_hours', 
+        'website', 'formatted_phone_number', 'photos', 
+        'geometry', 'types', 'business_status'
+    ]
+    
+    def __init__(self, daily_limit: int = None):
+        """Initialize collector with caching and cost tracking
+        
+        Args:
+            daily_limit: Maximum providers to collect per day
+        """
+        # API configuration
+        self.api_key = os.getenv('GOOGLE_PLACES_API_KEY')
+        if not self.api_key:
+            raise ValueError("GOOGLE_PLACES_API_KEY not found in environment")
+        
+        # API endpoints
+        self.search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+        self.details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+        self.photo_url = "https://maps.googleapis.com/maps/api/place/photo"
+        
+        # Initialize components
+        self.cache = PersistentCache()
+        self.cost_tracker = CostTracker()
+        self.db = DatabaseManager()
+        self.deduplicator = ProviderDeduplicator()
+        
+        # Configuration
+        self.daily_limit = daily_limit
+        self.processed_place_ids: Set[str] = set()
+        
+        # Load city translations
+        self._load_city_translations()
+        
+        logger.info(f"✅ Google Places Collector initialized (daily limit: {daily_limit or 'None'})")
+    
+    def _load_city_translations(self):
+        """Load city translations for Japanese place names"""
+        try:
+            cities_path = os.path.join(os.path.dirname(__file__), '..', '..', 'cities.json')
+            with open(cities_path, 'r') as f:
+                data = json.load(f)
+                self.city_translations = {
+                    city["translations"]["ja"]: city["translations"]["en"]
+                    for prefecture in data["prefectures"]
+                    for city in prefecture["cities"]
+                }
+        except Exception as e:
+            logger.warning(f"Could not load city translations: {e}")
+            self.city_translations = {}
+    
+    def generate_search_queries(self, cities: List[str] = None, 
+                              specialties: List[str] = None,
+                              limit: int = 100) -> List[str]:
+        """Generate optimized search queries
+        
+        Args:
+            cities: List of cities to search
+            specialties: List of medical specialties
+            limit: Maximum number of queries
+            
+        Returns:
+            List of search queries
+        """
+        if not cities:
+            cities = ["Tokyo", "Yokohama", "Osaka", "Fukuoka", "Kyoto"]
+        
+        if not specialties:
+            # Load from specialties.json if available
+            try:
+                spec_path = os.path.join(os.path.dirname(__file__), '..', '..', 'specialties.json')
+                with open(spec_path, 'r') as f:
+                    specialties = json.load(f)["specialties"]
+            except:
+                specialties = ["doctor", "clinic", "hospital", "dentist"]
+        
+        # Focused search terms for English-speaking facilities
+        search_patterns = [
+            "English speaking {specialty} {city}",
+            "International {specialty} {city}",
+            "{specialty} English {city}"
+        ]
+        
+        queries = []
+        for city in cities:
+            for specialty in specialties:
+                for pattern in search_patterns:
+                    query = pattern.format(specialty=specialty, city=city)
+                    queries.append(query)
+                    
+                    if len(queries) >= limit:
+                        return queries
+        
+        return queries[:limit]
+    
+    def search_providers(self, query: str, max_results: int = 20) -> List[Dict]:
+        """Search for healthcare providers with caching
+        
+        Args:
+            query: Search query
+            max_results: Maximum results to return
+            
+        Returns:
+            List of provider results
+        """
+        # Check cache first
+        cache_key = f"search_{query}"
+        cached = self.cache.get(cache_key, 'search')
+        if cached:
+            logger.info(f"✅ Cache hit for search: {query}")
+            self.cost_tracker.log_request('place_search', cached=True)
+            return cached[:max_results]
+        
+        # Check budget
+        can_proceed, reason = self.cost_tracker.can_make_request('place_search')
+        if not can_proceed:
+            logger.warning(f"❌ Budget limit: {reason}")
+            return []
+        
+        # Make API request
+        params = {
+            'query': query,
+            'key': self.api_key,
+            'language': 'en',
+            'region': 'jp',
+            'type': 'doctor|hospital|health|dentist'
+        }
+        
+        try:
+            response = requests.get(self.search_url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get('status') != 'OK':
+                logger.error(f"API error: {data.get('status')}")
+                return []
+            
+            results = data.get('results', [])
+            
+            # Cache for 7 days (search results change less frequently)
+            self.cache.set(cache_key, results, 'search', ttl_days=7)
+            
+            # Log cost
+            self.cost_tracker.log_request('place_search', search_query=query)
+            
+            logger.info(f"🔍 Found {len(results)} results for: {query}")
+            return results[:max_results]
+            
+        except Exception as e:
+            logger.error(f"Search error: {str(e)}")
+            return []
+    
+    def get_place_details(self, place_id: str) -> Optional[Dict]:
+        """Get detailed place information with caching and deduplication
+        
+        Args:
+            place_id: Google Place ID
+            
+        Returns:
+            Place details or None
+        """
+        # Check if already processed
+        if self.cache.is_processed(place_id):
+            logger.info(f"✅ Already processed: {place_id}")
+            return None
+        
+        # Check cache
+        cached = self.cache.get(place_id, 'details')
+        if cached:
+            logger.info(f"✅ Cache hit for details: {place_id}")
+            self.cost_tracker.log_request('place_details', place_id=place_id, cached=True)
+            return cached
+        
+        # Check if already in database
+        existing = self.db.get_provider_by_place_id(place_id)
+        if existing:
+            logger.info(f"✅ Already in database: {place_id}")
+            return None
+        
+        # Check budget
+        can_proceed, reason = self.cost_tracker.can_make_request('place_details')
+        if not can_proceed:
+            logger.warning(f"❌ Budget limit: {reason}")
+            return None
+        
+        # Make API request with optimized fields
+        params = {
+            'place_id': place_id,
+            'key': self.api_key,
+            'language': 'en',
+            'fields': ','.join(self.REQUIRED_FIELDS)
+        }
+        
+        try:
+            response = requests.get(self.details_url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get('status') != 'OK':
+                logger.error(f"API error for {place_id}: {data.get('status')}")
+                return None
+            
+            result = data.get('result', {})
+            
+            # Store photo references separately (they don't expire)
+            if 'photos' in result:
+                photo_refs = [photo.get('photo_reference') for photo in result['photos'][:4]]
+                self.cache.set_photo_references(place_id, photo_refs)
+            
+            # Cache for 30 days
+            self.cache.set(place_id, result, 'details', ttl_days=30)
+            
+            # Log cost (basic + contact data)
+            self.cost_tracker.log_request('place_details', place_id=place_id)
+            self.cost_tracker.log_request('contact_data', place_id=place_id)
+            
+            # Mark as processed
+            self.cache.mark_processed(place_id)
+            
+            logger.info(f"📍 Retrieved details for: {result.get('name', 'Unknown')}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Details error for {place_id}: {str(e)}")
+            return None
+    
+    def create_provider_record(self, place_data: Dict) -> Optional[Dict]:
+        """Create a provider record from place data
+        
+        Args:
+            place_data: Google Places API response
+            
+        Returns:
+            Provider record or None if rejected
+        """
+        # Basic validation
+        if not place_data or not place_data.get('place_id'):
+            return None
+        
+        # Extract basic information
+        record = {
+            'google_place_id': place_data.get('place_id'),
+            'provider_name': place_data.get('name', ''),
+            'address': place_data.get('formatted_address', ''),
+            'phone': place_data.get('formatted_phone_number', ''),
+            'website': place_data.get('website', ''),
+            'rating': place_data.get('rating', 0),
+            'total_reviews': place_data.get('user_ratings_total', 0)
+        }
+        
+        # Extract location data
+        if 'geometry' in place_data:
+            location = place_data['geometry'].get('location', {})
+            record['latitude'] = location.get('lat')
+            record['longitude'] = location.get('lng')
+        
+        # Parse address components
+        self._parse_address_components(place_data, record)
+        
+        # Extract business hours
+        if 'opening_hours' in place_data:
+            record['business_hours'] = place_data['opening_hours'].get('weekday_text', [])
+        
+        # Extract medical specialties from types
+        types = place_data.get('types', [])
+        specialties = self._extract_specialties(types)
+        record['specialties'] = specialties
+        
+        # Process reviews for English proficiency
+        reviews = place_data.get('reviews', [])
+        proficiency_data = self._analyze_english_proficiency(reviews)
+        record.update(proficiency_data)
+        
+        # Check English proficiency threshold
+        if record['proficiency_score'] < 3:  # Minimum score of 3
+            logger.info(f"❌ Rejected {record['provider_name']}: Low English proficiency ({record['proficiency_score']})")
+            return None
+        
+        # Check for photos
+        if 'photos' not in place_data or not place_data['photos']:
+            logger.info(f"❌ Rejected {record['provider_name']}: No photos available")
+            return None
+        
+        # Store photo references (not URLs yet)
+        photo_refs = [photo.get('photo_reference') for photo in place_data['photos'][:4]]
+        record['photo_references'] = photo_refs
+        
+        # Generate fingerprints for deduplication
+        fingerprints = self.deduplicator.generate_fingerprints(record)
+        record.update(fingerprints)
+        
+        # Check for duplicates
+        existing = self.db.check_fingerprints(
+            fingerprints['primary_fingerprint'],
+            fingerprints['secondary_fingerprint'],
+            fingerprints['fuzzy_fingerprint']
+        )
+        
+        if existing:
+            logger.info(f"🔁 Duplicate found: {record['provider_name']} = {existing.provider_name}")
+            return None
+        
+        # Set initial status
+        record['status'] = 'pending'
+        record['created_at'] = datetime.now().isoformat()
+        
+        return record
+    
+    def _parse_address_components(self, place_data: Dict, record: Dict):
+        """Parse address components to extract city, prefecture, district"""
+        components = place_data.get('address_components', [])
+        
+        for component in components:
+            types = component.get('types', [])
+            
+            if 'locality' in types:
+                # City
+                city_ja = component.get('long_name', '')
+                record['city'] = self.city_translations.get(city_ja, city_ja)
+            
+            elif 'administrative_area_level_1' in types:
+                # Prefecture
+                record['prefecture'] = component.get('long_name', '')
+            
+            elif 'sublocality_level_1' in types or 'ward' in types:
+                # Ward/District
+                record['district'] = component.get('long_name', '')
+    
+    def _extract_specialties(self, types: List[str]) -> List[str]:
+        """Extract medical specialties from Google Place types"""
+        medical_type_mapping = {
+            'doctor': 'General Medicine',
+            'hospital': 'Hospital',
+            'dentist': 'Dentistry',
+            'physiotherapist': 'Physical Therapy',
+            'health': 'Healthcare'
+        }
+        
+        specialties = []
+        for place_type in types:
+            if place_type in medical_type_mapping:
+                specialties.append(medical_type_mapping[place_type])
+        
+        return specialties or ['Healthcare']
+    
+    def _analyze_english_proficiency(self, reviews: List[Dict]) -> Dict:
+        """Analyze reviews for English language proficiency indicators"""
+        english_keywords = [
+            'english', 'English', 'ENGLISH', '英語', 'えいご',
+            'foreign', 'Foreign', 'international', 'International',
+            'interpreter', 'translation', 'bilingual'
+        ]
+        
+        proficiency_score = 0
+        review_content = []
+        english_mentions = []
+        
+        for review in reviews:
+            text = review.get('text', '')
+            review_content.append({
+                'text': text,
+                'rating': review.get('rating', 0),
+                'time': review.get('time', 0)
+            })
+            
+            # Check for English keywords
+            for keyword in english_keywords:
+                if keyword in text:
+                    proficiency_score += 10
+                    english_mentions.append(text[:200])
+                    break
+        
+        # Additional scoring based on review patterns
+        if len(english_mentions) >= 3:
+            proficiency_score += 20
+        elif len(english_mentions) >= 2:
+            proficiency_score += 10
+        
+        # Convert to 0-5 scale
+        proficiency_level = min(5, proficiency_score // 10)
+        
+        return {
+            'review_content': review_content,
+            'proficiency_score': proficiency_level,
+            'english_proficiency': self._get_proficiency_label(proficiency_level)
+        }
+    
+    def _get_proficiency_label(self, score: int) -> str:
+        """Convert proficiency score to label"""
+        labels = {
+            0: 'Unknown',
+            1: 'Limited',
+            2: 'Basic',
+            3: 'Conversational',
+            4: 'Professional',
+            5: 'Fluent'
+        }
+        return labels.get(score, 'Unknown')
+    
+    def collect_providers(self, queries: List[str], max_per_query: int = 2) -> Dict[str, Any]:
+        """Main collection method with all optimizations
+        
+        Args:
+            queries: List of search queries
+            max_per_query: Maximum results per query
+            
+        Returns:
+            Collection summary
+        """
+        summary = {
+            'queries_executed': 0,
+            'providers_found': 0,
+            'providers_collected': 0,
+            'duplicates_skipped': 0,
+            'rejected_proficiency': 0,
+            'rejected_no_photos': 0,
+            'api_calls': 0,
+            'cache_hits': 0,
+            'estimated_cost': 0.0
+        }
+        
+        collected_providers = []
+        
+        for query in queries:
+            # Check daily limit
+            if self.daily_limit and summary['providers_collected'] >= self.daily_limit:
+                logger.info(f"📊 Daily limit reached: {self.daily_limit}")
+                break
+            
+            # Search providers
+            results = self.search_providers(query, max_results=max_per_query)
+            summary['queries_executed'] += 1
+            summary['providers_found'] += len(results)
+            
+            for result in results:
+                place_id = result.get('place_id')
+                if not place_id:
+                    continue
+                
+                # Get details
+                details = self.get_place_details(place_id)
+                if not details:
+                    summary['duplicates_skipped'] += 1
+                    continue
+                
+                # Create provider record
+                record = self.create_provider_record(details)
+                if not record:
+                    if details.get('proficiency_score', 0) < 3:
+                        summary['rejected_proficiency'] += 1
+                    else:
+                        summary['rejected_no_photos'] += 1
+                    continue
+                
+                # Save to database
+                provider = self.db.create_or_update_provider(record)
+                collected_providers.append(provider)
+                summary['providers_collected'] += 1
+                
+                # Check limit
+                if self.daily_limit and summary['providers_collected'] >= self.daily_limit:
+                    break
+        
+        # Get final stats
+        stats = self.cost_tracker.get_usage_stats(days=1)
+        summary['api_calls'] = stats['total_requests']
+        summary['cache_hits'] = stats['cache_hits']
+        summary['estimated_cost'] = stats['current_day_cost']
+        
+        logger.info(f"✅ Collection complete: {summary['providers_collected']} providers collected")
+        logger.info(f"💰 Today's cost: ${summary['estimated_cost']:.2f}")
+        
+        return summary

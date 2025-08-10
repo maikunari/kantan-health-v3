@@ -539,29 +539,8 @@ const AddProviders: React.FC = () => {
                 </Col>
                 <Col span={12}>
                   <Form.Item label="OR Provider Name" name="name">
-                    <Select 
-                      placeholder="Select wards (optional)"
-                      mode="multiple"
-                      allowClear
-                    >
-                      <Option value="Shibuya">Shibuya</Option>
-                      <Option value="Shinjuku">Shinjuku</Option>
-                      <Option value="Minato">Minato</Option>
-                      <Option value="Chiyoda">Chiyoda</Option>
-                      <Option value="Ginza">Ginza</Option>
-                      <Option value="Harajuku">Harajuku</Option>
-                      <Option value="Roppongi">Roppongi</Option>
-                      <Option value="Akihabara">Akihabara</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="Provider Limit" name="limit">
-                    <InputNumber 
-                      min={1} 
-                      max={50} 
-                      placeholder="10"
-                      style={{ width: '100%' }}
+                    <Input 
+                      placeholder="Tokyo Medical Center" 
                     />
                   </Form.Item>
                 </Col>
@@ -569,22 +548,17 @@ const AddProviders: React.FC = () => {
 
               <Row gutter={16}>
                 <Col span={12}>
-                  <Form.Item label="Specialty Filter" name="specialty">
-                    <Select placeholder="Filter by specialty (optional)">
-                      <Option value="general">General Medicine</Option>
-                      <Option value="cardiology">Cardiology</Option>
-                      <Option value="dermatology">Dermatology</Option>
-                      <Option value="gynecology">Gynecology</Option>
-                      <Option value="pediatrics">Pediatrics</Option>
-                      <Option value="psychiatry">Psychiatry</Option>
-                      <Option value="dentistry">Dentistry</Option>
-                      <Option value="ophthalmology">Ophthalmology</Option>
-                      <Option value="orthopedics">Orthopedics</Option>
-                      <Option value="ent">ENT</Option>
-                    </Select>
+                  <Form.Item label="Location (City)" name="location">
+                    <Input 
+                      placeholder="Tokyo" 
+                      prefix={<EnvironmentOutlined />}
+                    />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={24}>
                   <Form.Item label="Pipeline Options">
                     <Space direction="vertical">
                       <div>
