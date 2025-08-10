@@ -425,7 +425,7 @@ Generate content for all {len(provider_details)} providers with ALL SIX content 
                 # Get photo URLs
                 photo_urls = self.photo_manager.get_photo_urls({
                     'google_place_id': provider.google_place_id,
-                    'photo_references': provider.photo_references
+                    'photo_urls': provider.photo_urls
                 }, max_photos=1)  # Just get the first photo
                 
                 selected_image = photo_urls[0] if photo_urls else ""

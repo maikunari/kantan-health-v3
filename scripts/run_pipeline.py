@@ -60,8 +60,8 @@ def print_summary(results: Dict[str, Any]):
     print("="*60)
     
     # Overall status
-    print(f"\nStatus: {results.get('status', 'Unknown')}")
-    print(f"Duration: {results.get('duration', 'N/A')}")
+    print(f"\nStatus: {results.get('status', 'completed')}")
+    print(f"Duration: {results.get('duration_seconds', 0):.1f} seconds")
     
     # Collection summary
     if 'collection' in results:
