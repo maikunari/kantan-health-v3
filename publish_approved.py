@@ -115,21 +115,33 @@ Examples:
     # Run publish phase of pipeline
     print(f"\n🚀 Publishing {len(provider_ids)} providers to WordPress...")
     
-    results = pipeline.run(
-        mode=PipelineMode.PUBLISH,
-        provider_ids=provider_ids,
-        create_only=True  # Only create new posts, don't update existing
-    )
+    try:
+        results = pipeline.run(
+            mode=PipelineMode.PUBLISH,
+            provider_ids=provider_ids
+        )
+    except Exception as e:
+        print(f"\n❌ Pipeline error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return 1
     
     # Show results
-    if results.get('status') == 'completed':
-        pub_results = results.get('publishing', {})
+    publishing_phase = results.get('phases', {}).get('publishing', {})
+    
+    # Check if we actually had any providers to publish
+    if publishing_phase.get('total_providers', 0) == 0:
+        print(f"\n✅ No providers needed publishing (all already have WordPress posts)")
+        return 0
+    
+    if publishing_phase and not publishing_phase.get('error'):
         print(f"\n✅ Publishing completed successfully")
-        print(f"   - Created: {pub_results.get('created', 0)} posts")
-        print(f"   - Failed: {pub_results.get('failed', 0)}")
+        print(f"   - Created: {publishing_phase.get('created', 0)} posts")
+        print(f"   - Updated: {publishing_phase.get('updated', 0)} posts")
+        print(f"   - Failed: {publishing_phase.get('failed', 0)}")
         
         # Update status for successfully published providers
-        if pub_results.get('created', 0) > 0:
+        if publishing_phase.get('created', 0) > 0 or publishing_phase.get('updated', 0) > 0:
             session = db.get_session()
             try:
                 # Update status to 'published' for providers with WordPress posts
@@ -146,11 +158,13 @@ Examples:
                 session.close()
     else:
         print(f"\n❌ Publishing failed")
-        if results.get('errors'):
-            for error in results['errors'][:5]:
+        if publishing_phase.get('error'):
+            print(f"   Error: {publishing_phase.get('error')}")
+        if publishing_phase.get('errors'):
+            for error in publishing_phase.get('errors', [])[:5]:
                 print(f"   - {error}")
     
-    return 0 if results.get('status') == 'completed' else 1
+    return 0 if not publishing_phase.get('error') else 1
 
 
 if __name__ == '__main__':

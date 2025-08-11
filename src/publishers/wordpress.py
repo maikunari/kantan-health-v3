@@ -86,6 +86,42 @@ class WordPressPublisher:
                 # Get photo URLs for this provider
                 provider_photos = photo_urls.get(provider.id, []) if photo_urls else []
                 
+                # Check if provider has photo references (new system)
+                if not provider_photos and hasattr(provider, 'photo_references') and provider.photo_references:
+                    # Convert references to proxy URLs
+                    api_base = os.getenv('API_BASE_URL', 'http://localhost:5000')
+                    provider_photos = [f"{api_base}/api/photo/{ref}" for ref in provider.photo_references[:4]]
+                    logger.info(f"📸 Using photo references for {provider.provider_name}: {len(provider_photos)} photos")
+                
+                # Fallback: If no references, check provider's photo_urls field (old system)
+                elif not provider_photos and hasattr(provider, 'photo_urls') and provider.photo_urls:
+                    try:
+                        import json
+                        if isinstance(provider.photo_urls, str):
+                            old_urls = json.loads(provider.photo_urls)
+                        elif isinstance(provider.photo_urls, list):
+                            old_urls = provider.photo_urls
+                        else:
+                            old_urls = []
+                        
+                        # Convert old URLs to proxy URLs by extracting references
+                        import re
+                        api_base = os.getenv('API_BASE_URL', 'http://localhost:5000')
+                        provider_photos = []
+                        
+                        for url in old_urls[:4]:  # Limit to 4 photos
+                            match = re.search(r'photoreference=([^&]+)', url)
+                            if match:
+                                ref = match.group(1)
+                                provider_photos.append(f"{api_base}/api/photo/{ref}")
+                        
+                        if provider_photos:
+                            logger.info(f"📸 Converted {len(provider_photos)} URLs to proxy for {provider.provider_name}")
+                        
+                    except Exception as e:
+                        logger.warning(f"Could not parse photo_urls for {provider.provider_name}: {e}")
+                        provider_photos = []
+                
                 if provider.wordpress_post_id:
                     # Update existing post
                     result = self.update_provider(provider, provider_photos)
@@ -128,14 +164,14 @@ class WordPressPublisher:
                 'title': provider.provider_name,
                 'content': self._generate_post_content(provider),
                 'status': 'publish',
-                'type': 'post',
+                'type': 'healthcare_provider',  # Custom post type
                 'categories': self._get_categories(provider),
                 'acf': self._prepare_acf_fields(provider, photo_urls)
             }
             
-            # Make API request
+            # Make API request to healthcare_provider endpoint
             response = requests.post(
-                f"{self.wp_url}/wp-json/wp/v2/posts",
+                f"{self.wp_url}/wp-json/wp/v2/healthcare_provider",
                 auth=(self.wp_username, self.wp_password),
                 json=post_data,
                 headers={'Content-Type': 'application/json'}
@@ -194,9 +230,9 @@ class WordPressPublisher:
                 'acf': self._prepare_acf_fields(provider, photo_urls)
             }
             
-            # Make API request
+            # Make API request to healthcare_provider endpoint
             response = requests.post(
-                f"{self.wp_url}/wp-json/wp/v2/posts/{provider.wordpress_post_id}",
+                f"{self.wp_url}/wp-json/wp/v2/healthcare_provider/{provider.wordpress_post_id}",
                 auth=(self.wp_username, self.wp_password),
                 json=post_data,
                 headers={'Content-Type': 'application/json'}
@@ -281,8 +317,9 @@ class WordPressPublisher:
             accessibility_info.append("Parking available")
         accessibility_text = ", ".join(accessibility_info) if accessibility_info else "Contact for accessibility information"
         
-        # Prepare ACF data
+        # Prepare ACF data with ALL fields from the old system
         acf_data = {
+            # Basic provider info
             self.acf_field_mappings['provider_name']: provider.provider_name,
             self.acf_field_mappings['english_speaker']: provider.english_proficiency or 'Unknown',
             self.acf_field_mappings['location']: location,
@@ -299,7 +336,66 @@ class WordPressPublisher:
             self.acf_field_mappings['reviews']: reviews_text,
             self.acf_field_mappings['review_summary']: provider.review_summary or '',
             self.acf_field_mappings['english_experience_summary']: provider.english_experience_summary or '',
-            self.acf_field_mappings['accessibility_info']: accessibility_text
+            self.acf_field_mappings['accessibility_info']: accessibility_text,
+            
+            # Additional ACF fields from old system
+            "provider_phone": provider.phone or '',
+            "wheelchair_accessible": self._format_wheelchair_accessibility(provider.wheelchair_accessible),
+            "parking_available": self._format_parking_availability(provider.parking_available),
+            "prefecture": provider.prefecture or '',
+            "district": provider.district or '',
+            "business_status": self._normalize_business_status(provider.business_status) if hasattr(provider, 'business_status') else 'Operational',
+            "postal_code": provider.postal_code if hasattr(provider, 'postal_code') else '',
+            
+            # Location & Map data
+            "latitude": provider.latitude or 0,
+            "longitude": provider.longitude or 0,
+            "google_maps_embed": self._generate_google_maps_embed(provider),
+            "google_map": self._generate_google_map_array(provider),
+            
+            # Language Support
+            "english_proficiency": provider.english_proficiency or 'Unknown',
+            "proficiency_score": provider.proficiency_score or 0,
+            
+            # Photos
+            "photo_urls": self._format_photo_urls_for_acf(photo_urls),
+            "external_featured_image": photo_urls[0] if photo_urls else provider.selected_featured_image or '',
+            "featured_image_source": self._get_featured_image_source(provider, photo_urls),
+            "photo_count": len(photo_urls) if photo_urls else 0,
+            "image_selection_status": self._get_image_selection_status(provider),
+            
+            # SEO Fields
+            "seo_title": provider.seo_title or provider.provider_name,
+            "seo_meta_description": provider.seo_meta_description or provider.ai_excerpt or '',
+            
+            # Business Hours (individual days)
+            "business_hours": self._format_business_hours_for_acf(provider.business_hours) if hasattr(provider, 'business_hours') else '',
+            "hours_monday": self._get_day_hours(provider.business_hours, 'Monday') if hasattr(provider, 'business_hours') else '',
+            "hours_tuesday": self._get_day_hours(provider.business_hours, 'Tuesday') if hasattr(provider, 'business_hours') else '',
+            "hours_wednesday": self._get_day_hours(provider.business_hours, 'Wednesday') if hasattr(provider, 'business_hours') else '',
+            "hours_thursday": self._get_day_hours(provider.business_hours, 'Thursday') if hasattr(provider, 'business_hours') else '',
+            "hours_friday": self._get_day_hours(provider.business_hours, 'Friday') if hasattr(provider, 'business_hours') else '',
+            "hours_saturday": self._get_day_hours(provider.business_hours, 'Saturday') if hasattr(provider, 'business_hours') else '',
+            "hours_sunday": self._get_day_hours(provider.business_hours, 'Sunday') if hasattr(provider, 'business_hours') else '',
+            "open_now": self._get_open_now_status(provider.business_hours) if hasattr(provider, 'business_hours') else 'Status unknown',
+            
+            # Accessibility Status Fields
+            "accessibility_status": self._format_accessibility_status(provider.wheelchair_accessible),
+            "parking_status": self._format_parking_status(provider.parking_available),
+            
+            # Patient Insights
+            "review_keywords": self._extract_patient_feedback_themes(provider.review_content),
+            "patient_highlights": self._generate_patient_highlights(provider.review_content),
+            "english_indicators": self._extract_english_indicators(provider),
+            
+            # Content fields
+            "ai_description": provider.ai_description or '',
+            "ai_excerpt": provider.ai_excerpt or '',
+            "provider_city": provider.city or '',
+            "provider_rating": str(provider.rating or 0),
+            "provider_reviews": str(provider.total_reviews or 0),
+            "provider_website": self._clean_website_url(provider.website or ''),
+            "provider_address": self._clean_address(provider.address or ''),
         }
         
         return acf_data
@@ -394,9 +490,9 @@ class WordPressPublisher:
                 media = upload_response.json()
                 media_id = media.get('id')
                 
-                # Set as featured image
+                # Set as featured image on healthcare_provider CPT
                 update_response = requests.post(
-                    f"{self.wp_url}/wp-json/wp/v2/posts/{post_id}",
+                    f"{self.wp_url}/wp-json/wp/v2/healthcare_provider/{post_id}",
                     auth=(self.wp_username, self.wp_password),
                     json={'featured_media': media_id}
                 )
@@ -443,3 +539,351 @@ class WordPressPublisher:
                 'success': False,
                 'error': str(e)
             }
+    
+    def _generate_google_maps_embed(self, provider: Provider) -> str:
+        """Generate Google Maps embed HTML"""
+        if not provider.latitude or not provider.longitude:
+            return ""
+        
+        address = provider.address or provider.provider_name
+        return f'<iframe src="https://maps.google.com/maps?q={provider.latitude},{provider.longitude}&t=&z=15&ie=UTF8&iwloc=&output=embed" width="100%" height="450" frameborder="0" style="border:0" allowfullscreen></iframe>'
+    
+    def _generate_google_map_array(self, provider: Provider) -> Dict[str, Any]:
+        """Generate Google Map array for ACF Google Map field"""
+        if not provider.latitude or not provider.longitude:
+            return {}
+        
+        return {
+            "address": provider.address or "",
+            "lat": provider.latitude,
+            "lng": provider.longitude,
+            "zoom": 15,
+            "place_id": provider.google_place_id or "",
+            "name": provider.provider_name
+        }
+    
+    def _format_photo_urls_for_acf(self, photo_urls: List[str]) -> str:
+        """Format photo URLs for ACF gallery field"""
+        if not photo_urls:
+            return ""
+        
+        # Return newline-separated URLs for the ACF field
+        return "\n".join(photo_urls[:10])  # Limit to 10 photos
+    
+    def _format_wheelchair_accessibility(self, wheelchair_accessible: str) -> str:
+        """Format wheelchair accessibility for ACF dropdown field"""
+        if wheelchair_accessible in ['Yes', 'true', 'True', True]:
+            return "Wheelchair accessible"
+        elif wheelchair_accessible in ['No', 'false', 'False', False]:
+            return "Not wheelchair accessible"
+        else:
+            return "Wheelchair accessibility unknown"
+    
+    def _format_parking_availability(self, parking_available: str) -> str:
+        """Format parking availability for ACF dropdown field"""
+        if parking_available in ['Yes', 'true', 'True', True]:
+            return "Parking is available"
+        elif parking_available in ['No', 'false', 'False', False]:
+            return "Parking is not available"
+        else:
+            return "Parking unknown"
+    
+    def _get_featured_image_source(self, provider: Provider, photo_urls: List[str]) -> str:
+        """Determine the source of the featured image"""
+        if provider.selected_featured_image:
+            return "Claude AI Selected"
+        elif photo_urls and len(photo_urls) > 0:
+            return "First Available Photo"
+        else:
+            return "No Image Available"
+    
+    def _normalize_business_status(self, status: str) -> str:
+        """Normalize business status for ACF field"""
+        if status in ['OPERATIONAL', 'operational', 'open']:
+            return 'Operational'
+        elif status in ['CLOSED_TEMPORARILY', 'closed_temporarily']:
+            return 'Temporarily Closed'
+        elif status in ['CLOSED_PERMANENTLY', 'closed_permanently']:
+            return 'Permanently Closed'
+        else:
+            return 'Operational'
+    
+    def _format_business_hours_for_acf(self, business_hours: Any) -> str:
+        """Format business hours for ACF field"""
+        if not business_hours:
+            return ""
+        
+        # If it's a string (JSON), parse it
+        if isinstance(business_hours, str):
+            try:
+                business_hours = json.loads(business_hours)
+            except:
+                return ""
+        
+        # If we have display_text from Google Places, use that
+        if isinstance(business_hours, dict) and 'display_text' in business_hours:
+            return "\n".join(business_hours['display_text'])
+        
+        # Format from formatted_hours
+        if isinstance(business_hours, dict) and 'formatted_hours' in business_hours:
+            formatted_lines = []
+            days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            for day in days_order:
+                if day in business_hours['formatted_hours']:
+                    hours = business_hours['formatted_hours'][day]
+                    if hours.get('status') == 'closed':
+                        formatted_lines.append(f"{day}: Closed")
+                    elif hours.get('open') and hours.get('close'):
+                        formatted_lines.append(f"{day}: {hours['open']} - {hours['close']}")
+                    else:
+                        formatted_lines.append(f"{day}: Closed")
+            
+            return "\n".join(formatted_lines)
+        
+        return ""
+    
+    def _get_day_hours(self, business_hours: Any, day: str) -> str:
+        """Get hours for specific day"""
+        if not business_hours:
+            return "Hours not available"
+        
+        # If it's a string (JSON), parse it
+        if isinstance(business_hours, str):
+            try:
+                business_hours = json.loads(business_hours)
+            except:
+                return "Hours not available"
+        
+        if isinstance(business_hours, dict) and 'formatted_hours' in business_hours:
+            if day in business_hours['formatted_hours']:
+                hours = business_hours['formatted_hours'][day]
+                if hours.get('status') == 'closed':
+                    return "Closed"
+                elif hours.get('open') and hours.get('close'):
+                    return f"{hours['open']} - {hours['close']}"
+                else:
+                    return "Closed"
+        
+        return "Hours not available"
+    
+    def _get_open_now_status(self, business_hours: Any) -> str:
+        """Get open now status from Google Places data"""
+        if not business_hours:
+            return "Status unknown"
+        
+        # If it's a string (JSON), parse it
+        if isinstance(business_hours, str):
+            try:
+                business_hours = json.loads(business_hours)
+            except:
+                return "Status unknown"
+        
+        if isinstance(business_hours, dict) and 'open_now' in business_hours:
+            return "Open Now" if business_hours['open_now'] else "Closed"
+        
+        return "Status unknown"
+    
+    def _format_accessibility_status(self, wheelchair_accessible: str) -> str:
+        """Format accessibility status for ACF field"""
+        return self._format_wheelchair_accessibility(wheelchair_accessible)
+    
+    def _format_parking_status(self, parking_available: str) -> str:
+        """Format parking status for ACF field"""
+        return self._format_parking_availability(parking_available)
+    
+    def _extract_patient_feedback_themes(self, review_content: Any) -> str:
+        """Extract patient feedback themes from reviews"""
+        if not review_content:
+            return ""
+        
+        # Simple keyword extraction (could be enhanced with NLP)
+        themes = []
+        
+        reviews = []
+        if isinstance(review_content, str):
+            try:
+                reviews = json.loads(review_content)
+            except:
+                return ""
+        elif isinstance(review_content, list):
+            reviews = review_content
+        
+        # Extract common themes
+        keywords = {
+            'english': 0,
+            'friendly': 0,
+            'clean': 0,
+            'professional': 0,
+            'wait': 0,
+            'appointment': 0
+        }
+        
+        for review in reviews:
+            if isinstance(review, dict) and 'text' in review:
+                text = review['text'].lower()
+                for keyword in keywords:
+                    if keyword in text:
+                        keywords[keyword] += 1
+        
+        # Return top themes
+        for keyword, count in sorted(keywords.items(), key=lambda x: x[1], reverse=True):
+            if count > 0:
+                themes.append(f"{keyword} ({count} mentions)")
+        
+        return ", ".join(themes[:5]) if themes else "No themes extracted"
+    
+    def _generate_patient_highlights(self, review_content: Any) -> List[Dict[str, str]]:
+        """Generate patient highlights from reviews as ACF repeater field array"""
+        if not review_content:
+            return []
+        
+        reviews = []
+        if isinstance(review_content, str):
+            try:
+                reviews = json.loads(review_content)
+            except:
+                return []
+        elif isinstance(review_content, list):
+            reviews = review_content
+        
+        if not reviews or not isinstance(reviews, list):
+            return []
+        
+        highlights = []
+        
+        # Analyze reviews for common positive highlights
+        has_english_support = False
+        has_clean_facilities = False
+        has_friendly_staff = False
+        has_professional_care = False
+        has_convenient_location = False
+        
+        for review in reviews:
+            if isinstance(review, dict):
+                text = review.get('text', '').lower()
+                rating = review.get('rating', 0)
+                
+                # Only consider reviews with 4+ stars for highlights
+                if rating >= 4:
+                    if any(word in text for word in ['english', 'bilingual', 'speaks english']):
+                        has_english_support = True
+                    if any(word in text for word in ['clean', 'hygienic', 'spotless']):
+                        has_clean_facilities = True
+                    if any(word in text for word in ['friendly', 'kind', 'caring', 'welcoming']):
+                        has_friendly_staff = True
+                    if any(word in text for word in ['professional', 'expert', 'skilled']):
+                        has_professional_care = True
+                    if any(word in text for word in ['convenient', 'accessible', 'easy to find']):
+                        has_convenient_location = True
+        
+        # Build highlights array for ACF repeater field
+        if has_english_support:
+            highlights.append({
+                'highlight_text': 'English-speaking support available',
+                'highlight_icon': 'language'
+            })
+        
+        if has_clean_facilities:
+            highlights.append({
+                'highlight_text': 'Clean and modern facilities',
+                'highlight_icon': 'sparkles'
+            })
+        
+        if has_friendly_staff:
+            highlights.append({
+                'highlight_text': 'Friendly and caring staff',
+                'highlight_icon': 'heart'
+            })
+        
+        if has_professional_care:
+            highlights.append({
+                'highlight_text': 'Professional medical care',
+                'highlight_icon': 'stethoscope'
+            })
+        
+        if has_convenient_location:
+            highlights.append({
+                'highlight_text': 'Convenient location',
+                'highlight_icon': 'location'
+            })
+        
+        # If no specific highlights found but has good reviews, add generic one
+        if not highlights and reviews:
+            avg_rating = sum(r.get('rating', 0) for r in reviews if isinstance(r, dict)) / len(reviews)
+            if avg_rating >= 4.0:
+                highlights.append({
+                    'highlight_text': 'Highly rated by patients',
+                    'highlight_icon': 'star'
+                })
+        
+        return highlights
+    
+    def _extract_english_indicators(self, provider: Provider) -> str:
+        """Extract English language indicators"""
+        indicators = []
+        
+        # Check proficiency score
+        if hasattr(provider, 'proficiency_score') and provider.proficiency_score:
+            if provider.proficiency_score >= 40:
+                indicators.append("High English proficiency score")
+            elif provider.proficiency_score >= 20:
+                indicators.append("Moderate English proficiency score")
+        
+        # Check English proficiency field
+        if provider.english_proficiency and provider.english_proficiency != 'Unknown':
+            indicators.append(f"English: {provider.english_proficiency}")
+        
+        # Check for English in reviews
+        if hasattr(provider, 'english_experience_summary') and provider.english_experience_summary:
+            if 'english' in provider.english_experience_summary.lower():
+                indicators.append("English support mentioned in reviews")
+        
+        return ", ".join(indicators) if indicators else "English support status unclear"
+    
+    def _get_image_selection_status(self, provider: Provider) -> str:
+        """Determine the image selection status"""
+        if provider.selected_featured_image:
+            return "selected"  # AI selected
+        elif hasattr(provider, 'photo_urls'):
+            photo_urls = provider.photo_urls
+            if isinstance(photo_urls, str):
+                try:
+                    photo_urls = json.loads(photo_urls)
+                except:
+                    photo_urls = []
+            
+            if photo_urls and len(photo_urls) > 0:
+                return "fallback"  # Using fallback (first photo)
+            else:
+                return "none"  # No images available
+        else:
+            return "none"
+    
+    def _clean_website_url(self, url: str) -> str:
+        """Clean website URL by removing query parameters"""
+        if not url:
+            return ""
+        
+        try:
+            if '?' in url:
+                url = url.split('?')[0]
+            return url.rstrip('/')
+        except Exception:
+            return url
+    
+    def _clean_address(self, address: str) -> str:
+        """Clean address by removing Japan suffix"""
+        if not address:
+            return ""
+        
+        cleaned = address.strip()
+        
+        # Remove 'Japan' from end
+        japan_suffixes = [', Japan', ',Japan', ' Japan']
+        for suffix in japan_suffixes:
+            if cleaned.lower().endswith(suffix.lower()):
+                cleaned = cleaned[:-len(suffix)]
+                break
+        
+        return cleaned.strip(' ,')

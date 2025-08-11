@@ -9,7 +9,7 @@ import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, TIMESTAMP, or_, and_
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, TIMESTAMP, or_, and_, ARRAY
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import NullPool
 
@@ -76,6 +76,7 @@ class Provider(Base):
     
     # Photos
     photo_urls = Column(JSON)
+    photo_references = Column(ARRAY(Text))  # New: Array of photo references
     
     # Accessibility
     business_hours = Column(JSON)
