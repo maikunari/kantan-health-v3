@@ -178,32 +178,37 @@ class GooglePlacesCollector:
             logger.error(f"Search error: {str(e)}")
             return []
     
-    def get_place_details(self, place_id: str) -> Optional[Dict]:
+    def get_place_details(self, place_id: str, force_refresh: bool = False) -> Optional[Dict]:
         """Get detailed place information with caching and deduplication
         
         Args:
             place_id: Google Place ID
+            force_refresh: Skip cache and fetch fresh data (for expired references)
             
         Returns:
             Place details or None
         """
-        # Check if already processed
-        if self.cache.is_processed(place_id):
-            logger.info(f"✅ Already processed: {place_id}")
-            return None
-        
-        # Check cache
-        cached = self.cache.get(place_id, 'details')
-        if cached:
-            logger.info(f"✅ Cache hit for details: {place_id}")
-            self.cost_tracker.log_request('place_details', place_id=place_id, cached=True)
-            return cached
-        
-        # Check if already in database
-        existing = self.db.get_provider_by_place_id(place_id)
-        if existing:
-            logger.info(f"✅ Already in database: {place_id}")
-            return None
+        # Skip these checks if force_refresh is True
+        if not force_refresh:
+            # Check if already processed
+            if self.cache.is_processed(place_id):
+                logger.info(f"✅ Already processed: {place_id}")
+                return None
+            
+            # Check cache
+            cached = self.cache.get(place_id, 'details')
+            if cached:
+                logger.info(f"✅ Cache hit for details: {place_id}")
+                self.cost_tracker.log_request('place_details', place_id=place_id, cached=True)
+                return cached
+            
+            # Check if already in database
+            existing = self.db.get_provider_by_place_id(place_id)
+            if existing:
+                logger.info(f"✅ Already in database: {place_id}")
+                return None
+        else:
+            logger.info(f"🔄 Force refresh requested, skipping cache for: {place_id}")
         
         # Check budget
         can_proceed, reason = self.cost_tracker.can_make_request('place_details')

@@ -4,8 +4,8 @@
 echo "🚀 Deploying Healthcare Directory API..."
 
 # Configuration
-DROPLET_IP="your-droplet-ip"  # CHANGE THIS to your droplet IP
-DROPLET_USER="root"
+DROPLET_IP="206.189.156.138"  
+DROPLET_USER="deploy"
 REMOTE_DIR="/var/www/healthcare-api"
 
 # Create deployment package

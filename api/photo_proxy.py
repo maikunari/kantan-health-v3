@@ -9,6 +9,7 @@ import os
 import sys
 import hashlib
 import requests
+import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, redirect, make_response, jsonify, send_file
 from io import BytesIO
@@ -18,10 +19,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.core.cache import PersistentCache
 from src.core.cost_tracker import CostTracker
-from src.utils.activity_logger import log_activity
+# from src.utils.activity_logger import log_activity
+# Temporary: Define no-op log_activity to avoid crashes
+def log_activity(*args, **kwargs):
+    pass
 
 # Create blueprint
 photo_proxy_bp = Blueprint('photo_proxy', __name__)
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 # Initialize services
 cache = PersistentCache()
@@ -41,10 +48,13 @@ def get_photo(reference):
     
     Args:
         reference: Google photo reference
+        provider_id (query param): Optional provider ID to help with refresh
         
     Returns:
         Redirects to photo URL or serves cached image
     """
+    from flask import request
+    provider_id = request.args.get('provider_id', type=int)
     try:
         # Validate reference
         if not reference or len(reference) < 10:
@@ -132,6 +142,110 @@ def get_photo(reference):
                 'error'
             )
             return jsonify({'error': 'API authentication failed'}), 403
+        
+        elif response.status_code == 400:
+            # Photo reference expired - refresh from Google Places
+            logger.info(f"Photo reference expired, refreshing from Google Places...")
+            
+            # Find which provider owns this reference
+            from src.core.database import DatabaseManager
+            from src.collectors.google_places import GooglePlacesCollector
+            from sqlalchemy import text
+            import json
+            
+            db = DatabaseManager()
+            session = db.get_session()
+            
+            try:
+                # First try to find by the reference itself
+                provider = session.execute(text("""
+                    SELECT id, provider_name, google_place_id, photo_references
+                    FROM providers
+                    WHERE photo_references::text LIKE :ref_pattern
+                    LIMIT 1
+                """), {'ref_pattern': f'%{reference[:50]}%'}).fetchone()
+                
+                # If not found, this might be an old reference from WordPress
+                # Try using provider_id if provided
+                if not provider and provider_id:
+                    logger.info(f"Reference not found, trying provider_id {provider_id}")
+                    provider = session.execute(text("""
+                        SELECT id, provider_name, google_place_id, photo_references
+                        FROM providers
+                        WHERE id = :provider_id
+                        LIMIT 1
+                    """), {'provider_id': provider_id}).fetchone()
+                
+                if not provider:
+                    logger.info("Reference not found in database, might be outdated from WordPress")
+                    logger.error("Cannot determine provider for expired reference")
+                    return jsonify({'error': 'Photo reference expired and provider cannot be determined'}), 404
+                
+                if provider and provider.google_place_id:
+                    logger.info(f"Found provider: {provider.provider_name}, refreshing photos...")
+                    
+                    # Fetch fresh photo references (force refresh to bypass cache)
+                    collector = GooglePlacesCollector()
+                    details = collector.get_place_details(provider.google_place_id, force_refresh=True)
+                    
+                    if not details:
+                        logger.error(f"Failed to get place details for {provider.google_place_id}")
+                    elif 'photos' not in details:
+                        logger.error(f"No photos in place details for {provider.google_place_id}")
+                    
+                    if details and 'photos' in details:
+                        # Extract new references
+                        new_photos = details['photos']
+                        new_references = [p.get('photo_reference') for p in new_photos if p.get('photo_reference')]
+                        
+                        if new_references:
+                            # Update database with new references (as PostgreSQL text array)
+                            session.execute(text("""
+                                UPDATE providers 
+                                SET photo_references = :references
+                                WHERE id = :id
+                            """), {
+                                'references': new_references,  # Pass as Python list, SQLAlchemy handles conversion
+                                'id': provider.id
+                            })
+                            session.commit()
+                            
+                            # Use the first new reference to serve the image
+                            new_ref = new_references[0]
+                            new_url = f"{PHOTO_BASE_URL}?maxwidth={MAX_WIDTH}&photoreference={new_ref}&key={GOOGLE_API_KEY}"
+                            
+                            # Fetch with new reference
+                            new_response = requests.get(new_url, timeout=10)
+                            if new_response.status_code == 200:
+                                # Cache and return the new image
+                                cache_data = {
+                                    'image_data': new_response.content,
+                                    'content_type': new_response.headers.get('Content-Type', 'image/jpeg'),
+                                    'cached_at': datetime.now().isoformat(),
+                                    'attribution': new_response.headers.get('X-Attribution', '')
+                                }
+                                cache.set(
+                                    f"photo_data_{new_ref[:32]}",
+                                    cache_data,
+                                    'photo_cache',
+                                    ttl_days=CACHE_DAYS
+                                )
+                                
+                                # Return the image
+                                img_response = make_response(new_response.content)
+                                img_response.headers['Content-Type'] = new_response.headers.get('Content-Type', 'image/jpeg')
+                                img_response.headers['Cache-Control'] = 'public, max-age=86400'
+                                return img_response
+                
+                # If we couldn't refresh, return error
+                logger.error(f"Could not refresh expired reference")
+                return jsonify({'error': 'Photo reference expired and could not be refreshed'}), 404
+                
+            except Exception as e:
+                logger.error(f"Error refreshing photo reference: {str(e)}")
+                return jsonify({'error': 'Failed to refresh photo reference'}), 500
+            finally:
+                session.close()
         
         else:
             # Other error
