@@ -55,6 +55,16 @@ def get_photo(reference):
     """
     from flask import request
     provider_id = request.args.get('provider_id', type=int)
+    
+    # Check if photos are disabled
+    photos_disabled = os.getenv('DISABLE_GOOGLE_PHOTOS', 'false').lower() == 'true'
+    if photos_disabled:
+        logger.info(f"Photo request blocked - photos disabled via environment variable")
+        return jsonify({
+            'error': 'Google Photos API is disabled',
+            'message': 'Photos have been disabled to reduce API costs. Using cityscape images instead.'
+        }), 404
+    
     try:
         # Validate reference
         if not reference or len(reference) < 10:

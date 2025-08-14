@@ -53,12 +53,46 @@ python3 run_mega_batch_automation.py --stats-only
 python3 run_mega_batch_automation.py --limit 10 --dry-run
 ```
 
+## 🎯 Important: Google Photos Configuration
+
+### Disabling/Enabling Google Photos API
+The system supports toggling Google Photos API usage via environment variable. This is useful for:
+- **Cost Reduction**: Save $350+/month in API costs at scale
+- **Using Alternative Images**: Cityscape images via WordPress taxonomy
+- **Premium Listings**: Re-enable for select premium providers
+
+#### To Disable Photos (Recommended for Cost Savings):
+```bash
+# In config/.env
+DISABLE_GOOGLE_PHOTOS=true
+```
+
+When disabled:
+- No Google Photos API calls are made (zero cost)
+- Provider collection continues normally
+- WordPress receives empty photo fields
+- Use cityscape images via location taxonomy instead
+
+#### To Enable Photos (For Premium Listings):
+```bash
+# In config/.env
+DISABLE_GOOGLE_PHOTOS=false
+```
+
+When enabled:
+- Photos are fetched and cached for 30 days
+- Photo proxy serves images with auto-refresh
+- Costs $0.007 per photo from Google API
+
+**Note**: Update WordPress templates to handle empty photo fields gracefully when photos are disabled.
+
 ## 🔧 Core Components
 
 ### 1. **Data Collection Pipeline**
 - **Google Places Integration**: Advanced search with 150+ query variations
 - **Deduplication System**: Fingerprint-based duplicate prevention
 - **Location Processing**: Precise Japanese address parsing
+- **Photo Management**: Optional Google Photos with disable capability
 
 ### 2. **AI Content Generation** ⭐
 - **Optimized Mega-Batch Processor**: 4 content types in single API call (90.4% efficiency gain)

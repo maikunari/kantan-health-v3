@@ -42,6 +42,11 @@ class GooglePlacesCollector:
         if not self.api_key:
             raise ValueError("GOOGLE_PLACES_API_KEY not found in environment")
         
+        # Check if photos are disabled
+        self.photos_disabled = os.getenv('DISABLE_GOOGLE_PHOTOS', 'false').lower() == 'true'
+        if self.photos_disabled:
+            logger.info("⚠️ Google Photos API is DISABLED via environment variable")
+        
         # API endpoints
         self.search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
         self.details_url = "https://maps.googleapis.com/maps/api/place/details/json"
@@ -235,10 +240,16 @@ class GooglePlacesCollector:
             
             result = data.get('result', {})
             
-            # Store photo references separately (they don't expire)
-            if 'photos' in result:
-                photo_refs = [photo.get('photo_reference') for photo in result['photos'][:4]]
-                self.cache.set_photo_references(place_id, photo_refs)
+            # Skip photo processing if disabled
+            if self.photos_disabled:
+                if 'photos' in result:
+                    logger.info(f"📷 Skipping photo extraction (disabled) for: {result.get('name', 'Unknown')}")
+                    result['photos'] = []  # Clear photos to prevent downstream processing
+            else:
+                # Store photo references separately (they don't expire)
+                if 'photos' in result:
+                    photo_refs = [photo.get('photo_reference') for photo in result['photos'][:4]]
+                    self.cache.set_photo_references(place_id, photo_refs)
             
             # Cache for 30 days
             self.cache.set(place_id, result, 'details', ttl_days=30)
@@ -309,14 +320,19 @@ class GooglePlacesCollector:
             logger.info(f"❌ Rejected {record['provider_name']}: Low English proficiency ({record['proficiency_score']})")
             return None
         
-        # Check for photos
-        if 'photos' not in place_data or not place_data['photos']:
-            logger.info(f"❌ Rejected {record['provider_name']}: No photos available")
-            return None
-        
-        # Store photo references (not URLs yet)
-        photo_refs = [photo.get('photo_reference') for photo in place_data['photos'][:4]]
-        record['photo_references'] = photo_refs
+        # Check for photos (skip if disabled)
+        if not self.photos_disabled:
+            if 'photos' not in place_data or not place_data['photos']:
+                logger.info(f"❌ Rejected {record['provider_name']}: No photos available")
+                return None
+            
+            # Store photo references (not URLs yet)
+            photo_refs = [photo.get('photo_reference') for photo in place_data['photos'][:4]]
+            record['photo_references'] = photo_refs
+        else:
+            # Photos disabled - set empty references
+            record['photo_references'] = []
+            logger.debug(f"📷 Photos disabled for: {record['provider_name']}")
         
         # Generate fingerprints for deduplication
         fingerprints = self.deduplicator.generate_fingerprints(record)

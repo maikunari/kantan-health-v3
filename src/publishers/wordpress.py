@@ -86,12 +86,18 @@ class WordPressPublisher:
                 # Get photo URLs for this provider
                 provider_photos = photo_urls.get(provider.id, []) if photo_urls else []
                 
+                # Check if photos are disabled
+                photos_disabled = os.getenv('DISABLE_GOOGLE_PHOTOS', 'false').lower() == 'true'
+                
                 # Check if provider has photo references (new system)
-                if not provider_photos and hasattr(provider, 'photo_references') and provider.photo_references:
+                if not photos_disabled and not provider_photos and hasattr(provider, 'photo_references') and provider.photo_references:
                     # Convert references to proxy URLs
                     api_base = os.getenv('API_BASE_URL', 'http://localhost:5000')
                     provider_photos = [f"{api_base}/api/photo/{ref}" for ref in provider.photo_references[:4]]
                     logger.info(f"📸 Using photo references for {provider.provider_name}: {len(provider_photos)} photos")
+                elif photos_disabled:
+                    provider_photos = []
+                    logger.info(f"📷 Photos disabled for {provider.provider_name}")
                 
                 # Fallback: If no references, check provider's photo_urls field (old system)
                 elif not provider_photos and hasattr(provider, 'photo_urls') and provider.photo_urls:
