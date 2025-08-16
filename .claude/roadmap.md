@@ -120,7 +120,7 @@ class GeographicSearchEngine:
 - [x] Add resume capability for interrupted collections
 - [x] Build collection statistics dashboard
 
-### 2.4 Expand to Top 10 Cities
+### 2.4 Expand to Top 10 Cities ✅
 Priority cities by population:
 1. Tokyo (14M) - 23 wards
 2. Yokohama (3.7M) - 18 wards
