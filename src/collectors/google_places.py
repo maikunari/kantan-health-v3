@@ -31,6 +31,31 @@ class GooglePlacesCollector:
         'geometry', 'types', 'business_status'
     ]
     
+    # Tokyo's 23 Special Wards for targeted searching
+    TOKYO_WARDS = [
+        "Chiyoda", "Chuo", "Minato", "Shinjuku", "Bunkyo",
+        "Taito", "Sumida", "Koto", "Shinagawa", "Meguro",
+        "Ota", "Setagaya", "Shibuya", "Nakano", "Suginami",
+        "Toshima", "Kita", "Arakawa", "Itabashi", "Nerima",
+        "Adachi", "Katsushika", "Edogawa"
+    ]
+    
+    # Major city wards for other cities
+    CITY_WARDS = {
+        "Yokohama": ["Naka", "Nishi", "Minami", "Hodogaya", "Isogo", 
+                     "Kanagawa", "Tsurumi", "Kohoku", "Aoba", "Tsuzuki"],
+        "Osaka": ["Kita", "Chuo", "Nishi", "Naniwa", "Tennoji", 
+                  "Yodogawa", "Higashinari", "Abeno", "Sumiyoshi"],
+        "Nagoya": ["Naka", "Higashi", "Kita", "Nishi", "Nakamura",
+                   "Mizuho", "Atsuta", "Minami", "Midori"],
+        "Kyoto": ["Kamigyo", "Nakagyo", "Shimogyo", "Higashiyama", 
+                  "Sakyo", "Kita", "Ukyo", "Fushimi"],
+        "Kobe": ["Chuo", "Hyogo", "Nada", "Higashinada", "Nagata",
+                 "Suma", "Tarumi", "Kita", "Nishi"],
+        "Fukuoka": ["Hakata", "Chuo", "Higashi", "Minami", "Nishi",
+                    "Jonan", "Sawara"]
+    }
+    
     def __init__(self, daily_limit: int = None):
         """Initialize collector with caching and cost tracking
         
@@ -84,12 +109,16 @@ class GooglePlacesCollector:
     
     def generate_search_queries(self, cities: List[str] = None, 
                               specialties: List[str] = None,
+                              wards: List[str] = None,
+                              use_ward_specific: bool = True,
                               limit: int = 100) -> List[str]:
-        """Generate optimized search queries
+        """Generate optimized search queries with ward-level precision
         
         Args:
             cities: List of cities to search
             specialties: List of medical specialties
+            wards: Specific wards to search (overrides city wards)
+            use_ward_specific: Whether to use ward-specific searches
             limit: Maximum number of queries
             
         Returns:
@@ -107,20 +136,48 @@ class GooglePlacesCollector:
             except:
                 specialties = ["doctor", "clinic", "hospital", "dentist"]
         
-        # Focused search terms for English-speaking facilities
-        search_patterns = [
-            "English speaking {specialty} {city}",
-            "International {specialty} {city}",
-            "{specialty} English {city}"
-        ]
-        
         queries = []
+        
+        # If ward-specific searching is enabled
+        if use_ward_specific:
+            for city in cities:
+                # Get wards for this city
+                if wards:
+                    # Use provided wards
+                    city_wards = wards
+                elif city == "Tokyo":
+                    city_wards = self.TOKYO_WARDS
+                elif city in self.CITY_WARDS:
+                    city_wards = self.CITY_WARDS[city]
+                else:
+                    # Fall back to city-level search
+                    city_wards = [city]
+                
+                # Generate ward-specific queries
+                for ward in city_wards:
+                    for specialty in specialties:
+                        # Ward-specific patterns (more precise)
+                        ward_patterns = [
+                            f"{specialty} {ward}",  # Simple and effective
+                            f"{specialty} {ward} {city}",  # With city context
+                            f"English {specialty} {ward}",  # English focus
+                        ]
+                        
+                        for pattern in ward_patterns:
+                            queries.append(pattern)
+                            if len(queries) >= limit:
+                                return queries
+        
+        # Also add some city-level queries for broader coverage
         for city in cities:
             for specialty in specialties:
-                for pattern in search_patterns:
-                    query = pattern.format(specialty=specialty, city=city)
-                    queries.append(query)
-                    
+                city_patterns = [
+                    f"English speaking {specialty} {city}",
+                    f"International {specialty} {city}",
+                ]
+                
+                for pattern in city_patterns:
+                    queries.append(pattern)
                     if len(queries) >= limit:
                         return queries
         
@@ -494,7 +551,7 @@ class GooglePlacesCollector:
         }
         return labels.get(score, 'Unknown')
     
-    def collect_providers(self, queries: List[str], max_per_query: int = 2) -> Dict[str, Any]:
+    def collect_providers(self, queries: List[str] = None, max_per_query: int = 60) -> Dict[str, Any]:
         """Main collection method with all optimizations
         
         Args:
