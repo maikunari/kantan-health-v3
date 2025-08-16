@@ -126,62 +126,110 @@ class GooglePlacesCollector:
         
         return queries[:limit]
     
-    def search_providers(self, query: str, max_results: int = 20) -> List[Dict]:
-        """Search for healthcare providers with caching
+    def search_providers(self, query: str, max_results: int = 60) -> List[Dict]:
+        """Search for healthcare providers with pagination support
+        
+        This method now supports pagination to get up to 60 results (3 pages of 20).
+        Google Places API returns max 20 results per request, but provides a 
+        next_page_token for additional results.
         
         Args:
             query: Search query
-            max_results: Maximum results to return
+            max_results: Maximum results to return (default 60, max 60)
             
         Returns:
-            List of provider results
+            List of provider results (up to 60)
         """
+        # Limit max_results to 60 (Google's maximum with pagination)
+        max_results = min(max_results, 60)
+        
         # Check cache first
-        cache_key = f"search_{query}"
+        cache_key = f"search_{query}_paginated"
         cached = self.cache.get(cache_key, 'search')
         if cached:
-            logger.info(f"✅ Cache hit for search: {query}")
+            logger.info(f"✅ Cache hit for search: {query} ({len(cached)} results)")
             self.cost_tracker.log_request('place_search', cached=True)
             return cached[:max_results]
         
-        # Check budget
-        can_proceed, reason = self.cost_tracker.can_make_request('place_search')
-        if not can_proceed:
-            logger.warning(f"❌ Budget limit: {reason}")
-            return []
+        all_results = []
+        next_page_token = None
+        page_count = 0
+        max_pages = 3  # Google allows max 3 pages (60 results total)
         
-        # Make API request
-        params = {
-            'query': query,
-            'key': self.api_key,
-            'language': 'en',
-            'region': 'jp',
-            'type': 'doctor|hospital|health|dentist'
-        }
+        while page_count < max_pages:
+            # Check budget for each page request
+            can_proceed, reason = self.cost_tracker.can_make_request('place_search')
+            if not can_proceed:
+                logger.warning(f"❌ Budget limit on page {page_count + 1}: {reason}")
+                break
+            
+            # Prepare params for this page
+            params = {
+                'key': self.api_key,
+                'language': 'en',
+                'region': 'jp',
+                'type': 'doctor|hospital|health|dentist'
+            }
+            
+            # First page uses query, subsequent pages use pagetoken
+            if page_count == 0:
+                params['query'] = query
+            else:
+                if not next_page_token:
+                    break  # No more pages available
+                params['pagetoken'] = next_page_token
+            
+            try:
+                response = requests.get(self.search_url, params=params, timeout=10)
+                response.raise_for_status()
+                
+                data = response.json()
+                status = data.get('status')
+                
+                if status not in ['OK', 'ZERO_RESULTS']:
+                    logger.error(f"API error on page {page_count + 1}: {status}")
+                    if page_count == 0:
+                        return []  # First page failed, return empty
+                    break  # Subsequent page failed, return what we have
+                
+                # Add results from this page
+                page_results = data.get('results', [])
+                all_results.extend(page_results)
+                
+                # Log cost for this page
+                self.cost_tracker.log_request('place_search', search_query=f"{query}_page{page_count + 1}")
+                
+                logger.info(f"📄 Page {page_count + 1}: Found {len(page_results)} results for: {query}")
+                
+                # Check if we have enough results
+                if len(all_results) >= max_results:
+                    break
+                
+                # Get next page token if available
+                next_page_token = data.get('next_page_token')
+                if not next_page_token:
+                    break  # No more pages
+                
+                # Google requires a short delay before using next_page_token
+                # This is MANDATORY - requests without delay will fail
+                if page_count < max_pages - 1 and next_page_token:
+                    logger.info("⏳ Waiting 2 seconds before next page (Google requirement)...")
+                    time.sleep(2)
+                
+                page_count += 1
+                
+            except Exception as e:
+                logger.error(f"Search error on page {page_count + 1}: {str(e)}")
+                if page_count == 0:
+                    return []  # First page failed
+                break  # Return what we have from previous pages
         
-        try:
-            response = requests.get(self.search_url, params=params, timeout=10)
-            response.raise_for_status()
-            
-            data = response.json()
-            if data.get('status') != 'OK':
-                logger.error(f"API error: {data.get('status')}")
-                return []
-            
-            results = data.get('results', [])
-            
-            # Cache for 7 days (search results change less frequently)
-            self.cache.set(cache_key, results, 'search', ttl_days=7)
-            
-            # Log cost
-            self.cost_tracker.log_request('place_search', search_query=query)
-            
-            logger.info(f"🔍 Found {len(results)} results for: {query}")
-            return results[:max_results]
-            
-        except Exception as e:
-            logger.error(f"Search error: {str(e)}")
-            return []
+        # Cache all results for 7 days
+        if all_results:
+            self.cache.set(cache_key, all_results, 'search', ttl_days=7)
+        
+        logger.info(f"🔍 Total results for '{query}': {len(all_results)} (from {page_count + 1} pages)")
+        return all_results[:max_results]
     
     def get_place_details(self, place_id: str, force_refresh: bool = False) -> Optional[Dict]:
         """Get detailed place information with caching and deduplication
