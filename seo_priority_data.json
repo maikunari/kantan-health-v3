@@ -1,0 +1,142 @@
+{
+  "tier1": [
+    [
+      "Unknown",
+      null,
+      "General Medicine",
+      29
+    ],
+    [
+      "Osaka",
+      null,
+      "General Medicine",
+      12
+    ],
+    [
+      "Unknown",
+      null,
+      "Dentistry",
+      10
+    ],
+    [
+      "Yokohama",
+      null,
+      "General Medicine",
+      9
+    ],
+    [
+      "Tokyo",
+      "Shinjuku",
+      "General Medicine",
+      8
+    ],
+    [
+      "Tokyo",
+      "Minato",
+      "General Medicine",
+      8
+    ],
+    [
+      "Sendai",
+      null,
+      "General Medicine",
+      7
+    ],
+    [
+      "Tokyo",
+      "Shibuya",
+      "General Medicine",
+      6
+    ],
+    [
+      "Unknown",
+      null,
+      "General Medicine",
+      5
+    ]
+  ],
+  "tier2": [
+    [
+      "Shibuya",
+      null,
+      4
+    ],
+    [
+      "Kyoto",
+      null,
+      3
+    ],
+    [
+      "Fukuoka",
+      null,
+      3
+    ],
+    [
+      "Tokyo",
+      "Setagaya",
+      3
+    ],
+    [
+      "Tokyo",
+      "Chuo",
+      3
+    ],
+    [
+      "Tokyo",
+      "Ota",
+      2
+    ],
+    [
+      "Tokyo",
+      "Suginami",
+      2
+    ],
+    [
+      "Tokyo",
+      "Shinagawa",
+      2
+    ],
+    [
+      "\u6e2f\u533a",
+      null,
+      1
+    ],
+    [
+      "Nagoya",
+      null,
+      1
+    ]
+  ],
+  "locations": {
+    "Unknown": 44,
+    "Tokyo": 63,
+    "Yokohama": 19,
+    "Osaka": 16,
+    "Sendai": 8,
+    "Shibuya": 4,
+    "Kyoto": 3,
+    "Fukuoka": 3,
+    "\u6a2a\u6d5c\u5e02": 1,
+    "Kobe": 1
+  },
+  "specialties": {
+    "General Medicine": 140,
+    "Healthcare": 44,
+    "Dentistry": 26,
+    "general_practitioner": 9,
+    "Hospital": 5,
+    "Gynecology": 3,
+    "general_medicine": 4,
+    "Dermatology": 3,
+    "gynecology": 2,
+    "Pediatrics": 2,
+    "ENT (Ear, Nose & Throat)": 3,
+    "Ophthalmology": 2,
+    "dentistry": 3,
+    "Plastic Surgery": 1,
+    "physical_therapy": 1,
+    "pharmacy": 1,
+    "Pharmacy": 1
+  },
+  "total_providers": 169
+}
