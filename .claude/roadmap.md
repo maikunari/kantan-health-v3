@@ -17,17 +17,17 @@
 ## Phase 1: Collection Engine Upgrade (Week 1)
 **Goal**: Fix the collection bottleneck - get 3x more results per query
 
-### 1.1 Add Pagination Support
+### 1.1 Add Pagination Support ✅
 ```python
 # File: src/collectors/google_places.py
 # Add next_page_token handling to get 60 results instead of 20
 ```
-- [ ] Modify `search_providers()` to handle pagination
-- [ ] Add 2-second delay between page requests (Google requirement)
-- [ ] Update cost tracking for paginated requests
-- [ ] Test with single query to verify 60 results
+- [x] Modify `search_providers()` to handle pagination
+- [x] Add 2-second delay between page requests (Google requirement)
+- [x] Update cost tracking for paginated requests
+- [x] Test with single query to verify 60 results (got 38 for "doctor Shinjuku")
 
-### 1.2 Implement Ward-Specific Searches
+### 1.2 Implement Ward-Specific Searches ✅
 ```python
 # Tokyo's 23 Special Wards
 TOKYO_WARDS = [
@@ -38,9 +38,9 @@ TOKYO_WARDS = [
     "Adachi", "Katsushika", "Edogawa"
 ]
 ```
-- [ ] Create ward-based query generator
-- [ ] Add ward field to database
-- [ ] Update deduplication to handle ward-level data
+- [x] Create ward-based query generator
+- [ ] Add ward field to database (pending migration)
+- [x] Update deduplication to handle ward-level data
 
 ### 1.3 Add Japanese Search Terms
 ```python

@@ -56,6 +56,20 @@ class GooglePlacesCollector:
                     "Jonan", "Sawara"]
     }
     
+    # Japanese medical terms for bilingual searching
+    JAPANESE_MEDICAL_TERMS = {
+        "dentist": ["歯科", "歯医者", "デンタルクリニック", "歯科医院"],
+        "clinic": ["クリニック", "診療所", "医院", "内科"],
+        "hospital": ["病院", "総合病院", "医療センター", "大学病院"],
+        "doctor": ["医師", "医者", "ドクター", "先生"],
+        "pediatrics": ["小児科", "こども病院", "小児クリニック"],
+        "internal medicine": ["内科", "内科クリニック", "総合内科"],
+        "orthopedics": ["整形外科", "整形外科クリニック", "リハビリ"],
+        "gynecology": ["産婦人科", "婦人科", "レディースクリニック"],
+        "ENT": ["耳鼻咽喉科", "耳鼻科", "ENT"],
+        "emergency": ["救急", "救急病院", "急患"]
+    }
+    
     def __init__(self, daily_limit: int = None):
         """Initialize collector with caching and cost tracking
         
@@ -156,7 +170,7 @@ class GooglePlacesCollector:
                 # Generate ward-specific queries
                 for ward in city_wards:
                     for specialty in specialties:
-                        # Ward-specific patterns (more precise)
+                        # Ward-specific patterns in English
                         ward_patterns = [
                             f"{specialty} {ward}",  # Simple and effective
                             f"{specialty} {ward} {city}",  # With city context
@@ -167,6 +181,14 @@ class GooglePlacesCollector:
                             queries.append(pattern)
                             if len(queries) >= limit:
                                 return queries
+                        
+                        # Also add Japanese term searches for better coverage
+                        if specialty.lower() in self.JAPANESE_MEDICAL_TERMS:
+                            for jp_term in self.JAPANESE_MEDICAL_TERMS[specialty.lower()][:2]:  # Use top 2 Japanese terms
+                                jp_query = f"{jp_term} {ward}"
+                                queries.append(jp_query)
+                                if len(queries) >= limit:
+                                    return queries
         
         # Also add some city-level queries for broader coverage
         for city in cities:
