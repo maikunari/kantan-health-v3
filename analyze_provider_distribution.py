@@ -35,10 +35,11 @@ def analyze_provider_distribution():
         
         locations = session.execute(text("""
             SELECT 
-                COALESCE(city, 'Unknown') as city,
+                city,
                 ward,
                 COUNT(*) as count
             FROM providers
+            WHERE city IS NOT NULL AND city != ''
             GROUP BY city, ward
             ORDER BY count DESC
             LIMIT 20
@@ -97,12 +98,14 @@ def analyze_provider_distribution():
         
         combinations = session.execute(text("""
             SELECT 
-                COALESCE(city, 'Unknown') as city,
+                city,
                 ward,
                 specialties::text as specialties,
                 COUNT(*) as count
             FROM providers
-            WHERE specialties IS NOT NULL
+            WHERE specialties IS NOT NULL 
+                AND city IS NOT NULL 
+                AND city != ''
             GROUP BY city, ward, specialties::text
             HAVING COUNT(*) >= 5
             ORDER BY count DESC
@@ -133,10 +136,11 @@ def analyze_provider_distribution():
         
         tier2_query = session.execute(text("""
             SELECT 
-                COALESCE(city, 'Unknown') as city,
+                city,
                 ward,
                 COUNT(*) as count
             FROM providers
+            WHERE city IS NOT NULL AND city != ''
             GROUP BY city, ward
             HAVING COUNT(*) BETWEEN 1 AND 4
             ORDER BY count DESC
@@ -148,6 +152,23 @@ def analyze_provider_distribution():
             location = f"{ward}, {city}" if ward else city
             print(f"  {location}: {count} providers")
             tier2_combinations.append((city, ward, count))
+        
+        # Report on providers with missing locations
+        print("\n⚠️ PROVIDERS NEEDING LOCATION FIX:")
+        print("-" * 40)
+        
+        missing_location_count = session.execute(text("""
+            SELECT COUNT(*) 
+            FROM providers 
+            WHERE city IS NULL OR city = ''
+        """)).scalar()
+        
+        if missing_location_count > 0:
+            print(f"  {missing_location_count} providers with missing city data")
+            print("  These providers are excluded from SEO analysis")
+            print("  Run: python3 utility/fix_missing_locations.py to fix")
+        else:
+            print("  ✅ All providers have location data")
         
         # Summary statistics
         print("\n📊 SEO CONTENT GENERATION PRIORITIES:")

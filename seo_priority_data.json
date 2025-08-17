@@ -1,22 +1,10 @@
 {
   "tier1": [
     [
-      "Unknown",
-      null,
-      "General Medicine",
-      29
-    ],
-    [
       "Osaka",
       null,
       "General Medicine",
       12
-    ],
-    [
-      "Unknown",
-      null,
-      "Dentistry",
-      10
     ],
     [
       "Yokohama",
@@ -26,13 +14,13 @@
     ],
     [
       "Tokyo",
-      "Shinjuku",
+      "Minato",
       "General Medicine",
       8
     ],
     [
       "Tokyo",
-      "Minato",
+      "Shinjuku",
       "General Medicine",
       8
     ],
@@ -47,12 +35,6 @@
       "Shibuya",
       "General Medicine",
       6
-    ],
-    [
-      "Unknown",
-      null,
-      "General Medicine",
-      5
     ]
   ],
   "tier2": [
@@ -60,6 +42,16 @@
       "Shibuya",
       null,
       4
+    ],
+    [
+      "Tokyo",
+      "Chuo",
+      3
+    ],
+    [
+      "Tokyo",
+      "Setagaya",
+      3
     ],
     [
       "Kyoto",
@@ -73,21 +65,6 @@
     ],
     [
       "Tokyo",
-      "Setagaya",
-      3
-    ],
-    [
-      "Tokyo",
-      "Chuo",
-      3
-    ],
-    [
-      "Tokyo",
-      "Ota",
-      2
-    ],
-    [
-      "Tokyo",
       "Suginami",
       2
     ],
@@ -97,31 +74,37 @@
       2
     ],
     [
-      "\u6e2f\u533a",
-      null,
+      "Tokyo",
+      "Ota",
+      2
+    ],
+    [
+      "Tokyo",
+      "Meguro",
       1
     ],
     [
-      "Nagoya",
-      null,
+      "Tokyo",
+      "Toshima",
       1
     ]
   ],
   "locations": {
-    "Unknown": 44,
-    "Tokyo": 63,
+    "Tokyo": 62,
     "Yokohama": 19,
     "Osaka": 16,
     "Sendai": 8,
     "Shibuya": 4,
-    "Kyoto": 3,
     "Fukuoka": 3,
-    "\u6a2a\u6d5c\u5e02": 1,
-    "Kobe": 1
+    "Kyoto": 3,
+    "Kutchan": 1,
+    "Kobe": 1,
+    "\u6e2f\u533a": 1,
+    "\u6a2a\u6d5c\u5e02": 1
   },
   "specialties": {
-    "General Medicine": 140,
-    "Healthcare": 44,
+    "General Medicine": 141,
+    "Healthcare": 45,
     "Dentistry": 26,
     "general_practitioner": 9,
     "Hospital": 5,
@@ -138,5 +121,5 @@
     "pharmacy": 1,
     "Pharmacy": 1
   },
-  "total_providers": 169
+  "total_providers": 170
 }

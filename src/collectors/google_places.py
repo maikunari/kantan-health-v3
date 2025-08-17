@@ -16,6 +16,7 @@ from ..core.cache import PersistentCache
 from ..core.cost_tracker import CostTracker
 from ..core.database import DatabaseManager, Provider
 from .deduplication import ProviderDeduplicator
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -101,10 +102,113 @@ class GooglePlacesCollector:
         self.daily_limit = daily_limit
         self.processed_place_ids: Set[str] = set()
         
+        # Exclusion tracking for efficiency
+        self.excluded_place_ids: Set[str] = set()  # Place IDs to skip
+        self.session_rejected_ids: Set[str] = set()  # Rejected in this session
+        self._load_exclusion_list()
+        
         # Load city translations
         self._load_city_translations()
         
         logger.info(f"✅ Google Places Collector initialized (daily limit: {daily_limit or 'None'})")
+    
+    def _load_exclusion_list(self):
+        """Load place IDs to exclude from searches (existing providers and rejected)"""
+        try:
+            session = self.db.get_session()
+            
+            # Get all existing provider fingerprints from database
+            # Since we don't have place_id, use provider names for now
+            existing = session.execute(text("""
+                SELECT DISTINCT primary_fingerprint 
+                FROM providers 
+                WHERE primary_fingerprint IS NOT NULL
+            """)).fetchall()
+            
+            # For now, we'll track by fingerprint instead of place_id
+            self.excluded_fingerprints = {row[0] for row in existing}
+            self.excluded_place_ids = set()  # Will be populated as we discover place_ids
+            
+            # Also load recently rejected from cache
+            for i in range(1000):  # Check last 1000 rejected entries
+                rejected = self.cache.get(f"rejected_place_{i}")
+                if rejected and 'place_id' in rejected:
+                    self.excluded_place_ids.add(rejected['place_id'])
+            
+            logger.info(f"📋 Loaded {len(self.excluded_place_ids)} place IDs to exclude")
+            
+        except Exception as e:
+            logger.warning(f"Could not load exclusion list: {e}")
+            self.excluded_place_ids = set()
+        finally:
+            if 'session' in locals():
+                session.close()
+    
+    def extract_romaji_name(self, name: str) -> str:
+        """Extract Romaji (English) name from potentially bilingual provider name
+        
+        Examples:
+        - "日の出薬局 Hinode Pharmacy" -> "Hinode Pharmacy"
+        - "DUOデンタルクリニック" -> "DUO Dental Clinic"
+        - "グローバルヘルスケアクリニック Global Healthcare Clinic" -> "Global Healthcare Clinic"
+        - "Ōkura ENT" -> "Okura ENT" (normalize special characters)
+        """
+        if not name:
+            return name
+        
+        # Check if name contains both Japanese and English
+        has_japanese = any(ord(char) > 0x3000 for char in name)
+        has_english = any(char.isalpha() and ord(char) < 128 for char in name)
+        
+        if has_japanese and has_english:
+            # Split and find the English part
+            # Common patterns: "Japanese English" or "Japanese (English)"
+            parts = name.split()
+            english_parts = []
+            
+            for part in parts:
+                # Skip pure Japanese parts
+                if all(ord(char) > 0x3000 or not char.isalpha() for char in part):
+                    continue
+                # Keep parts with English letters
+                if any(char.isalpha() and ord(char) < 128 for char in part):
+                    english_parts.append(part)
+            
+            if english_parts:
+                result = ' '.join(english_parts)
+            else:
+                # Fallback: take everything after Japanese characters end
+                # Find the last Japanese character
+                last_japanese_idx = -1
+                for i, char in enumerate(name):
+                    if ord(char) > 0x3000:
+                        last_japanese_idx = i
+                
+                if last_japanese_idx >= 0 and last_japanese_idx < len(name) - 1:
+                    result = name[last_japanese_idx + 1:].strip()
+                else:
+                    result = name
+        else:
+            result = name
+        
+        # Normalize special characters (Ō -> O, etc.)
+        replacements = {
+            'Ō': 'O', 'ō': 'o', 'Ū': 'U', 'ū': 'u',
+            'Ā': 'A', 'ā': 'a', 'Ī': 'I', 'ī': 'i',
+            'Ē': 'E', 'ē': 'e'
+        }
+        for old, new in replacements.items():
+            result = result.replace(old, new)
+        
+        # Clean up any remaining issues
+        result = ' '.join(result.split())  # Normalize whitespace
+        result = result.strip('()[]（）【】')  # Remove brackets
+        
+        # If result is empty or too short, return original
+        if len(result) < 3:
+            return name
+        
+        return result
     
     def _load_city_translations(self):
         """Load city translations for Japanese place names"""
@@ -303,12 +407,34 @@ class GooglePlacesCollector:
                     return []  # First page failed
                 break  # Return what we have from previous pages
         
-        # Cache all results for 7 days
-        if all_results:
-            self.cache.set(cache_key, all_results, 'search', ttl_days=7)
+        # Filter out excluded place IDs BEFORE caching
+        filtered_results = []
+        excluded_count = 0
         
-        logger.info(f"🔍 Total results for '{query}': {len(all_results)} (from {page_count + 1} pages)")
-        return all_results[:max_results]
+        for result in all_results:
+            place_id = result.get('place_id')
+            if place_id and place_id in self.excluded_place_ids:
+                excluded_count += 1
+                logger.debug(f"⏭️ Skipping known/rejected place: {place_id}")
+                continue
+            
+            # Also check if in session rejected list
+            if place_id and place_id in self.session_rejected_ids:
+                excluded_count += 1
+                logger.debug(f"⏭️ Skipping session-rejected place: {place_id}")
+                continue
+                
+            filtered_results.append(result)
+        
+        # Cache filtered results for 7 days
+        if filtered_results:
+            self.cache.set(cache_key, filtered_results, 'search', ttl_days=7)
+        
+        if excluded_count > 0:
+            logger.info(f"🚫 Filtered out {excluded_count} known/rejected places from search results")
+        
+        logger.info(f"🔍 Total results for '{query}': {len(filtered_results)} usable (from {len(all_results)} total)")
+        return filtered_results[:max_results]
     
     def get_place_details(self, place_id: str, force_refresh: bool = False) -> Optional[Dict]:
         """Get detailed place information with caching and deduplication
@@ -445,12 +571,33 @@ class GooglePlacesCollector:
         # Check English proficiency threshold
         if record['proficiency_score'] < 3:  # Minimum score of 3
             logger.info(f"❌ Rejected {record['provider_name']}: Low English proficiency ({record['proficiency_score']})")
+            
+            # Add to session rejected list and cache
+            self.session_rejected_ids.add(place_id)
+            self.cache.set(f"rejected_{place_id}", {
+                'place_id': place_id,
+                'reason': 'low_english_proficiency',
+                'score': record['proficiency_score'],
+                'name': record['provider_name'],
+                'timestamp': datetime.now().isoformat()
+            }, category='rejected', ttl_days=30)
+            
             return None
         
         # Check for photos (skip if disabled)
         if not self.photos_disabled:
             if 'photos' not in place_data or not place_data['photos']:
                 logger.info(f"❌ Rejected {record['provider_name']}: No photos available")
+                
+                # Add to session rejected list and cache
+                self.session_rejected_ids.add(place_id)
+                self.cache.set(f"rejected_{place_id}", {
+                    'place_id': place_id,
+                    'reason': 'no_photos',
+                    'name': record['provider_name'],
+                    'timestamp': datetime.now().isoformat()
+                }, category='rejected', ttl_days=30)
+                
                 return None
             
             # Store photo references (not URLs yet)
@@ -460,6 +607,16 @@ class GooglePlacesCollector:
             # Photos disabled - set empty references
             record['photo_references'] = []
             logger.debug(f"📷 Photos disabled for: {record['provider_name']}")
+        
+        # Provider passed all checks - clean the name if needed
+        original_name = record['provider_name']
+        cleaned_name = self.extract_romaji_name(original_name)
+        
+        if cleaned_name != original_name:
+            logger.info(f"🔤 Romanized name: '{original_name}' -> '{cleaned_name}'")
+            record['provider_name'] = cleaned_name
+            # Keep original for reference
+            record['original_name'] = original_name
         
         # Generate fingerprints for deduplication
         fingerprints = self.deduplicator.generate_fingerprints(record)

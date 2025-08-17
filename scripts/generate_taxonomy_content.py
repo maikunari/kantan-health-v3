@@ -148,7 +148,7 @@ Provider Count: {count}
 Local Features: {keyword_text}
 
 Required sections:
-1. Meta Title (60 chars max): "English Doctors & Clinics in {full_location} - Find Healthcare"
+1. Meta Title (60 chars max): "English Doctors & Clinics in {full_location} - Healthcare Directory"
 2. Meta Description (155 chars): Brief, compelling description for search results
 3. Brief Intro (50-75 words): Welcoming introduction mentioning the area
 4. Full Description (400-500 words) covering:
@@ -207,7 +207,7 @@ Specialty: {specialty}
 Provider Count: {count} English-speaking providers
 
 Required sections:
-1. Meta Title (60 chars max): "English-Speaking {specialty} in Japan - Find Specialists"
+1. Meta Title (60 chars max): "English-Speaking {specialty} in Japan - Healthcare Directory"
 2. Meta Description (155 chars): Brief, compelling description for search results
 3. Brief Intro (50-75 words): What this specialty covers
 4. Full Description (400-500 words) covering:
@@ -275,17 +275,17 @@ This is a HIGH-PRIORITY page for organic search traffic.
 
 Specialty: {specialty}
 Location: {full_location}
-Provider Count: {provider_count} verified providers
+Provider Availability: {'Multiple verified providers' if provider_count >= 5 else 'Verified providers available' if provider_count >= 1 else 'Growing network'}
 Local Context: {keyword_text}
 Priority: Tier {priority_tier}
 
 Required sections:
-1. Meta Title (60 chars max): "{specialty} in {full_location} - {provider_count}+ English Doctors"
+1. Meta Title (60 chars max): "{specialty} in {full_location} - English-Speaking Providers"
 2. Meta Description (155 chars): Compelling description mentioning both specialty and location
-3. Brief Intro (50-75 words): Welcome message combining specialty expertise and local convenience
+3. Brief Intro (50-75 words): Welcome message about English-speaking {specialty} providers in {full_location} (no specific numbers)
 4. Full Description (400-500 words) with these sections:
    
-   Opening paragraph: Seeking {specialty} care in {full_location}
+   Opening paragraph: Seeking {specialty} care in {full_location} with English-speaking providers
    
    Local Context paragraph: Why {full_location} is convenient for {specialty} care
    - Mention: {keyword_text}
@@ -445,7 +445,7 @@ PAGES TO GENERATE:
 
 PAGE {i}: {specialty} in {full_location}
 Type: Combination Page (HIGH PRIORITY)
-Providers: {count}
+Provider Network: {'Established' if count >= 5 else 'Available' if count >= 1 else 'Growing'}
 Target Keywords: "English {specialty} in {full_location}"
 """
             elif content_type == "location":
@@ -454,7 +454,7 @@ Target Keywords: "English {specialty} in {full_location}"
 
 PAGE {i}: Healthcare in {full_location}
 Type: Location Page
-Providers: {count}
+Provider Network: {'Large network' if count >= 10 else 'Established' if count >= 5 else 'Available'}
 Target Keywords: "English doctors in {full_location}"
 """
             else:  # specialty
@@ -462,7 +462,7 @@ Target Keywords: "English doctors in {full_location}"
 
 PAGE {i}: {specialty} Specialists
 Type: Specialty Page  
-Providers: {count}
+Provider Network: {'Nationwide' if count >= 20 else 'Multiple locations' if count >= 5 else 'Available'}
 Target Keywords: "English {specialty} Japan"
 """
         
