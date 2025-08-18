@@ -108,7 +108,8 @@ IMPORTANT GUIDELINES:
 - Use HTML formatting for full descriptions with <h2> headers
 - Include practical details about train access and what to expect
 - Avoid sales language and marketing fluff
-- Don't use exact numbers (use "several" or "multiple" instead)
+- NEVER use exact numbers like "8+", "12+" etc. Use "multiple", "several", or "various" instead
+- Do NOT mention specific provider counts anywhere
 - NO call-to-action at the end (no "browse providers below")
 - Content should be 70% unique to each location/specialty, 30% can be template
 
@@ -157,7 +158,7 @@ Create content for a specialty overview page
 For EACH page, provide content in this format:
 
 PAGE [number]:
-TITLE: [page title, 60 chars max]
+TITLE: [Simple format: "English [Specialty] in [Location]" - keep it under 60 chars]
 META: [meta description, 155 chars max]
 BRIEF_INTRO:
 [2-3 sentences starting with "Find trusted English-speaking..."]

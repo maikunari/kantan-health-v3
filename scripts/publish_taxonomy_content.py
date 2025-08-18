@@ -137,15 +137,23 @@ class TaxonomyPublisher:
             # Post doesn't exist, create it
             logger.info(f"📝 Creating new post: {slug}")
             
-            # Prepare post data
+            # Prepare post data with Yoast fields at TOP level AND in ACF
             post_data = {
                 'title': content['title'],
                 'slug': slug,
                 'status': 'publish',
                 'content': '',  # Minimal content as we use ACF fields
+                # Yoast fields at top level (if REST fields are registered)
+                '_yoast_wpseo_title': content['title'],
+                '_yoast_wpseo_metadesc': content['meta_description'],
+                '_rank_math_title': content['title'],
+                '_rank_math_description': content['meta_description'],
                 'acf': {
                     'brief_intro': content['brief_intro'],
-                    'full_description': content['full_description']
+                    'full_description': content['full_description'],
+                    # Also store in ACF for backup/display
+                    'seo_title': content['title'],
+                    'seo_meta_description': content['meta_description']
                 }
             }
             
@@ -177,11 +185,20 @@ class TaxonomyPublisher:
         
         endpoint = f"{self.wp_url}/wp-json/wp/v2/tc_combination/{post_id}"
         
-        # Prepare ACF data
+        # Prepare data with Yoast fields at TOP level AND in ACF
         data = {
+            'title': content['title'],  # Update the title
+            # Yoast fields at top level (if REST fields are registered)
+            '_yoast_wpseo_title': content['title'],
+            '_yoast_wpseo_metadesc': content['meta_description'],
+            '_rank_math_title': content['title'],
+            '_rank_math_description': content['meta_description'],
             'acf': {
                 'brief_intro': content['brief_intro'],
-                'full_description': content['full_description']
+                'full_description': content['full_description'],
+                # Also store in ACF for backup/display
+                'seo_title': content['title'],
+                'seo_meta_description': content['meta_description']
             }
         }
         

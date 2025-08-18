@@ -43,3 +43,11 @@ Welcome to our Shinjuku, Tokyo dentistry practice, where our team of 8+ English-
 2025-08-17 12:02:10,757 - src.core.pipeline - INFO - 💵 Estimated Cost: $3.54
 2025-08-17 12:02:10,757 - src.core.pipeline - INFO - ✅ Cache Hit Rate: 13.9%
 2025-08-17 12:02:10,757 - src.core.pipeline - INFO - ============================================================
+
+4) Can we hook directly into my google api account to get actual costs to show in our dashboard?  not just estimates?  
+
+5) further, can we get actual costs from anthropic console as well? 
+
+6) Titles have been changed, we need them to stay simple - English Dentist in Bunkyo. 
+
+7) Change dentistry slug to dentist, and update all page titles accordingly.
