@@ -12,6 +12,164 @@ from typing import Dict, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
+# Try to import Google Cloud Monitoring
+try:
+    from google.cloud import monitoring_v3
+    from google.api_core import exceptions
+    CLOUD_MONITORING_AVAILABLE = True
+except ImportError:
+    CLOUD_MONITORING_AVAILABLE = False
+    logger.debug("Google Cloud Monitoring not available - using estimate-based tracking")
+
+
+class CloudMonitoringCostTracker:
+    """Track actual API usage using Google Cloud Monitoring"""
+    
+    # Calibrated Google Places API costs (after testing)
+    ACTUAL_COSTS = {
+        'text_search': 0.032,      # Text Search
+        'nearby_search': 0.032,    # Nearby Search  
+        'place_details': 0.017,    # Place Details
+    }
+    
+    def __init__(self, project_id: str = None):
+        """Initialize Cloud Monitoring client
+        
+        Args:
+            project_id: Google Cloud project ID (uses default if None)
+        """
+        if not CLOUD_MONITORING_AVAILABLE:
+            raise ImportError("Google Cloud Monitoring is not available. Install google-cloud-monitoring.")
+        
+        self.client = monitoring_v3.MetricServiceClient()
+        
+        # Get project ID from environment or use provided
+        if project_id:
+            self.project_id = project_id
+        else:
+            import google.auth
+            _, self.project_id = google.auth.default()
+        
+        self.project_name = f"projects/{self.project_id}"
+        logger.info(f"✅ Cloud Monitoring initialized for project: {self.project_id}")
+    
+    def get_actual_api_calls_today(self) -> Dict[str, int]:
+        """Get actual API calls made today from Cloud Monitoring
+        
+        Returns:
+            Dictionary with API call counts by type
+        """
+        results = {}
+        
+        # Define the metrics to query
+        metrics = {
+            'text_search': 'maps.googleapis.com/quotas/text_search_requests/usage',
+            'nearby_search': 'maps.googleapis.com/quotas/nearby_search_requests/usage',
+            'place_details': 'maps.googleapis.com/quotas/place_details_requests/usage',
+        }
+        
+        # Calculate time interval for last 24 hours
+        now = datetime.utcnow()
+        start_time = now - timedelta(hours=24)
+        
+        interval = monitoring_v3.TimeInterval(
+            {
+                "end_time": {"seconds": int(now.timestamp())},
+                "start_time": {"seconds": int(start_time.timestamp())},
+            }
+        )
+        
+        for api_type, metric_type in metrics.items():
+            try:
+                # Build the request
+                request = monitoring_v3.ListTimeSeriesRequest(
+                    name=self.project_name,
+                    filter=f'metric.type="{metric_type}"',
+                    interval=interval,
+                    view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+                )
+                
+                # Execute the request
+                page_result = self.client.list_time_series(request=request)
+                
+                # Sum up the values
+                total_calls = 0
+                for time_series in page_result:
+                    for point in time_series.points:
+                        total_calls += point.value.int64_value
+                
+                results[api_type] = total_calls
+                logger.debug(f"Cloud Monitoring - {api_type}: {total_calls} calls")
+                
+            except exceptions.NotFound:
+                logger.debug(f"Metric {metric_type} not found - may not have any usage yet")
+                results[api_type] = 0
+            except Exception as e:
+                logger.warning(f"Error querying {metric_type}: {e}")
+                results[api_type] = 0
+        
+        return results
+    
+    def get_actual_cost_today(self) -> float:
+        """Calculate actual cost based on real API usage
+        
+        Returns:
+            Total cost for today based on actual usage
+        """
+        api_calls = self.get_actual_api_calls_today()
+        
+        total_cost = 0.0
+        for api_type, count in api_calls.items():
+            cost_per_call = self.ACTUAL_COSTS.get(api_type, 0)
+            api_cost = count * cost_per_call
+            total_cost += api_cost
+            
+            if count > 0:
+                logger.debug(f"{api_type}: {count} calls × ${cost_per_call:.3f} = ${api_cost:.2f}")
+        
+        return round(total_cost, 2)
+    
+    def get_remaining_budget(self, daily_limit: float = 10.0) -> float:
+        """Get remaining daily budget based on actual usage
+        
+        Args:
+            daily_limit: Daily budget limit in USD
+            
+        Returns:
+            Remaining budget for today
+        """
+        actual_cost = self.get_actual_cost_today()
+        remaining = daily_limit - actual_cost
+        return round(remaining, 2)
+    
+    def get_usage_comparison(self, estimated_cost: float) -> Dict[str, any]:
+        """Compare actual usage with estimates
+        
+        Args:
+            estimated_cost: Estimated cost from local tracking
+            
+        Returns:
+            Comparison data
+        """
+        actual_cost = self.get_actual_cost_today()
+        api_calls = self.get_actual_api_calls_today()
+        total_calls = sum(api_calls.values())
+        
+        # Calculate savings
+        retail_cost = actual_cost  # For now, same as actual
+        savings_percent = 0.0
+        if estimated_cost > 0:
+            savings_percent = ((estimated_cost - actual_cost) / estimated_cost) * 100
+        
+        return {
+            'api_calls': api_calls,
+            'total_calls': total_calls,
+            'actual_cost': actual_cost,
+            'estimated_cost': estimated_cost,
+            'savings_percent': round(savings_percent, 1),
+            'retail_cost': retail_cost,
+        }
+
 
 class CostTracker:
     """Track API costs and enforce budget limits"""
@@ -31,13 +189,17 @@ class CostTracker:
     
     def __init__(self, daily_limit_usd: float = 10.0, 
                  monthly_limit_usd: float = 85.0,
-                 db_path: str = 'cache/api_usage.db'):
+                 db_path: str = 'cache/api_usage.db',
+                 use_cloud_monitoring: bool = True,
+                 project_id: str = None):
         """Initialize cost tracker
         
         Args:
             daily_limit_usd: Daily spending limit in USD
             monthly_limit_usd: Monthly spending limit in USD
             db_path: Path to SQLite database
+            use_cloud_monitoring: Try to use Cloud Monitoring for actual costs
+            project_id: Google Cloud project ID (for Cloud Monitoring)
         """
         self.DAILY_LIMIT = self.daily_limit = daily_limit_usd
         self.MONTHLY_LIMIT = self.monthly_limit = monthly_limit_usd
@@ -48,6 +210,17 @@ class CostTracker:
         
         # Initialize database
         self._init_db()
+        
+        # Try to initialize Cloud Monitoring
+        self.cloud_monitor = None
+        if use_cloud_monitoring and CLOUD_MONITORING_AVAILABLE:
+            try:
+                self.cloud_monitor = CloudMonitoringCostTracker(project_id)
+                logger.info(f"✅ Cloud Monitoring enabled for real-time cost tracking")
+            except Exception as e:
+                logger.warning(f"Could not initialize Cloud Monitoring: {e}")
+                logger.info("Falling back to estimate-based tracking")
+        
         logger.info(f"✅ Cost tracker initialized (Daily: ${daily_limit_usd}, Monthly: ${monthly_limit_usd})")
     
     def _init_db(self):
@@ -294,7 +467,19 @@ class CostTracker:
         Returns:
             Total cost for today
         """
-        return self._get_daily_cost()
+        estimated_cost = self._get_daily_cost()
+        
+        # Try to get actual cost from Cloud Monitoring
+        if self.cloud_monitor:
+            try:
+                actual_cost = self.cloud_monitor.get_actual_cost_today()
+                logger.info(f"📊 Cloud Monitoring - Actual: ${actual_cost:.2f}, Estimated: ${estimated_cost:.2f}")
+                # Use the higher value to be conservative
+                return max(actual_cost, estimated_cost)
+            except Exception as e:
+                logger.debug(f"Cloud Monitoring unavailable: {e}")
+        
+        return estimated_cost
     
     def get_monthly_usage(self) -> float:
         """Get this month's total API usage cost
@@ -303,3 +488,28 @@ class CostTracker:
             Total cost for current month
         """
         return self._get_monthly_cost()
+    
+    def get_actual_vs_estimated(self) -> Dict[str, any]:
+        """Get comparison of actual vs estimated costs
+        
+        Returns:
+            Dictionary with actual and estimated costs
+        """
+        estimated_cost = self._get_daily_cost()
+        
+        if self.cloud_monitor:
+            try:
+                comparison = self.cloud_monitor.get_usage_comparison(estimated_cost)
+                return comparison
+            except Exception as e:
+                logger.warning(f"Could not get Cloud Monitoring data: {e}")
+        
+        return {
+            'api_calls': {},
+            'total_calls': 0,
+            'actual_cost': estimated_cost,
+            'estimated_cost': estimated_cost,
+            'savings_percent': 0.0,
+            'retail_cost': estimated_cost,
+            'cloud_monitoring_available': False
+        }

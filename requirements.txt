@@ -34,3 +34,4 @@ redis==5.0.0
 
 # Optional: Monitoring
 flask-limiter==3.5.0
+google-cloud-monitoring>=2.0.0
