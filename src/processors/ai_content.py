@@ -13,7 +13,6 @@ from collections import namedtuple
 
 from anthropic import Anthropic
 from ..core.database import DatabaseManager, Provider
-from ..collectors.photo_manager import PhotoURLManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,6 @@ class AIContentProcessor:
         self.claude = Anthropic(api_key=self.api_key)
         self.model = model
         self.db = DatabaseManager()
-        self.photo_manager = PhotoURLManager()
         
         logger.info(f"✅ AI Content Processor initialized with {model}")
     
@@ -422,13 +420,8 @@ Generate content for all {len(provider_details)} providers with ALL SIX content 
         
         for provider, content in zip(providers, content_results):
             try:
-                # Get photo URLs
-                photo_urls = self.photo_manager.get_photo_urls({
-                    'google_place_id': provider.google_place_id,
-                    'photo_urls': provider.photo_urls
-                }, max_photos=1)  # Just get the first photo
-                
-                selected_image = photo_urls[0] if photo_urls else ""
+                # Photos are no longer collected
+                selected_image = ""
                 
                 # Update content result
                 updated_result = ContentResult(

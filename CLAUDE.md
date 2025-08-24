@@ -7,14 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a healthcare directory automation system for international patients in Japan. It uses Google Places API, Claude AI, PostgreSQL, and WordPress to discover, process, and publish healthcare provider data with a focus on English-speaking support.
 
 **Core Technologies:**
-- Python 3.12+ (Homebrew) with Flask, SQLAlchemy, psycopg2, psutil
+- Python 3.12+ (Homebrew) with SQLAlchemy, psycopg2
 - PostgreSQL database for provider data
 - WordPress REST API with ACF Pro for content management
-- Google Places API for provider discovery
+- Google Places API for provider discovery (photos disabled)
 - Claude AI (Anthropic) for content generation
 
 ## Development Commands
-```
 
 ### Main Automation Scripts (Unified Pipeline)
 ```bash
@@ -98,7 +97,6 @@ Always use scripts that call `collect_providers()` or use the unified pipeline f
 2. **Data Collection** (`src/collectors/`)
    - `google_places.py` - Advanced search with 150+ query variations
    - `deduplication.py` - Fingerprint-based duplicate detection
-   - `photo_manager.py` - Optimized photo URL generation (no longer needed)
    - English proficiency filtering (score ≥3 required)
 
 3. **AI Content Generation** (`src/processors/ai_content.py`)
@@ -128,8 +126,6 @@ Google Places → PostgreSQL → AI Content Generation → WordPress Sync
       ↓              ↓                    ↓                ↓
   Deduplication   Provider Table    Mega-batch Process   ACF Fields
   Fingerprinting  Content Storage   4 Content Types     REST API
-                     ↕                    ↕                ↕
-              Web Interface ←→ Flask API ←→ Real-time Status
 ```
 
 ### Key Scripts by Function
@@ -261,13 +257,12 @@ SELECT id, provider_name FROM providers WHERE provider_name ILIKE '%search%';
 
 ### Caching System
 - Place details: 30-day cache (permanent for stable data)
-- Photo URLs: 12-hour cache (may change more frequently) <- REMOVE THIS!
-- Search results: Not cached (always fresh)
+- Search results: 7-day cache
 - SQLite-based: No external dependencies
 
 ### Database Performance
 - Unified database manager with connection pooling
-- Proper column mapping (no photo_references field)
+- Proper column mapping
 - Indexed queries for provider lookups
 - Batch operations for efficiency
 
@@ -286,12 +281,8 @@ SELECT id, provider_name FROM providers WHERE provider_name ILIKE '%search%';
 - ✅ **API Endpoint Updates**: All API endpoints now use new unified modules
 - ✅ **User Script Updates**: Updated add_specific_provider.py, add_geographic_providers.py, publish_approved.py
 - ✅ **SSL/urllib3 Compatibility Fixed**: Migrated to Homebrew Python 3.12 with virtual environment
-- ✅ **Web Interface Implementation**: Full React + TypeScript frontend with Flask API backend
-- ✅ **Settings Management**: Comprehensive configuration interface for all API keys with security features
-- ✅ **Provider Selection Modal**: Advanced filtering and multi-select capabilities for WordPress sync
-- ✅ **Process Tracking System**: Real-time monitoring of sync operations with psutil integration
-- ✅ **Enhanced UI Components**: Removed redundant notifications, improved Recent Activity sections
-- ✅ **WordPress Sync Fixes**: Fixed provider selection modal sync functionality with proper process tracking
+- ✅ **Photo Collection Removed**: All photo-related functionality has been deprecated
+- ✅ **Web Interface Deprecated**: Moved to deprecated/ folder - use command line interface only
 
 
 
@@ -314,7 +305,6 @@ SELECT id, provider_name FROM providers WHERE provider_name ILIKE '%search%';
 **Database Integration:**
 - All operations use existing PostgreSQL integration layer
 - Maintains compatibility with existing command-line automation scripts
-- Real-time status queries for web interface responsiveness
 
 ### Pending Improvements
 - 🔄 **Status System Standardization**: Apply unified status terminology to content generation components
@@ -333,7 +323,7 @@ SELECT id, provider_name FROM providers WHERE provider_name ILIKE '%search%';
 
 **Common Issues:**
 1. **Providers Stuck in `description_generated`**: Use `publish_approved.py` to create initial WordPress posts
-2. **Sync Not Starting**: Ensure Flask server is running and check browser console for API errors
+2. **Sync Not Starting**: Check that the unified pipeline is properly configured
 3. **Process Tracking Issues**: Verify psutil is installed (`pip install psutil`)
 4. **SSL/Python Issues**: Use Homebrew Python 3.12 environment as documented
 5. **Modal Not Loading Providers**: Check API endpoint connectivity and database access
@@ -346,8 +336,8 @@ python3 scripts/run_pipeline.py --status-only
 # Check providers needing WordPress posts
 python3 publish_approved.py --dry-run
 
-# Check Flask server status
-curl http://localhost:5000/api/dashboard/overview
+# Check pipeline status
+python3 scripts/run_pipeline.py --status-only
 
 # Verify process tracking
 python3 -c "import psutil; print('psutil OK')"

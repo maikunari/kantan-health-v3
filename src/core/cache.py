@@ -61,14 +61,6 @@ class PersistentCache:
                 )
             ''')
             
-            # Photo reference cache (permanent)
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS photo_references (
-                    place_id TEXT PRIMARY KEY,
-                    photo_refs TEXT NOT NULL,
-                    created_at TIMESTAMP NOT NULL
-                )
-            ''')
             
             # Create indexes for performance
             conn.execute('CREATE INDEX IF NOT EXISTS idx_cache_expires ON place_cache(expires_at)')
@@ -81,7 +73,7 @@ class PersistentCache:
         
         Args:
             key: Cache key (usually place_id)
-            cache_type: Type of cache ('details', 'photo_url', etc.)
+            cache_type: Type of cache ('details', 'search', etc.)
             
         Returns:
             Cached data or None if not found/expired
@@ -195,44 +187,6 @@ class PersistentCache:
         
         logger.debug(f"✅ Marked {place_id} as processed")
     
-    def get_photo_references(self, place_id: str) -> Optional[list]:
-        """Get permanently cached photo references
-        
-        Args:
-            place_id: Google Place ID
-            
-        Returns:
-            List of photo references or None
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute('''
-                SELECT photo_refs FROM photo_references 
-                WHERE place_id = ?
-            ''', (place_id,))
-            
-            row = cursor.fetchone()
-            
-            if row:
-                return json.loads(row[0])
-        
-        return None
-    
-    def set_photo_references(self, place_id: str, references: list) -> None:
-        """Store photo references permanently
-        
-        Args:
-            place_id: Google Place ID
-            references: List of photo reference strings
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute('''
-                INSERT OR REPLACE INTO photo_references 
-                (place_id, photo_refs, created_at)
-                VALUES (?, ?, ?)
-            ''', (place_id, json.dumps(references), datetime.now().isoformat()))
-            conn.commit()
-        
-        logger.debug(f"💾 Stored {len(references)} photo references for {place_id}")
     
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics

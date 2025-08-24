@@ -54,8 +54,6 @@ class Provider(Base):
     longitude = Column(Float)
     nearest_station = Column(Text)
     
-    # Photos
-    photo_urls = Column(JSON)
     
     # Accessibility
     business_hours = Column(JSON)

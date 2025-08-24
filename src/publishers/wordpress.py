@@ -61,13 +61,11 @@ class WordPressPublisher:
         
         logger.info("✅ WordPress Publisher initialized")
     
-    def sync_providers(self, providers: List[Provider], 
-                      photo_urls: Dict[int, List[str]] = None) -> Dict[str, Any]:
+    def sync_providers(self, providers: List[Provider]) -> Dict[str, Any]:
         """Sync multiple providers to WordPress
         
         Args:
             providers: List of providers to sync
-            photo_urls: Pre-fetched photo URLs by provider ID
             
         Returns:
             Sync summary
@@ -83,60 +81,17 @@ class WordPressPublisher:
         
         for provider in providers:
             try:
-                # Get photo URLs for this provider
-                provider_photos = photo_urls.get(provider.id, []) if photo_urls else []
-                
-                # Check if photos are disabled
-                photos_disabled = os.getenv('DISABLE_GOOGLE_PHOTOS', 'false').lower() == 'true'
-                
-                # Check if provider has photo references (new system)
-                if not photos_disabled and not provider_photos and hasattr(provider, 'photo_references') and provider.photo_references:
-                    # Convert references to proxy URLs
-                    api_base = os.getenv('API_BASE_URL', 'http://localhost:5000')
-                    provider_photos = [f"{api_base}/api/photo/{ref}" for ref in provider.photo_references[:4]]
-                    logger.info(f"📸 Using photo references for {provider.provider_name}: {len(provider_photos)} photos")
-                elif photos_disabled:
-                    provider_photos = []
-                    logger.info(f"📷 Photos disabled for {provider.provider_name}")
-                
-                # Fallback: If no references, check provider's photo_urls field (old system)
-                elif not provider_photos and hasattr(provider, 'photo_urls') and provider.photo_urls:
-                    try:
-                        import json
-                        if isinstance(provider.photo_urls, str):
-                            old_urls = json.loads(provider.photo_urls)
-                        elif isinstance(provider.photo_urls, list):
-                            old_urls = provider.photo_urls
-                        else:
-                            old_urls = []
-                        
-                        # Convert old URLs to proxy URLs by extracting references
-                        import re
-                        api_base = os.getenv('API_BASE_URL', 'http://localhost:5000')
-                        provider_photos = []
-                        
-                        for url in old_urls[:4]:  # Limit to 4 photos
-                            match = re.search(r'photoreference=([^&]+)', url)
-                            if match:
-                                ref = match.group(1)
-                                provider_photos.append(f"{api_base}/api/photo/{ref}")
-                        
-                        if provider_photos:
-                            logger.info(f"📸 Converted {len(provider_photos)} URLs to proxy for {provider.provider_name}")
-                        
-                    except Exception as e:
-                        logger.warning(f"Could not parse photo_urls for {provider.provider_name}: {e}")
-                        provider_photos = []
+                # Photos are no longer collected
                 
                 if provider.wordpress_post_id:
                     # Update existing post
-                    result = self.update_provider(provider, provider_photos)
+                    result = self.update_provider(provider)
                     if result.get('success'):
                         summary['updated'] += 1
                         summary['synced'] += 1
                 else:
                     # Create new post
-                    result = self.create_provider(provider, provider_photos)
+                    result = self.create_provider(provider)
                     if result.get('success'):
                         summary['created'] += 1
                         summary['synced'] += 1
@@ -152,12 +107,11 @@ class WordPressPublisher:
         
         return summary
     
-    def create_provider(self, provider: Provider, photo_urls: List[str] = None) -> Dict[str, Any]:
+    def create_provider(self, provider: Provider) -> Dict[str, Any]:
         """Create a new WordPress post for a provider
         
         Args:
             provider: Provider to create
-            photo_urls: List of photo URLs
             
         Returns:
             Result dictionary with success status
@@ -172,7 +126,7 @@ class WordPressPublisher:
                 'status': 'publish',
                 'type': 'healthcare_provider',  # Custom post type
                 'categories': self._get_categories(provider),
-                'acf': self._prepare_acf_fields(provider, photo_urls)
+                'acf': self._prepare_acf_fields(provider)
             }
             
             # Make API request to healthcare_provider endpoint
@@ -206,12 +160,11 @@ class WordPressPublisher:
             logger.error(f"❌ Create error: {str(e)}")
             return {'success': False, 'error': str(e)}
     
-    def update_provider(self, provider: Provider, photo_urls: List[str] = None) -> Dict[str, Any]:
+    def update_provider(self, provider: Provider) -> Dict[str, Any]:
         """Update an existing WordPress post
         
         Args:
             provider: Provider to update
-            photo_urls: List of photo URLs
             
         Returns:
             Result dictionary with success status
@@ -233,7 +186,7 @@ class WordPressPublisher:
                 'title': provider.provider_name,
                 'content': self._generate_post_content(provider),
                 'categories': self._get_categories(provider),
-                'acf': self._prepare_acf_fields(provider, photo_urls)
+                'acf': self._prepare_acf_fields(provider)
             }
             
             # Make API request to healthcare_provider endpoint
@@ -276,12 +229,11 @@ class WordPressPublisher:
         # Minimal content since ACF handles display
         return f"<!-- Provider: {provider.provider_name} -->"
     
-    def _prepare_acf_fields(self, provider: Provider, photo_urls: List[str] = None) -> Dict[str, Any]:
+    def _prepare_acf_fields(self, provider: Provider) -> Dict[str, Any]:
         """Prepare ACF fields for WordPress
         
         Args:
             provider: Provider data
-            photo_urls: List of photo URLs
             
         Returns:
             Dictionary of ACF field values
@@ -363,12 +315,12 @@ class WordPressPublisher:
             "english_proficiency": provider.english_proficiency or 'Unknown',
             "proficiency_score": provider.proficiency_score or 0,
             
-            # Photos
-            "photo_urls": self._format_photo_urls_for_acf(photo_urls),
-            "external_featured_image": photo_urls[0] if photo_urls else provider.selected_featured_image or '',
-            "featured_image_source": self._get_featured_image_source(provider, photo_urls),
-            "photo_count": len(photo_urls) if photo_urls else 0,
-            "image_selection_status": self._get_image_selection_status(provider),
+            # Photos are no longer collected
+            "photo_urls": "",
+            "external_featured_image": provider.selected_featured_image or '',
+            "featured_image_source": "No Image Available",
+            "photo_count": 0,
+            "image_selection_status": "none",
             
             # SEO Fields
             "seo_title": provider.seo_title or provider.provider_name,
@@ -568,13 +520,6 @@ class WordPressPublisher:
             "name": provider.provider_name
         }
     
-    def _format_photo_urls_for_acf(self, photo_urls: List[str]) -> str:
-        """Format photo URLs for ACF gallery field"""
-        if not photo_urls:
-            return ""
-        
-        # Return newline-separated URLs for the ACF field
-        return "\n".join(photo_urls[:10])  # Limit to 10 photos
     
     def _format_wheelchair_accessibility(self, wheelchair_accessible: str) -> str:
         """Format wheelchair accessibility for ACF dropdown field"""
@@ -594,14 +539,6 @@ class WordPressPublisher:
         else:
             return "Parking unknown"
     
-    def _get_featured_image_source(self, provider: Provider, photo_urls: List[str]) -> str:
-        """Determine the source of the featured image"""
-        if provider.selected_featured_image:
-            return "Claude AI Selected"
-        elif photo_urls and len(photo_urls) > 0:
-            return "First Available Photo"
-        else:
-            return "No Image Available"
     
     def _normalize_business_status(self, status: str) -> str:
         """Normalize business status for ACF field"""
@@ -847,24 +784,6 @@ class WordPressPublisher:
         
         return ", ".join(indicators) if indicators else "English support status unclear"
     
-    def _get_image_selection_status(self, provider: Provider) -> str:
-        """Determine the image selection status"""
-        if provider.selected_featured_image:
-            return "selected"  # AI selected
-        elif hasattr(provider, 'photo_urls'):
-            photo_urls = provider.photo_urls
-            if isinstance(photo_urls, str):
-                try:
-                    photo_urls = json.loads(photo_urls)
-                except:
-                    photo_urls = []
-            
-            if photo_urls and len(photo_urls) > 0:
-                return "fallback"  # Using fallback (first photo)
-            else:
-                return "none"  # No images available
-        else:
-            return "none"
     
     def _clean_website_url(self, url: str) -> str:
         """Clean website URL by removing query parameters"""

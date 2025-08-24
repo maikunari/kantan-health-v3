@@ -28,7 +28,7 @@ class GooglePlacesCollector:
     REQUIRED_FIELDS = [
         'place_id', 'name', 'formatted_address', 'rating', 
         'user_ratings_total', 'reviews', 'opening_hours', 
-        'website', 'formatted_phone_number', 'photos', 
+        'website', 'formatted_phone_number', 
         'geometry', 'types', 'business_status'
     ]
     
@@ -82,15 +82,9 @@ class GooglePlacesCollector:
         if not self.api_key:
             raise ValueError("GOOGLE_PLACES_API_KEY not found in environment")
         
-        # Check if photos are disabled
-        self.photos_disabled = os.getenv('DISABLE_GOOGLE_PHOTOS', 'false').lower() == 'true'
-        if self.photos_disabled:
-            logger.info("⚠️ Google Photos API is DISABLED via environment variable")
-        
         # API endpoints
         self.search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
         self.details_url = "https://maps.googleapis.com/maps/api/place/details/json"
-        self.photo_url = "https://maps.googleapis.com/maps/api/place/photo"
         
         # Initialize components
         self.cache = PersistentCache()
@@ -493,16 +487,7 @@ class GooglePlacesCollector:
             
             result = data.get('result', {})
             
-            # Skip photo processing if disabled
-            if self.photos_disabled:
-                if 'photos' in result:
-                    logger.info(f"📷 Skipping photo extraction (disabled) for: {result.get('name', 'Unknown')}")
-                    result['photos'] = []  # Clear photos to prevent downstream processing
-            else:
-                # Store photo references separately (they don't expire)
-                if 'photos' in result:
-                    photo_refs = [photo.get('photo_reference') for photo in result['photos'][:4]]
-                    self.cache.set_photo_references(place_id, photo_refs)
+            # Photos are no longer collected
             
             # Cache for 30 days
             self.cache.set(place_id, result, 'details', ttl_days=30)
@@ -587,29 +572,7 @@ class GooglePlacesCollector:
             
             return None
         
-        # Check for photos (skip if disabled)
-        if not self.photos_disabled:
-            if 'photos' not in place_data or not place_data['photos']:
-                logger.info(f"❌ Rejected {record['provider_name']}: No photos available")
-                
-                # Add to session rejected list and cache
-                self.session_rejected_ids.add(place_id)
-                self.cache.set(f"rejected_{place_id}", {
-                    'place_id': place_id,
-                    'reason': 'no_photos',
-                    'name': record['provider_name'],
-                    'timestamp': datetime.now().isoformat()
-                }, category='rejected', ttl_days=30)
-                
-                return None
-            
-            # Store photo references (not URLs yet)
-            photo_refs = [photo.get('photo_reference') for photo in place_data['photos'][:4]]
-            record['photo_references'] = photo_refs
-        else:
-            # Photos disabled - set empty references
-            record['photo_references'] = []
-            logger.debug(f"📷 Photos disabled for: {record['provider_name']}")
+        # Photos are no longer collected or required
         
         # Provider passed all checks - clean the name if needed
         original_name = record['provider_name']
@@ -749,7 +712,6 @@ class GooglePlacesCollector:
             'providers_collected': 0,
             'duplicates_skipped': 0,
             'rejected_proficiency': 0,
-            'rejected_no_photos': 0,
             'api_calls': 0,
             'cache_hits': 0,
             'estimated_cost': 0.0
@@ -784,8 +746,6 @@ class GooglePlacesCollector:
                 if not record:
                     if details.get('proficiency_score', 0) < 3:
                         summary['rejected_proficiency'] += 1
-                    else:
-                        summary['rejected_no_photos'] += 1
                     continue
                 
                 # Save to database

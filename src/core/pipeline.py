@@ -15,7 +15,6 @@ from .database import DatabaseManager, Provider
 from .cache import PersistentCache
 from .cost_tracker import CostTracker
 from ..collectors.google_places import GooglePlacesCollector
-from ..collectors.photo_manager import PhotoURLManager
 from ..processors.ai_content import AIContentProcessor
 from ..publishers.wordpress import WordPressPublisher
 from ..utils.pipeline_tracker import PipelineTracker
@@ -44,7 +43,6 @@ class UnifiedPipeline:
         self.collector = GooglePlacesCollector()
         self.processor = AIContentProcessor()
         self.publisher = WordPressPublisher()
-        self.photo_manager = PhotoURLManager()
         self.tracker = PipelineTracker()
         
         logger.info("✅ Unified Pipeline initialized")
@@ -158,7 +156,6 @@ class UnifiedPipeline:
             'queries_executed': 0,
             'duplicates_skipped': 0,
             'rejected_proficiency': 0,
-            'rejected_no_photos': 0
         }
         
         try:
@@ -198,7 +195,6 @@ class UnifiedPipeline:
             logger.info(f"✅ Collected {results['providers_collected']} new providers")
             logger.info(f"⏭️ Skipped {results['duplicates_skipped']} duplicates")
             logger.info(f"❌ Rejected {results['rejected_proficiency']} for low English proficiency")
-            logger.info(f"📸 Rejected {results['rejected_no_photos']} for no photos")
             
         except Exception as e:
             logger.error(f"❌ Collection error: {str(e)}")
@@ -330,11 +326,8 @@ class UnifiedPipeline:
             
             logger.info(f"📤 Syncing {len(providers)} providers to WordPress")
             
-            # Prefetch photo URLs for all providers
-            logger.info("📸 Prefetching photo URLs...")
-            photo_urls = self.photo_manager.prefetch_urls_for_sync(
-                [{'id': p.id, 'google_place_id': p.google_place_id} for p in providers]
-            )
+            # Photo URLs no longer needed
+            photo_urls = {}
             
             # Sync to WordPress
             if not options.get('dry_run'):
@@ -408,11 +401,10 @@ class UnifiedPipeline:
         expired = self.cache.cleanup_expired()
         logger.info(f"🗑️ Removed {expired} expired cache entries")
         
-        # Clean expired photo URLs
-        photo_expired = self.photo_manager.cleanup_expired_urls()
-        logger.info(f"🗑️ Removed {photo_expired} expired photo URLs")
+        # Photo cleanup no longer needed
+        photo_expired = 0
         
         return {
             'cache_entries_removed': expired,
-            'photo_urls_removed': photo_expired
+            'cache_entries_removed': expired
         }
