@@ -506,11 +506,12 @@ class GooglePlacesCollector:
             logger.error(f"Details error for {place_id}: {str(e)}")
             return None
     
-    def create_provider_record(self, place_data: Dict) -> Optional[Dict]:
+    def create_provider_record(self, place_data: Dict, city: str = None) -> Optional[Dict]:
         """Create a provider record from place data
         
         Args:
             place_data: Google Places API response
+            city: City name to override automatic detection
             
         Returns:
             Provider record or None if rejected
@@ -541,6 +542,10 @@ class GooglePlacesCollector:
         
         # Parse address components
         self._parse_address_components(place_data, record)
+        
+        # Override city if provided (for grid search)
+        if city:
+            record['city'] = city
         
         # Extract business hours
         if 'opening_hours' in place_data:
@@ -696,12 +701,13 @@ class GooglePlacesCollector:
         }
         return labels.get(score, 'Unknown')
     
-    def collect_providers(self, queries: List[str] = None, max_per_query: int = 60) -> Dict[str, Any]:
+    def collect_providers(self, queries: List[str] = None, max_per_query: int = 60, city: str = None) -> Dict[str, Any]:
         """Main collection method with all optimizations
         
         Args:
             queries: List of search queries
             max_per_query: Maximum results per query
+            city: City name to set for all collected providers
             
         Returns:
             Collection summary
@@ -742,7 +748,7 @@ class GooglePlacesCollector:
                     continue
                 
                 # Create provider record
-                record = self.create_provider_record(details)
+                record = self.create_provider_record(details, city=city)
                 if not record:
                     if details.get('proficiency_score', 0) < 3:
                         summary['rejected_proficiency'] += 1

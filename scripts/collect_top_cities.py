@@ -108,30 +108,22 @@ class TopCitiesCollector:
                     else:
                         location_query = f"{term} {city_name}"
                     
-                    # Search using the query
-                    providers = self.collector.search_providers(
-                        query=location_query,
-                        max_results=20
+                    # Use collect_providers to search AND save to database
+                    # This method handles deduplication, proficiency filtering, and saving
+                    summary = self.collector.collect_providers(
+                        queries=[location_query],
+                        max_per_query=20
                     )
                     
-                    if providers:
-                        new_providers = len(providers)
+                    if summary['providers_collected'] > 0:
+                        new_providers = summary['providers_collected']
                         total_collected += new_providers
-                        total_queries += 1  # Each search is one query
-                        # Estimate cost: ~$0.035 per query
-                        total_cost += 0.035
+                        total_queries += summary['queries_executed']
+                        # Use actual cost from summary
+                        total_cost += summary.get('estimated_cost', 0.035)
                         
-                        logger.info(f"   ✅ Found {new_providers} providers with '{term}'")
-                        
-                        # Save providers to database
-                        session = self.db.get_session()
-                        try:
-                            for provider in providers:
-                                # The search_providers method returns complete provider records
-                                # They should already be saved by the collector
-                                pass
-                        finally:
-                            session.close()
+                        logger.info(f"   ✅ Collected and saved {new_providers} providers with '{term}'")
+                        logger.info(f"      (Rejected: {summary.get('rejected_proficiency', 0)} low English, {summary.get('duplicates_skipped', 0)} duplicates)")
                     
                     # Rate limiting
                     time.sleep(2)

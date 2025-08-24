@@ -167,6 +167,15 @@ Examples:
   # Collect only, with specific limit
   python scripts/run_pipeline.py --mode collect --limit 20
   
+  # Collect providers in specific Tokyo wards
+  python scripts/run_pipeline.py --mode collect --cities Tokyo --wards Shibuya Minato --limit 50
+  
+  # Use grid search for comprehensive coverage (2km grid)
+  python scripts/run_pipeline.py --mode collect --use-grid --cities Tokyo --grid-size 2000 --limit 100
+  
+  # Collect dentists in Osaka
+  python scripts/run_pipeline.py --mode collect --cities Osaka --specialties Dentistry --limit 30
+  
   # Process AI content for pending providers
   python scripts/run_pipeline.py --mode process --batch-size 4
   
@@ -197,6 +206,16 @@ Examples:
     parser.add_argument('--queries-per-type', type=int, default=2, help='Max queries per search type (default: 2)')
     parser.add_argument('--results-per-query', type=int, default=20, help='Max results per query (default: 20)')
     parser.add_argument('--skip-photos', action='store_true', help='Skip photo URL generation to save costs')
+    parser.add_argument('--cities', type=str, nargs='+', help='Cities to search (e.g., Tokyo Osaka Kyoto)')
+    parser.add_argument('--wards', type=str, nargs='+', help='Specific wards to search (e.g., Shibuya Minato Shinjuku)')
+    parser.add_argument('--specialties', type=str, nargs='+', help='Medical specialties to search (e.g., Dentistry "Internal Medicine")')
+    parser.add_argument('--use-ward-specific', action='store_true', default=True, help='Use ward-specific searches (default: True)')
+    
+    # Grid search options
+    parser.add_argument('--use-grid', action='store_true', help='Use grid-based geographic search for comprehensive coverage')
+    parser.add_argument('--grid-size', type=int, help='Grid size in meters (default: 2000 for city, 500 for ward)')
+    parser.add_argument('--search-method', type=str, choices=['grid', 'standard'], default='standard',
+                        help='Search method to use (default: standard)')
     
     # Processing options
     parser.add_argument('--batch-size', type=int, default=2, help='AI batch size (default: 2)')
@@ -239,7 +258,13 @@ Examples:
         'regenerate': args.regenerate,
         'force_update': args.force_update,
         'create_only': args.create_only,
-        'update_only': args.update_only
+        'update_only': args.update_only,
+        'cities': args.cities,
+        'wards': args.wards,
+        'specialties': args.specialties,
+        'use_ward_specific': args.use_ward_specific,
+        'use_grid': args.use_grid or args.search_method == 'grid',
+        'grid_size': args.grid_size
     }
     
     # Remove None values

@@ -15,6 +15,7 @@ from .database import DatabaseManager, Provider
 from .cache import PersistentCache
 from .cost_tracker import CostTracker
 from ..collectors.google_places import GooglePlacesCollector
+from ..collectors.geographic_search import GeographicSearchEngine
 from ..processors.ai_content import AIContentProcessor
 from ..publishers.wordpress import WordPressPublisher
 from ..utils.pipeline_tracker import PipelineTracker
@@ -41,6 +42,7 @@ class UnifiedPipeline:
         self.cache = PersistentCache()
         self.cost_tracker = CostTracker()
         self.collector = GooglePlacesCollector()
+        self.geo_engine = None  # Initialized on demand
         self.processor = AIContentProcessor()
         self.publisher = WordPressPublisher()
         self.tracker = PipelineTracker()
@@ -162,7 +164,18 @@ class UnifiedPipeline:
             # Get collection parameters
             limit = options.get('limit', 10)
             cities = options.get('cities', ['Tokyo', 'Osaka', 'Yokohama'])
+            wards = options.get('wards')
             specialties = options.get('specialties')
+            use_ward_specific = options.get('use_ward_specific', True)
+            use_grid = options.get('use_grid', False)
+            grid_size = options.get('grid_size')
+            
+            # Smart grid size defaults
+            if grid_size is None:
+                if wards:
+                    grid_size = 500  # 500m for ward-specific searches
+                else:
+                    grid_size = 2000  # 2km for city-wide searches
             
             # Check for specific provider IDs
             provider_ids = options.get('provider_ids', [])
@@ -171,30 +184,152 @@ class UnifiedPipeline:
                 # Skip collection for specific providers
                 return results
             
-            # Generate search queries
-            queries = self.collector.generate_search_queries(
-                cities=cities,
-                specialties=specialties,
-                limit=100
-            )
-            
-            logger.info(f"🔍 Generated {len(queries)} search queries")
-            logger.info(f"🏙️ Cities: {', '.join(cities)}")
-            logger.info(f"💊 Limit: {limit} providers")
-            
-            # Execute collection
-            collection_summary = self.collector.collect_providers(
-                queries=queries,
-                max_per_query=max(1, limit // len(queries))
-            )
+            # Use grid search if enabled
+            if use_grid:
+                logger.info(f"🗺️ Using GRID SEARCH with {grid_size}m grid size")
+                
+                # Initialize geographic engine if needed
+                if self.geo_engine is None:
+                    self.geo_engine = GeographicSearchEngine(grid_size_meters=grid_size)
+                
+                # Generate grids for each city
+                all_grids = []
+                for city in cities:
+                    grids = self.geo_engine.generate_grid_searches(city, specialties)
+                    all_grids.extend(grids)
+                    logger.info(f"📍 Generated {len(grids)} grids for {city}")
+                
+                # Filter grids by ward if specified
+                if wards:
+                    filtered_grids = [g for g in all_grids if g.ward in wards]
+                    logger.info(f"🏘️ Filtered to {len(filtered_grids)} grids in wards: {', '.join(wards)}")
+                    all_grids = filtered_grids
+                
+                # Process grids with progress tracking
+                total_collected = 0
+                for grid_idx, grid in enumerate(all_grids, 1):
+                    if total_collected >= limit:
+                        logger.info(f"✅ Reached collection limit of {limit} providers")
+                        break
+                    
+                    # Progress message
+                    location = f"{grid.ward} ward" if grid.ward else grid.city
+                    logger.info(f"\n📍 Processing grid {grid_idx}/{len(all_grids)} for {location}")
+                    
+                    # Generate queries for this grid
+                    grid_queries = []
+                    if not specialties:
+                        specialties = ["doctor", "clinic", "hospital", "dentist"]
+                    
+                    for specialty in specialties:
+                        if grid.ward:
+                            query = f"{specialty} {grid.ward} {grid.city}"
+                        else:
+                            query = f"{specialty} near {grid.center_lat},{grid.center_lng}"
+                        grid_queries.append(query)
+                    
+                    # Calculate remaining slots
+                    remaining = limit - total_collected
+                    
+                    # Check if dry run
+                    if options.get('dry_run'):
+                        # Estimate what would happen without making API calls
+                        estimated_providers = len(grid_queries) * 15  # Average 15 providers per query
+                        estimated_cost = len(grid_queries) * 0.035  # $0.035 per query
+                        
+                        logger.info(f"   🔍 DRY RUN: Would search {len(grid_queries)} queries")
+                        logger.info(f"   📊 Estimated: ~{estimated_providers} providers, ${estimated_cost:.2f} cost")
+                        
+                        # Update dry-run totals (but don't actually collect)
+                        results['queries_executed'] += len(grid_queries)
+                        # Don't increment providers_collected in dry run - no actual collection
+                        total_collected += min(estimated_providers, remaining)  # Just for loop control
+                    else:
+                        # Actually collect providers
+                        grid_summary = self.collector.collect_providers(
+                            queries=grid_queries,
+                            max_per_query=min(10, remaining // len(grid_queries) if grid_queries else 1),
+                            city=grid.city  # Pass city for proper field population
+                        )
+                        
+                        # Track grid in geographic engine
+                        self.geo_engine.track_search({"grid_id": grid.grid_id}, grid_summary['providers_collected'])
+                        
+                        # Update totals
+                        total_collected += grid_summary['providers_collected']
+                        results['providers_collected'] += grid_summary['providers_collected']
+                        results['duplicates_skipped'] += grid_summary['duplicates_skipped']
+                        results['rejected_proficiency'] += grid_summary['rejected_proficiency']
+                        results['queries_executed'] += grid_summary['queries_executed']
+                
+                # Store estimated totals for dry run
+                if options.get('dry_run'):
+                    results['estimated_providers'] = total_collected
+                    results['estimated_cost'] = results['queries_executed'] * 0.035
+                
+                collection_summary = results
+            else:
+                # Standard search (non-grid)
+                logger.info(f"🔍 Using STANDARD SEARCH")
+                
+                # Generate search queries
+                queries = self.collector.generate_search_queries(
+                    cities=cities,
+                    specialties=specialties,
+                    wards=wards,
+                    use_ward_specific=use_ward_specific,
+                    limit=100
+                )
+                
+                logger.info(f"🔍 Generated {len(queries)} search queries")
+                logger.info(f"🏙️ Cities: {', '.join(cities)}")
+                if wards:
+                    logger.info(f"🏘️ Wards: {', '.join(wards)}")
+                if specialties:
+                    logger.info(f"🏥 Specialties: {', '.join(specialties)}")
+                logger.info(f"💊 Limit: {limit} providers")
+                
+                # Check if dry run
+                if options.get('dry_run'):
+                    # Estimate what would happen without making API calls
+                    estimated_providers = len(queries) * 20  # Average 20 providers per query
+                    estimated_cost = len(queries) * 0.035  # $0.035 per query
+                    
+                    logger.info(f"🔍 DRY RUN MODE - No API calls will be made")
+                    logger.info(f"   Would execute {len(queries)} search queries")
+                    logger.info(f"   Estimated providers: ~{min(estimated_providers, limit)}")
+                    logger.info(f"   Estimated cost: ${estimated_cost:.2f}")
+                    
+                    # Mock results for dry run
+                    collection_summary = {
+                        'providers_collected': 0,  # No actual collection in dry run
+                        'queries_executed': len(queries),
+                        'duplicates_skipped': 0,
+                        'rejected_proficiency': 0,
+                        'estimated_providers': min(estimated_providers, limit),
+                        'estimated_cost': estimated_cost,
+                        'dry_run': True
+                    }
+                else:
+                    # Execute actual collection
+                    collection_summary = self.collector.collect_providers(
+                        queries=queries,
+                        max_per_query=max(1, limit // len(queries) if queries else 1)
+                    )
             
             # Update results
             results.update(collection_summary)
             results['completed_at'] = datetime.now().isoformat()
             
-            logger.info(f"✅ Collected {results['providers_collected']} new providers")
-            logger.info(f"⏭️ Skipped {results['duplicates_skipped']} duplicates")
-            logger.info(f"❌ Rejected {results['rejected_proficiency']} for low English proficiency")
+            if options.get('dry_run'):
+                logger.info(f"🔍 DRY RUN COMPLETE")
+                logger.info(f"   Estimated providers: {results.get('estimated_providers', 0)}")
+                logger.info(f"   Estimated cost: ${results.get('estimated_cost', 0):.2f}")
+                logger.info(f"   No database changes made")
+            else:
+                logger.info(f"✅ Collected {results['providers_collected']} new providers")
+                logger.info(f"⏭️ Skipped {results['duplicates_skipped']} duplicates")
+                logger.info(f"❌ Rejected {results['rejected_proficiency']} for low English proficiency")
             
         except Exception as e:
             logger.error(f"❌ Collection error: {str(e)}")
