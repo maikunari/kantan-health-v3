@@ -8,21 +8,12 @@ This is a healthcare directory automation system for international patients in J
 
 **Core Technologies:**
 - Python 3.12+ (Homebrew) with Flask, SQLAlchemy, psycopg2, psutil
-- React 18+ with TypeScript and Ant Design UI components
 - PostgreSQL database for provider data
 - WordPress REST API with ACF Pro for content management
 - Google Places API for provider discovery
 - Claude AI (Anthropic) for content generation
 
 ## Development Commands
-
-### Web Application
-```bash
-# Start the Flask + React web interface
-./start_app.sh
-
-# Access the web interface at http://localhost:3000
-# API server runs on http://localhost:5000
 ```
 
 ### Main Automation Scripts (Unified Pipeline)
@@ -74,9 +65,25 @@ python3 add_specific_provider.py --name "Clinic Name" --location "Tokyo"
 # Add provider by Google Place ID
 python3 add_specific_provider.py --place-id "ChIJN1t_tDeuEmsRUsoyG83frY4"
 
-# Add providers by geographic area
+# Add providers by geographic area (RECOMMENDED for city collection)
 python3 add_geographic_providers.py --city "Tokyo" --wards "Shibuya,Minato" --specialty "ENT" --limit 10
 ```
+
+### IMPORTANT: Correct Collection Methods
+```bash
+# ✅ CORRECT - These scripts properly save to database:
+python3 scripts/run_pipeline.py --mode collect --limit 100  # Uses collect_providers()
+python3 add_geographic_providers.py --city Tokyo --limit 500  # Uses unified pipeline
+
+# ❌ INCORRECT - Do not use for collection:
+python3 scripts/collect_top_cities.py  # BUG: Uses search_providers() which doesn't save to DB
+```
+
+**Technical Note**: The `GooglePlacesCollector` class has two key methods:
+- `search_providers()` - Only searches and returns raw results (doesn't save to database)
+- `collect_providers()` - Searches, gets details, filters by English proficiency, and saves to database
+
+Always use scripts that call `collect_providers()` or use the unified pipeline for proper data collection.
 
 ## Architecture Overview
 
@@ -91,7 +98,7 @@ python3 add_geographic_providers.py --city "Tokyo" --wards "Shibuya,Minato" --sp
 2. **Data Collection** (`src/collectors/`)
    - `google_places.py` - Advanced search with 150+ query variations
    - `deduplication.py` - Fingerprint-based duplicate detection
-   - `photo_manager.py` - Optimized photo URL generation
+   - `photo_manager.py` - Optimized photo URL generation (no longer needed)
    - English proficiency filtering (score ≥3 required)
 
 3. **AI Content Generation** (`src/processors/ai_content.py`)
@@ -112,12 +119,7 @@ python3 add_geographic_providers.py --city "Tokyo" --wards "Shibuya,Minato" --sp
    - `cache.py` - Persistent SQLite caching (75% cost reduction)
    - `cost_tracker.py` - API cost tracking with limits
 
-6. **Web Interface** (`frontend/` + `api/`)
-   - React TypeScript frontend with Ant Design components
-   - Flask REST API with Blueprint architecture
-   - Real-time status monitoring and process tracking
-   - Provider selection modal with filtering capabilities
-   - Comprehensive settings management interface
+
 
 ### Data Flow
 
@@ -140,15 +142,6 @@ Google Places → PostgreSQL → AI Content Generation → WordPress Sync
 - `add_geographic_providers.py` - Add providers by geographic area
 - `publish_approved.py` - Publish providers with content to WordPress
 
-**Web Interface:**
-- `api/providers.py` - Provider management API
-- `api/wordpress_sync.py` - WordPress sync API with process tracking
-- `api/settings.py` - Configuration management API
-- `api/dashboard.py` - System metrics and overview
-- `api/add_providers.py` - Provider addition endpoints
-- `frontend/src/components/ContentGeneration/` - Content generation UI
-- `frontend/src/components/Sync/` - WordPress sync UI with provider selection modal
-- `frontend/src/components/Settings/` - Settings management interface
 
 **Utilities:**
 - `utility/migrate/*.py` - Database migration scripts
@@ -209,19 +202,9 @@ The system automatically filters providers based on English proficiency scoring:
 - Use small `--limit` values for testing
 - Test database connections before running automation
 - Verify WordPress API connectivity before sync operations
+- ALWAYS CLEAN UP TEST FILES
 
 ## Common Workflows
-
-### Daily Operations (Web Interface)
-```bash
-# 1. Start the web application
-./start_app.sh
-
-# 2. Access web interface at http://localhost:3000
-# - Use Content Generation page for AI content processing
-# - Use WordPress Sync page with provider selection modal
-# - Configure API keys in Settings page
-```
 
 ### Daily Operations (Command Line)
 ```bash
@@ -278,7 +261,7 @@ SELECT id, provider_name FROM providers WHERE provider_name ILIKE '%search%';
 
 ### Caching System
 - Place details: 30-day cache (permanent for stable data)
-- Photo URLs: 12-hour cache (may change more frequently)
+- Photo URLs: 12-hour cache (may change more frequently) <- REMOVE THIS!
 - Search results: Not cached (always fresh)
 - SQLite-based: No external dependencies
 
@@ -310,50 +293,10 @@ SELECT id, provider_name FROM providers WHERE provider_name ILIKE '%search%';
 - ✅ **Enhanced UI Components**: Removed redundant notifications, improved Recent Activity sections
 - ✅ **WordPress Sync Fixes**: Fixed provider selection modal sync functionality with proper process tracking
 
-### Current Web Interface Features
 
-**Content Generation Page (`/content-generation`):**
-- Real-time batch status monitoring with auto-refresh
-- Comprehensive progress tracking with completion rates
-- Enhanced Recent Activity section with verbose processing details
-- Quick action buttons for common batch sizes
-- Support for dry-run testing and content type selection
-
-**WordPress Sync Page (`/sync`):**
-- Provider selection modal with advanced filtering (status, city, content status, search)
-- Multi-select capabilities with visual feedback
-- Real-time sync status monitoring
-- Batch operation tracking with process management
-- Recent operations and error logging display
-
-**Settings Page (`/settings`):**
-- Secure API key management with masked display
-- Real-time connection testing for WordPress, Google API, and Claude API
-- Collapsible sections for organized configuration
-- Password visibility toggles and validation feedback
 
 ### Technical Architecture
 
-**Backend API Structure:**
-- `api/content_generation.py` - Manages AI content generation with subprocess tracking
-- `api/wordpress_sync.py` - Handles WordPress sync with process monitoring via psutil
-- `api/settings.py` - Provides secure configuration management with connection testing
-- Unified error handling and logging across all endpoints
-
-**Frontend Component Structure:**
-- `frontend/src/components/ContentGeneration/ContentGeneration.tsx` - Main content UI
-- `frontend/src/components/Sync/WordPressSync.tsx` - Sync interface with provider modal
-- `frontend/src/components/Settings/Settings.tsx` - Configuration management interface
-- Real-time status polling and responsive design with Ant Design components
-
-### Status Terminology System
-The application uses standardized status terminology across all components:
-- **IDLE**: No operations running
-- **STARTING**: Process initialization phase
-- **RUNNING**: Active processing in progress
-- **COMPLETING**: Process finishing up
-- **COMPLETED**: Operation finished successfully
-- **ERROR**: Operation failed with error details
 
 ### Known Technical Considerations
 

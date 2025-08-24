@@ -534,9 +534,12 @@ class GooglePlacesCollector:
         if not place_data or not place_data.get('place_id'):
             return None
         
+        # Extract place_id first for use in error handling
+        place_id = place_data.get('place_id')
+        
         # Extract basic information
         record = {
-            'google_place_id': place_data.get('place_id'),
+            'google_place_id': place_id,
             'provider_name': place_data.get('name', ''),
             'address': place_data.get('formatted_address', ''),
             'phone': place_data.get('formatted_phone_number', ''),
@@ -580,7 +583,7 @@ class GooglePlacesCollector:
                 'score': record['proficiency_score'],
                 'name': record['provider_name'],
                 'timestamp': datetime.now().isoformat()
-            }, category='rejected', ttl_days=30)
+            }, cache_type='rejected', ttl_days=30)
             
             return None
         
