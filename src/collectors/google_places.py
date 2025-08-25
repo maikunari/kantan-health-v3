@@ -770,6 +770,6 @@ class GooglePlacesCollector:
         summary['estimated_cost'] = stats['current_day_cost']
         
         logger.info(f"✅ Collection complete: {summary['providers_collected']} providers collected")
-        logger.info(f"💰 Today's cost: ${summary['estimated_cost']:.2f}")
+        # logger.info(f"💰 Today's cost: ${summary['estimated_cost']:.2f}")  # Cost logging commented out
         
         return summary

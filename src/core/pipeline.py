@@ -4,14 +4,14 @@ Unified Pipeline Orchestrator
 Main entry point for all healthcare directory operations
 """
 
-import os
+# import os  # Not currently used
 import uuid
 import logging
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any  # Optional removed - not used
 from datetime import datetime
 from enum import Enum
 
-from .database import DatabaseManager, Provider
+from .database import DatabaseManager  # Provider removed - not used
 from .cache import PersistentCache
 from .cost_tracker import CostTracker
 from ..collectors.google_places import GooglePlacesCollector
@@ -216,10 +216,44 @@ class UnifiedPipeline:
                     location = f"{grid.ward} ward" if grid.ward else grid.city
                     logger.info(f"\n📍 Processing grid {grid_idx}/{len(all_grids)} for {location}")
                     
-                    # Generate queries for this grid
+                    # ADAPTIVE SEARCH: Test grid with basic terms first
+                    basic_terms = ['doctor', 'clinic', 'hospital', 'dentist', 'pharmacy']
+                    test_queries = []
+                    
+                    # First, test if this grid has ANY providers
+                    for term in basic_terms:
+                        if grid.ward:
+                            query = f"{term} {grid.ward} {grid.city}"
+                        else:
+                            query = f"{term} near {grid.center_lat},{grid.center_lng}"
+                        test_queries.append(query)
+                    
+                    # Test with basic queries first (in actual collection, not dry run)
+                    grid_has_providers = False
+                    if not options.get('dry_run'):
+                        # Quick test to see if area has providers
+                        test_summary = self.collector.collect_providers(
+                            queries=test_queries,
+                            max_per_query=1,  # Just test for existence
+                            city=grid.city,
+                            ward=grid.ward
+                        )
+                        grid_has_providers = test_summary.get('providers_collected', 0) > 0
+                        
+                        if not grid_has_providers:
+                            logger.info(f"   ⏭️ Skipping empty grid - no providers found in basic search")
+                            continue
+                    
+                    # If grid has providers (or dry run), use comprehensive terms
                     grid_queries = []
                     if not specialties:
-                        specialties = ["doctor", "clinic", "hospital", "dentist"]
+                        # Use comprehensive medical terms for better coverage
+                        specialties = self._get_comprehensive_medical_terms()
+                    
+                    # Skip basic terms if we already tested them
+                    if not options.get('dry_run') and grid_has_providers:
+                        # Filter out already-tested basic terms
+                        specialties = [s for s in specialties if s not in basic_terms]
                     
                     for specialty in specialties:
                         if grid.ward:
@@ -238,29 +272,35 @@ class UnifiedPipeline:
                         estimated_cost = len(grid_queries) * 0.035  # $0.035 per query
                         
                         logger.info(f"   🔍 DRY RUN: Would search {len(grid_queries)} queries")
-                        logger.info(f"   📊 Estimated: ~{estimated_providers} providers, ${estimated_cost:.2f} cost")
+                        # logger.info(f"   📊 Estimated: ~{estimated_providers} providers, ${estimated_cost:.2f} cost")  # Cost logging commented out
                         
                         # Update dry-run totals (but don't actually collect)
                         results['queries_executed'] += len(grid_queries)
                         # Don't increment providers_collected in dry run - no actual collection
                         total_collected += min(estimated_providers, remaining)  # Just for loop control
                     else:
-                        # Actually collect providers
-                        grid_summary = self.collector.collect_providers(
-                            queries=grid_queries,
-                            max_per_query=min(10, remaining // len(grid_queries) if grid_queries else 1),
-                            city=grid.city  # Pass city for proper field population
-                        )
-                        
-                        # Track grid in geographic engine
-                        self.geo_engine.track_search({"grid_id": grid.grid_id}, grid_summary['providers_collected'])
-                        
-                        # Update totals
-                        total_collected += grid_summary['providers_collected']
-                        results['providers_collected'] += grid_summary['providers_collected']
-                        results['duplicates_skipped'] += grid_summary['duplicates_skipped']
-                        results['rejected_proficiency'] += grid_summary['rejected_proficiency']
-                        results['queries_executed'] += grid_summary['queries_executed']
+                        # Actually collect providers (if grid has any)
+                        if grid_queries:  # Only if we have queries to run
+                            grid_summary = self.collector.collect_providers(
+                                queries=grid_queries,
+                                max_per_query=min(10, remaining // len(grid_queries) if grid_queries else 1),
+                                city=grid.city  # Pass city for proper field population
+                            )
+                            
+                            # Track grid in geographic engine
+                            self.geo_engine.track_search({"grid_id": grid.grid_id}, grid_summary['providers_collected'])
+                            
+                            # Update totals (include test results if any)
+                            if grid_has_providers and 'test_summary' in locals():
+                                # Add providers from initial test
+                                total_collected += test_summary.get('providers_collected', 0)
+                                results['providers_collected'] += test_summary.get('providers_collected', 0)
+                            
+                            total_collected += grid_summary['providers_collected']
+                            results['providers_collected'] += grid_summary['providers_collected']
+                            results['duplicates_skipped'] += grid_summary['duplicates_skipped']
+                            results['rejected_proficiency'] += grid_summary['rejected_proficiency']
+                            results['queries_executed'] += grid_summary['queries_executed']
                 
                 # Store estimated totals for dry run
                 if options.get('dry_run'):
@@ -298,7 +338,7 @@ class UnifiedPipeline:
                     logger.info(f"🔍 DRY RUN MODE - No API calls will be made")
                     logger.info(f"   Would execute {len(queries)} search queries")
                     logger.info(f"   Estimated providers: ~{min(estimated_providers, limit)}")
-                    logger.info(f"   Estimated cost: ${estimated_cost:.2f}")
+                    # logger.info(f"   Estimated cost: ${estimated_cost:.2f}")  # Cost logging commented out
                     
                     # Mock results for dry run
                     collection_summary = {
@@ -324,7 +364,7 @@ class UnifiedPipeline:
             if options.get('dry_run'):
                 logger.info(f"🔍 DRY RUN COMPLETE")
                 logger.info(f"   Estimated providers: {results.get('estimated_providers', 0)}")
-                logger.info(f"   Estimated cost: ${results.get('estimated_cost', 0):.2f}")
+                # logger.info(f"   Estimated cost: ${results.get('estimated_cost', 0):.2f}")  # Cost logging commented out
                 logger.info(f"   No database changes made")
             else:
                 logger.info(f"✅ Collected {results['providers_collected']} new providers")
@@ -489,6 +529,34 @@ class UnifiedPipeline:
         
         return results
     
+    def _get_comprehensive_medical_terms(self) -> List[str]:
+        """Get comprehensive list of medical search terms for better coverage"""
+        return [
+            # Basic terms (essential)
+            'doctor', 'clinic', 'hospital', 'dentist', 'pharmacy',
+            
+            # Specialists
+            'cardiologist', 'dermatologist', 'psychiatrist', 'psychologist',
+            'orthopedic', 'pediatrician', 'gynecologist', 'ophthalmologist',
+            'ENT specialist', 'neurologist', 'urologist', 'oncologist',
+            'endocrinologist', 'gastroenterologist', 'rheumatologist',
+            
+            # Specialty clinics
+            'fertility clinic', 'dialysis center', 'rehabilitation center',
+            'mental health clinic', 'pain clinic', 'sleep clinic',
+            'sports medicine', 'travel clinic', 'vaccination center',
+            
+            # Alternative medicine
+            'acupuncture', 'chiropractor', 'physiotherapy', 'osteopath',
+            'traditional medicine', 'holistic clinic',
+            
+            # Japanese medical terms (for better coverage)
+            '医院', '病院', 'クリニック', '診療所',
+            '整形外科', '皮膚科', '耳鼻咽喉科', '眼科',
+            '内科', '外科', '小児科', '産婦人科',
+            '心療内科', '精神科', '歯科'
+        ]
+    
     def _print_summary(self, results: Dict[str, Any]):
         """Print execution summary"""
         logger.info("\n" + "=" * 60)
@@ -499,8 +567,8 @@ class UnifiedPipeline:
         logger.info(f"📊 Providers Collected: {results['totals']['collected']}")
         logger.info(f"🤖 Providers Processed: {results['totals']['processed']}")
         logger.info(f"📝 Providers Published: {results['totals']['published']}")
-        logger.info(f"💰 API Calls: {results['costs']['api_calls']}")
-        logger.info(f"💵 Estimated Cost: ${results['costs']['estimated_cost']:.2f}")
+        # logger.info(f"💰 API Calls: {results['costs']['api_calls']}")  # Cost logging commented out
+        # logger.info(f"💵 Estimated Cost: ${results['costs']['estimated_cost']:.2f}")  # Cost logging commented out
         logger.info(f"✅ Cache Hit Rate: {results['costs']['cache_rate']:.1f}%")
         logger.info("=" * 60)
     
@@ -532,10 +600,9 @@ class UnifiedPipeline:
         expired = self.cache.cleanup_expired()
         logger.info(f"🗑️ Removed {expired} expired cache entries")
         
-        # Photo cleanup no longer needed
-        photo_expired = 0
+        # Photo cleanup no longer needed (removed)
+        # photo_expired = 0  # Not used
         
         return {
-            'cache_entries_removed': expired,
             'cache_entries_removed': expired
         }
