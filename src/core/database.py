@@ -255,6 +255,38 @@ class DatabaseManager:
         finally:
             session.close()
     
+    def update_provider_field(self, provider_id: int, field_name: str, value: Any) -> bool:
+        """Update a single field for a provider
+        
+        Args:
+            provider_id: Provider ID
+            field_name: Field name to update
+            value: New value for the field
+            
+        Returns:
+            True if successful
+        """
+        session = self.Session()
+        try:
+            provider = session.query(Provider).filter_by(id=provider_id).first()
+            
+            if not provider:
+                logger.error(f"Provider {provider_id} not found")
+                return False
+            
+            setattr(provider, field_name, value)
+            session.commit()
+            
+            logger.debug(f"Updated {field_name} for provider {provider_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error updating provider field: {str(e)}")
+            return False
+        finally:
+            session.close()
+    
     def update_provider_content(self, provider_id: int, content_data: Dict[str, Any]) -> bool:
         """Update provider with AI-generated content"""
         session = self.Session()

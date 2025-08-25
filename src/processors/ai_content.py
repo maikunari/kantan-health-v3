@@ -250,6 +250,13 @@ Content Guidelines:
 - Make each content type distinct but complementary
 - SEO content should target local search terms
 
+CRITICAL UNIQUENESS REQUIREMENT:
+- EVERY piece of content MUST be UNIQUE to each specific provider
+- NEVER reuse the same phrases or sentences between different providers
+- Each provider must have COMPLETELY DIFFERENT content from all others
+- Specifically mention the provider's NAME and LOCATION in the content
+- DO NOT use generic templates - create fresh, original content for EACH provider
+
 Generate content for all {len(provider_details)} providers with ALL SIX content types."""
     
     def _analyze_reviews(self, review_content: Any) -> Dict[str, Any]:
@@ -384,22 +391,38 @@ Generate content for all {len(provider_details)} providers with ALL SIX content 
         return None
     
     def _create_fallback_content(self, providers: List[Provider]) -> List[ContentResult]:
-        """Create fallback content if API fails"""
+        """Create fallback content if API fails - UNIQUE for each provider"""
         results = []
         
         for provider in providers:
             name = provider.provider_name
             city = provider.city or "Japan"
+            district = provider.district or ""
             specialty = provider.specialties[0] if provider.specialties else "Healthcare"
             
-            # Create minimal but valid content
+            # Create UNIQUE content for each provider - avoid duplicates
+            location_detail = f"{district}, {city}" if district else city
+            
+            # Vary the description based on provider details
+            description = f"{name} is a {specialty.lower()} provider located in {location_detail}. " \
+                         f"The facility offers medical services with support for international patients."
+            
+            excerpt = f"{specialty} provider in {location_detail} offering professional medical care."
+            
+            # Make review summary unique to provider
+            review_summary = f"Patients visiting {name} receive {specialty.lower()} care in {city}."
+            
+            # Make English summary unique to provider and location
+            english_summary = f"{name} in {location_detail} provides support for international patients " \
+                            f"with translation assistance available for medical consultations."
+            
             results.append(ContentResult(
-                description=f"{name} provides quality healthcare services in {city}. Professional medical care with English language support available.",
-                excerpt=f"Healthcare provider in {city} offering medical services.",
-                review_summary="Healthcare facility providing medical services to patients.",
-                english_experience_summary="English language support is available for international patients.",
-                seo_title=f"{specialty} in {city} | {name}"[:60],
-                seo_meta_description=f"{specialty} services in {city}. Visit {name} for quality healthcare."[:160],
+                description=description,
+                excerpt=excerpt,
+                review_summary=review_summary,
+                english_experience_summary=english_summary,
+                seo_title=f"{name} | {specialty} in {city}"[:60],
+                seo_meta_description=f"{name} - {specialty} services in {location_detail}. Professional healthcare for international patients."[:160],
                 selected_featured_image=""
             ))
         

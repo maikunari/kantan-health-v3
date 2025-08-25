@@ -20,6 +20,7 @@ class Provider(Base):
     
     # Basic information
     provider_name = Column(String(255), nullable=False, index=True)
+    provider_name_romaji = Column(String(500))  # Romanized version for Japanese names
     address = Column(Text)
     city = Column(String(100), index=True)
     prefecture = Column(String(100))

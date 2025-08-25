@@ -373,3 +373,34 @@ session.close()
 2. **Import Updates**: All scripts now use `src.*` imports instead of direct imports
 3. **Command Changes**: Replace old run_*.py commands with `scripts/run_pipeline.py`
 4. **Caching**: First run may be slower as cache builds, subsequent runs will be much faster
+
+### Japanese Provider Name Processing (Romaji)
+
+**Unified Processing Script:**
+```bash
+# Process all Japanese providers (generate romaji + update WordPress)
+python3 scripts/process_japanese_providers.py
+
+# Process with limit
+python3 scripts/process_japanese_providers.py --limit 50
+
+# Preview changes without applying
+python3 scripts/process_japanese_providers.py --dry-run
+```
+
+**Romaji Conversion Features:**
+- Automatic detection of Japanese text (hiragana, katakana, kanji)
+- Medical term translation (not just transliteration):
+  - クリニック → Clinic (not Kurinikku)
+  - 病院 → Hospital (not Byouin)  
+  - 薬局 → Pharmacy (not Yakkyoku)
+  - 歯科 → Dental (not Shika)
+  - 小児科 → Pediatrics (not Shounika)
+- WordPress titles use romaji-only format (no Japanese in parentheses)
+- Database column: `provider_name_romaji VARCHAR(500)`
+- Utility module: `src/utils/romaji_converter.py`
+
+**Technical Requirements:**
+- cutlet>=0.3.0 (for romaji conversion)
+- mecab and unidic-lite (for Japanese text processing)
+- Installed via: `pip3 install cutlet unidic-lite`

@@ -14,6 +14,7 @@ import hashlib
 
 from ..core.database import DatabaseManager, Provider
 from .content_hash import ContentHashService
+from ..utils.romaji_converter import get_display_name, generate_romaji_for_provider
 
 logger = logging.getLogger(__name__)
 
@@ -119,15 +120,29 @@ class WordPressPublisher:
         logger.info(f"📝 Creating WordPress post for {provider.provider_name}")
         
         try:
+            # Generate romaji if needed
+            if not provider.provider_name_romaji:
+                provider.provider_name_romaji = generate_romaji_for_provider(provider)
+                if provider.provider_name_romaji:
+                    # Save romaji to database for future use
+                    self.db.update_provider_field(provider.id, 'provider_name_romaji', provider.provider_name_romaji)
+            
+            # Use romaji-only title if available, otherwise original name
+            title = provider.provider_name_romaji if provider.provider_name_romaji else provider.provider_name
+            
             # Prepare post data
             post_data = {
-                'title': provider.provider_name,
+                'title': title,
                 'content': self._generate_post_content(provider),
                 'status': 'publish',
                 'type': 'healthcare_provider',  # Custom post type
                 'categories': self._get_categories(provider),
                 'acf': self._prepare_acf_fields(provider)
             }
+            
+            # Add custom taxonomies
+            taxonomies = self._get_taxonomies(provider)
+            post_data.update(taxonomies)
             
             # Make API request to healthcare_provider endpoint
             response = requests.post(
@@ -181,13 +196,27 @@ class WordPressPublisher:
             changed_fields = self.hash_service.get_changed_fields(provider)
             logger.info(f"📝 Updating fields: {', '.join(changed_fields)}")
             
+            # Generate romaji if needed
+            if not provider.provider_name_romaji:
+                provider.provider_name_romaji = generate_romaji_for_provider(provider)
+                if provider.provider_name_romaji:
+                    # Save romaji to database for future use
+                    self.db.update_provider_field(provider.id, 'provider_name_romaji', provider.provider_name_romaji)
+            
+            # Use romaji-only title if available, otherwise original name
+            title = provider.provider_name_romaji if provider.provider_name_romaji else provider.provider_name
+            
             # Prepare update data
             post_data = {
-                'title': provider.provider_name,
+                'title': title,
                 'content': self._generate_post_content(provider),
                 'categories': self._get_categories(provider),
                 'acf': self._prepare_acf_fields(provider)
             }
+            
+            # Add custom taxonomies
+            taxonomies = self._get_taxonomies(provider)
+            post_data.update(taxonomies)
             
             # Make API request to healthcare_provider endpoint
             response = requests.post(
@@ -416,6 +445,161 @@ class WordPressPublisher:
                     categories.append(specialty_category_map[specialty])
         
         return categories
+    
+    def _get_or_create_term(self, term_name: str, taxonomy: str) -> Optional[int]:
+        """Get or create a WordPress taxonomy term
+        
+        Args:
+            term_name: Name of the term
+            taxonomy: Taxonomy slug (e.g., 'healthcare-location', 'healthcare-specialty')
+            
+        Returns:
+            Term ID if successful, None otherwise
+        """
+        if not term_name:
+            return None
+            
+        # Map taxonomy slugs to REST API endpoints
+        # WordPress custom taxonomies use different names in REST API
+        taxonomy_endpoints = {
+            'healthcare-location': 'location',
+            'healthcare-specialty': 'specialties',  # Note: plural form
+            'location': 'location',
+            'specialty': 'specialties',
+            'specialties': 'specialties'
+        }
+        
+        # Get the correct endpoint name
+        endpoint = taxonomy_endpoints.get(taxonomy, taxonomy)
+        
+        try:
+            # First, try to get existing term
+            url = f"{self.wp_url}/wp-json/wp/v2/{endpoint}"
+            logger.debug(f"Searching for term '{term_name}' at {url}")
+            
+            response = requests.get(
+                url,
+                auth=(self.wp_username, self.wp_password),
+                params={'search': term_name, 'per_page': 1}
+            )
+            
+            logger.debug(f"Search response: {response.status_code}")
+            
+            if response.status_code == 200:
+                terms = response.json()
+                if terms:
+                    logger.debug(f"Found existing term ID: {terms[0]['id']}")
+                    return terms[0]['id']
+            elif response.status_code == 404:
+                logger.warning(f"Taxonomy endpoint not found: {url}")
+                logger.warning(f"Response: {response.text[:200]}")
+                return None
+            
+            # If term doesn't exist, create it
+            logger.debug(f"Creating new term '{term_name}'")
+            response = requests.post(
+                url,
+                auth=(self.wp_username, self.wp_password),
+                json={'name': term_name}
+            )
+            
+            logger.debug(f"Create response: {response.status_code}")
+            
+            if response.status_code == 201:
+                term_id = response.json()['id']
+                logger.debug(f"Created new term ID: {term_id}")
+                return term_id
+            else:
+                logger.warning(f"Failed to create term: {response.status_code} - {response.text[:200]}")
+                
+        except Exception as e:
+            logger.warning(f"Could not get/create term '{term_name}' in {taxonomy}: {e}")
+        
+        return None
+    
+    def _get_taxonomies(self, provider: Provider) -> Dict[str, List[int]]:
+        """Get taxonomy term IDs for provider with enhanced specialty detection
+        
+        Args:
+            provider: Provider data
+            
+        Returns:
+            Dictionary with taxonomy term IDs
+        """
+        # Import specialty detector
+        from ..utils.specialty_detector import SpecialtyDetector
+        
+        taxonomies = {}
+        
+        # Set location taxonomy
+        locations = []
+        
+        # Add city as location
+        if provider.city:
+            term_id = self._get_or_create_term(provider.city, 'healthcare-location')
+            if term_id:
+                locations.append(term_id)
+        
+        # Add district/ward as location if available
+        if provider.district:
+            term_id = self._get_or_create_term(provider.district, 'healthcare-location')
+            if term_id:
+                locations.append(term_id)
+        elif hasattr(provider, 'ward') and provider.ward:
+            term_id = self._get_or_create_term(provider.ward, 'healthcare-location')
+            if term_id:
+                locations.append(term_id)
+        
+        if locations:
+            # WordPress REST API uses 'location' as the field name
+            taxonomies['location'] = locations
+        
+        # Enhanced specialty detection using multiple sources
+        detector = SpecialtyDetector()
+        
+        # Extract Google types if available
+        google_types = []
+        if hasattr(provider, 'provider_type') and provider.provider_type:
+            if isinstance(provider.provider_type, list):
+                google_types = provider.provider_type
+            else:
+                google_types = [provider.provider_type]
+        
+        # Use the enhanced detector to determine best specialty
+        best_specialty = detector.determine_specialty(
+            provider_name=provider.provider_name,
+            reviews=provider.review_content if provider.review_content else [],
+            google_types=google_types,
+            description=provider.ai_description,
+            existing_specialties=provider.specialties if provider.specialties else []
+        )
+        
+        # Clean up the specialty list
+        if provider.specialties and isinstance(provider.specialties, list):
+            cleaned_specialties = detector.clean_specialty_list(provider.specialties)
+        else:
+            cleaned_specialties = [best_specialty]
+        
+        # Ensure the best detected specialty is included
+        if best_specialty not in cleaned_specialties and best_specialty != 'General Medicine':
+            cleaned_specialties.insert(0, best_specialty)
+        
+        # Remove General Medicine if we have more specific specialties
+        if len(cleaned_specialties) > 1 and 'General Medicine' in cleaned_specialties:
+            cleaned_specialties = [s for s in cleaned_specialties if s != 'General Medicine']
+        
+        # Set specialty taxonomy with enhanced detection
+        specialties = []
+        for specialty in cleaned_specialties[:3]:  # Limit to top 3 specialties
+            term_id = self._get_or_create_term(specialty, 'healthcare-specialty')
+            if term_id:
+                specialties.append(term_id)
+        
+        if specialties:
+            # WordPress REST API uses 'specialties' as the field name
+            taxonomies['specialties'] = specialties
+        
+        return taxonomies
     
     def _set_featured_image(self, post_id: int, image_url: str) -> bool:
         """Set featured image for a post

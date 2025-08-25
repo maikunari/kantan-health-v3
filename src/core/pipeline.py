@@ -461,14 +461,10 @@ class UnifiedPipeline:
             
             logger.info(f"📤 Syncing {len(providers)} providers to WordPress")
             
-            # Photo URLs no longer needed
-            photo_urls = {}
-            
             # Sync to WordPress
             if not options.get('dry_run'):
                 sync_summary = self.publisher.sync_providers(
-                    providers,
-                    photo_urls=photo_urls
+                    providers
                 )
                 
                 results.update(sync_summary)
