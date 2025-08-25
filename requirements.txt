@@ -35,6 +35,7 @@ redis==5.0.0
 # Optional: Monitoring
 flask-limiter==3.5.0
 google-cloud-monitoring>=2.0.0
+google-cloud-billing>=1.11.0  # For accurate cost tracking from Google Cloud
 
 # Japanese text processing
 cutlet>=0.3.0  # Modern romaji converter for Japanese text

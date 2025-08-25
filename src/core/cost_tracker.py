@@ -187,20 +187,26 @@ class CostTracker:
         'nearby_search': 0.032      # Nearby Search
     }
     
-    def __init__(self, daily_limit_usd: float = 10.0, 
-                 monthly_limit_usd: float = 85.0,
+    def __init__(self, daily_limit_usd: float = None, 
+                 monthly_limit_usd: float = None,
                  db_path: str = 'cache/api_usage.db',
                  use_cloud_monitoring: bool = True,
                  project_id: str = None):
         """Initialize cost tracker
         
         Args:
-            daily_limit_usd: Daily spending limit in USD
-            monthly_limit_usd: Monthly spending limit in USD
+            daily_limit_usd: Daily spending limit in USD (uses env var if not provided)
+            monthly_limit_usd: Monthly spending limit in USD (uses env var if not provided)
             db_path: Path to SQLite database
             use_cloud_monitoring: Try to use Cloud Monitoring for actual costs
             project_id: Google Cloud project ID (for Cloud Monitoring)
         """
+        # Get limits from environment variables if not provided
+        if daily_limit_usd is None:
+            daily_limit_usd = float(os.getenv('DAILY_COST_LIMIT', '10.0'))
+        if monthly_limit_usd is None:
+            monthly_limit_usd = float(os.getenv('MONTHLY_COST_LIMIT', '85.0'))
+            
         self.DAILY_LIMIT = self.daily_limit = daily_limit_usd
         self.MONTHLY_LIMIT = self.monthly_limit = monthly_limit_usd
         self.db_path = db_path
@@ -211,9 +217,20 @@ class CostTracker:
         # Initialize database
         self._init_db()
         
-        # Try to initialize Cloud Monitoring
+        # Try to initialize Cloud Monitoring and Billing
         self.cloud_monitor = None
-        if use_cloud_monitoring and CLOUD_MONITORING_AVAILABLE:
+        self.billing_tracker = None
+        
+        # First try Google Billing API for most accurate costs
+        try:
+            from .google_billing_tracker import GoogleBillingTracker
+            self.billing_tracker = GoogleBillingTracker(project_id)
+            logger.info(f"✅ Google Billing API enabled for accurate cost tracking")
+        except Exception as e:
+            logger.debug(f"Google Billing API not available: {e}")
+        
+        # Fall back to Cloud Monitoring if available
+        if not self.billing_tracker and use_cloud_monitoring and CLOUD_MONITORING_AVAILABLE:
             try:
                 self.cloud_monitor = CloudMonitoringCostTracker(project_id)
                 logger.info(f"✅ Cloud Monitoring enabled for real-time cost tracking")
@@ -332,7 +349,31 @@ class CostTracker:
             logger.debug(f"✅ Cache hit for {request_type} (saved ${cost:.3f})")
     
     def _get_daily_cost(self) -> float:
-        """Get today's total cost"""
+        """Get today's total cost
+        
+        Tries billing API first, then Cloud Monitoring, then falls back to estimates
+        """
+        # Try Google Billing API first for most accurate data
+        if self.billing_tracker:
+            try:
+                actual_cost, _ = self.billing_tracker.get_today_costs()
+                if actual_cost > 0:
+                    logger.debug(f"Using actual cost from Billing API: ${actual_cost:.2f}")
+                    return actual_cost
+            except Exception as e:
+                logger.debug(f"Could not get billing data: {e}")
+        
+        # Try Cloud Monitoring next
+        if self.cloud_monitor:
+            try:
+                actual_cost = self.cloud_monitor.get_actual_cost_today()
+                if actual_cost > 0:
+                    logger.debug(f"Using actual cost from Cloud Monitoring: ${actual_cost:.2f}")
+                    return actual_cost
+            except Exception as e:
+                logger.debug(f"Could not get monitoring data: {e}")
+        
+        # Fall back to estimate from database
         today = datetime.now().date().isoformat()
         
         with sqlite3.connect(self.db_path) as conn:
@@ -342,10 +383,26 @@ class CostTracker:
             ''', (today,))
             
             row = cursor.fetchone()
-            return row[0] if row else 0.0
+            estimated = row[0] if row else 0.0
+            logger.debug(f"Using estimated cost from database: ${estimated:.2f}")
+            return estimated
     
     def _get_monthly_cost(self) -> float:
-        """Get current month's total cost"""
+        """Get current month's total cost
+        
+        Tries billing API first, then falls back to estimates
+        """
+        # Try Google Billing API first
+        if self.billing_tracker:
+            try:
+                monthly_cost = self.billing_tracker.get_month_costs()
+                if monthly_cost >= 0:  # Can be 0 if within free tier
+                    logger.debug(f"Using actual monthly cost from Billing API: ${monthly_cost:.2f}")
+                    return monthly_cost
+            except Exception as e:
+                logger.debug(f"Could not get monthly billing data: {e}")
+        
+        # Fall back to estimate from database
         start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         with sqlite3.connect(self.db_path) as conn:
@@ -355,7 +412,9 @@ class CostTracker:
             ''', (start_of_month.isoformat(),))
             
             result = cursor.fetchone()[0]
-            return result if result else 0.0
+            estimated = result if result else 0.0
+            logger.debug(f"Using estimated monthly cost from database: ${estimated:.2f}")
+            return estimated
     
     def get_usage_stats(self, days: int = 30) -> Dict[str, any]:
         """Get usage statistics
