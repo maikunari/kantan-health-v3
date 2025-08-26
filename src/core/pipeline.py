@@ -222,10 +222,11 @@ class UnifiedPipeline:
                     
                     # First, test if this grid has ANY providers
                     for term in basic_terms:
+                        # Add "English speaking" prefix to improve targeting
                         if grid.ward:
-                            query = f"{term} {grid.ward} {grid.city}"
+                            query = f"English speaking {term} {grid.ward} {grid.city}"
                         else:
-                            query = f"{term} near {grid.center_lat},{grid.center_lng}"
+                            query = f"English speaking {term} near {grid.center_lat},{grid.center_lng}"
                         test_queries.append(query)
                     
                     # Test with basic queries first (in actual collection, not dry run)
@@ -235,8 +236,7 @@ class UnifiedPipeline:
                         test_summary = self.collector.collect_providers(
                             queries=test_queries,
                             max_per_query=1,  # Just test for existence
-                            city=grid.city,
-                            ward=grid.ward
+                            city=grid.city  # Note: ward is part of grid object but not passed separately
                         )
                         grid_has_providers = test_summary.get('providers_collected', 0) > 0
                         
@@ -256,10 +256,21 @@ class UnifiedPipeline:
                         specialties = [s for s in specialties if s not in basic_terms]
                     
                     for specialty in specialties:
+                        # Check if term contains Japanese characters
+                        has_japanese = any(ord(char) > 0x3000 for char in specialty)
+                        
                         if grid.ward:
-                            query = f"{specialty} {grid.ward} {grid.city}"
+                            # Add "English speaking" prefix for non-Japanese terms
+                            if not has_japanese:
+                                query = f"English speaking {specialty} {grid.ward} {grid.city}"
+                            else:
+                                query = f"{specialty} {grid.ward} {grid.city}"
                         else:
-                            query = f"{specialty} near {grid.center_lat},{grid.center_lng}"
+                            # Add "English speaking" prefix for non-Japanese terms
+                            if not has_japanese:
+                                query = f"English speaking {specialty} near {grid.center_lat},{grid.center_lng}"
+                            else:
+                                query = f"{specialty} near {grid.center_lat},{grid.center_lng}"
                         grid_queries.append(query)
                     
                     # Calculate remaining slots

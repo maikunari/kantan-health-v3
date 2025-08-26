@@ -430,20 +430,34 @@ class GooglePlacesCollector:
         logger.info(f"🔍 Total results for '{query}': {len(filtered_results)} usable (from {len(all_results)} total)")
         return filtered_results[:max_results]
     
-    def get_place_details(self, place_id: str, force_refresh: bool = False) -> Optional[Dict]:
+    def get_place_details(self, place_id: str, force_refresh: bool = False, city: str = None) -> Optional[Dict]:
         """Get detailed place information with caching and deduplication
         
         Args:
             place_id: Google Place ID
             force_refresh: Skip cache and fetch fresh data (for expired references)
+            city: City name for city-aware deduplication
             
         Returns:
             Place details or None
         """
         # Skip these checks if force_refresh is True
         if not force_refresh:
-            # Check if already processed
-            if self.cache.is_processed(place_id):
+            # Check if already processed IN THIS CITY
+            if self.cache.is_processed(place_id) and city:
+                # Check if we have this provider in THIS specific city
+                existing = self.db.get_provider_by_place_id(place_id)
+                if existing and existing.city and existing.city.lower() == city.lower():
+                    logger.info(f"✅ Already have {place_id} in {city}")
+                    return None
+                elif existing and existing.city:
+                    # Different city - this could be a chain with multiple locations
+                    logger.info(f"📍 Found {place_id} in new city: {city} (existing in {existing.city})")
+                    # Continue to collect for new city
+                else:
+                    logger.info(f"✅ Already processed: {place_id}")
+                    return None
+            elif self.cache.is_processed(place_id):
                 logger.info(f"✅ Already processed: {place_id}")
                 return None
             
@@ -454,11 +468,20 @@ class GooglePlacesCollector:
                 self.cost_tracker.log_request('place_details', place_id=place_id, cached=True)
                 return cached
             
-            # Check if already in database
+            # City-aware database check
             existing = self.db.get_provider_by_place_id(place_id)
             if existing:
-                logger.info(f"✅ Already in database: {place_id}")
-                return None
+                if city and existing.city and existing.city.lower() == city.lower():
+                    logger.info(f"✅ Already have {place_id} in {city}")
+                    return None
+                elif city and existing.city and existing.city.lower() != city.lower():
+                    # Different city - allow collection for this new city
+                    logger.info(f"📍 Provider {place_id} exists in {existing.city}, collecting for {city}")
+                    # Continue to collect
+                else:
+                    # No city specified - use old behavior
+                    logger.info(f"✅ Already in database: {place_id}")
+                    return None
         else:
             logger.info(f"🔄 Force refresh requested, skipping cache for: {place_id}")
         
@@ -741,8 +764,8 @@ class GooglePlacesCollector:
                 if not place_id:
                     continue
                 
-                # Get details
-                details = self.get_place_details(place_id)
+                # Get details with city-aware deduplication
+                details = self.get_place_details(place_id, city=city)
                 if not details:
                     summary['duplicates_skipped'] += 1
                     continue

@@ -49,6 +49,15 @@ class GeographicSearchEngine:
         "Fukuoka": {"lat": 33.5904, "lng": 130.4017, "radius_km": 12},
         "Kawasaki": {"lat": 35.5309, "lng": 139.7031, "radius_km": 10},
         "Saitama": {"lat": 35.8617, "lng": 139.6455, "radius_km": 10},
+        # Additional major cities
+        "Sendai": {"lat": 38.2682, "lng": 140.8694, "radius_km": 10},
+        "Hiroshima": {"lat": 34.3853, "lng": 132.4553, "radius_km": 10},
+        "Niigata": {"lat": 37.9026, "lng": 139.0238, "radius_km": 10},
+        "Hamamatsu": {"lat": 34.7108, "lng": 137.7261, "radius_km": 10},
+        "Kumamoto": {"lat": 32.8032, "lng": 130.7079, "radius_km": 10},
+        "Okayama": {"lat": 34.6555, "lng": 133.9195, "radius_km": 10},
+        "Shizuoka": {"lat": 34.9756, "lng": 138.3827, "radius_km": 10},
+        "Kagoshima": {"lat": 31.5966, "lng": 130.5571, "radius_km": 10},
     }
     
     # Ward/District center coordinates for Tokyo

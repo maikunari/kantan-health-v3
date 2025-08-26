@@ -1,0 +1,188 @@
+{
+  "timestamp": "2025-08-26T11:54:53.523948",
+  "total_found": 159,
+  "tested": 20,
+  "qualified": 20,
+  "providers": [
+    {
+      "name": "Tokyo Medical And Surgical Clinic (English Speaking)",
+      "address": "Japan, \u3012105-0011 Tokyo, Minato City, Shibakoen, 3 Chome\u22124\u221230 32 BLDG 2\u968e",
+      "place_id": "ChIJr0K98b2LGGARtFI6Jl19br8",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.1,
+      "english_score": 60,
+      "reviews_count": 201
+    },
+    {
+      "name": "International Health Care Clinic",
+      "address": "Japan, \u3012105-0004 Tokyo, Minato City, Shinbashi, 2 Chome\u221210\u22125 \u672b\u5409\u30d3\u30eb 3F",
+      "place_id": "ChIJPcKml-uLGGARB2S_YVCnEF4",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 5,
+      "english_score": 60,
+      "reviews_count": 127
+    },
+    {
+      "name": "Tokyo Station International Clinic",
+      "address": "Japan, \u3012100-0005 Tokyo, Chiyoda City, Marunouchi, 1 Chome\u22129\u22121 \u30b0\u30e9\u30f3\u30eb\u30fc\u30d5 1F",
+      "place_id": "ChIJ5y-q0vWLGGAR-NGaoXDiC-g",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.5,
+      "english_score": 60,
+      "reviews_count": 260
+    },
+    {
+      "name": "Sendagaya International Clinic",
+      "address": "Japan, \u3012151-0051 Tokyo, Shibuya, Sendagaya, 1 Chome\u221220\u22123 \u30d0\u30eb\u30d3\u30be\u30f3\uff11\uff11\u756a\u9928 \u53f7\u9928203\u53f7",
+      "place_id": "ChIJB9USN76MGGARgAFgNRKIy4k",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.5,
+      "english_score": 60,
+      "reviews_count": 164
+    },
+    {
+      "name": "American Clinic Tokyo",
+      "address": "Japan, \u3012107-0052 Tokyo, Minato City, Akasaka, 1 Chome\u22127\u22124 \uff2e\uff4f\uff0e\uff11\u30cb\u30a4\u30af\u30e9\u30d3\u30eb 3\u968e",
+      "place_id": "ChIJ6dCrf4WLGGARFRJ-NeToPmY",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.1,
+      "english_score": 40,
+      "reviews_count": 64
+    },
+    {
+      "name": "Yaesugai Medical Clinic",
+      "address": "Japan, \u3012103-0027 Tokyo, Chuo City, Nihonbashi, 2 Chome\u22122\u221220 \u65e5\u672c\u6a4b\u4ef2\u901a\u308a\u30d3\u30eb 3\u968e",
+      "place_id": "ChIJ_6G4kP2LGGARUPi6X85ir0E",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.5,
+      "english_score": 40,
+      "reviews_count": 64
+    },
+    {
+      "name": "National Medical Clinic",
+      "address": "Japan, \u3012106-0047 Tokyo, Minato City, Minamiazabu, 5 Chome\u221216\u221211-202 \u30e9\u30fb\u30ac\u30fc\u30eb \uff15\uff11\uff16",
+      "place_id": "ChIJ09mKw3KLGGARAH2l2TNQU28",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.4,
+      "english_score": 35,
+      "reviews_count": 25
+    },
+    {
+      "name": "Tokyo Online Clinic",
+      "address": "Japan, \u3012150-0002 Tokyo, Shibuya, 3 Chome\u22128\u22127 \u7b2c\u4e8c\u7aaa\u5cf6\u30d3\u30eb 5\u968e",
+      "place_id": "ChIJL_UoPIb1GGARQW9ZfQqpF6E",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.6,
+      "english_score": 40,
+      "reviews_count": 627
+    },
+    {
+      "name": "Nishiazabu International Clinic",
+      "address": "Japan, \u3012106-0031 Tokyo, Minato City, Nishiazabu, 3 Chome\u221217\u221220 LY\u897f\u9ebb\u5e03 2F",
+      "place_id": "ChIJVVVJVnCLGGAROQZatWbi7VQ",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.3,
+      "english_score": 60,
+      "reviews_count": 100
+    },
+    {
+      "name": "Roppongi HAT Clinic",
+      "address": "Japan, \u3012106-0032 Tokyo, Minato City, Roppongi, 3 Chome\u22121\u22121 \uff34\uff0d\uff23\uff35\uff22\uff25\uff12\uff26",
+      "place_id": "ChIJcSG1tISLGGARASlBZclnJeg",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.8,
+      "english_score": 40,
+      "reviews_count": 58
+    },
+    {
+      "name": "Tokyo International Clinic",
+      "address": "4 Chome-18-19 Takanawa, Minato City, Tokyo 108-0074, Japan",
+      "place_id": "ChIJ0_xoTliKGGARXy5pbfCEw7Y",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.1,
+      "english_score": 45,
+      "reviews_count": 9
+    },
+    {
+      "name": "Shinjuku Hiro Clinic",
+      "address": "Japan, \u3012169-0072 Tokyo, Shinjuku City, Okubo, 2 Chome\u221211\u221215 \u5927\u6797\u30d3\u30eb 1\u968e2\u968e",
+      "place_id": "ChIJqQCfqdOMGGARLpNfulXTbSc",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.1,
+      "english_score": 40,
+      "reviews_count": 53
+    },
+    {
+      "name": "Koishikawa International Clinic",
+      "address": "Japan, \u3012112-0001 Tokyo, Bunkyo City, Hakusan, 2 Chome\u221229\u22124 \u6cc9\u767d\u5c71\u30d3\u30eb \uff11F",
+      "place_id": "ChIJ6QzEarWNGGARv97eM1d_MDY",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 5,
+      "english_score": 55,
+      "reviews_count": 15
+    },
+    {
+      "name": "Hiroo International Clinic",
+      "address": "Japan, \u3012106-0047 Tokyo, Minato City, Minamiazabu, 4 Chome\u221214\u22126 7F",
+      "place_id": "ChIJyUgbog6LGGARIWD661ucf04",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 3.8,
+      "english_score": 60,
+      "reviews_count": 59
+    },
+    {
+      "name": "Tokyo Business Clinic Yaesu North Exit",
+      "address": "Japan, \u3012100-0005 Tokyo, Chiyoda City, Marunouchi, 1 Chome\u22128\u22122 Tekko Building, B1",
+      "place_id": "ChIJA6rID3mLGGAR8Xw4UqBfbLc",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.3,
+      "english_score": 40,
+      "reviews_count": 257
+    },
+    {
+      "name": "Kim Clinic",
+      "address": "Japan, \u3012160-0021 Tokyo, Shinjuku City, Kabukicho, 2 Chome\u221241\u22127 \u5ddd\u4e95\u30d3\u30eb 4\u968e",
+      "place_id": "ChIJAYyE6CeNGGARI5FIAh_cTOc",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.6,
+      "english_score": 30,
+      "reviews_count": 100
+    },
+    {
+      "name": "Roppongi Hills Clinic",
+      "address": "Japan, \u3012106-0032 Tokyo, Minato City, Roppongi, 6 Chome\u22124\u22121 \u30d2\u30eb\u30ba\u30cf\u30ea\u30a6\u30c3\u30c9\u30d3\u30e5\u30fc\u30c6\u30a3\u30d7\u30e9\u30b6 3F",
+      "place_id": "ChIJu9PoCHeLGGARB_jKl32P0dg",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 2.5,
+      "english_score": 40,
+      "reviews_count": 136
+    },
+    {
+      "name": "Tokyo Business Clinic Gransta Marunouchi",
+      "address": "Japan, \u3012100-0005 Tokyo, Chiyoda City, Marunouchi, 1 Chome\u22129\u22121 JR\u6771\u65e5\u672c\u6771\u4eac\u99c5\u69cb\u5185 B1",
+      "place_id": "ChIJkxD1wuCLGGARp7LO0l3XxqU",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.2,
+      "english_score": 40,
+      "reviews_count": 387
+    },
+    {
+      "name": "Yanagisawa Clinic",
+      "address": "\u83f1\u548c\u30d3\u30eb 3F, 2-3 Katamachi, Shinjuku City, Tokyo 160-0001, Japan",
+      "place_id": "ChIJa0hKwvOMGGARqGXAJ_d_UHA",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 4.8,
+      "english_score": 40,
+      "reviews_count": 65
+    },
+    {
+      "name": "Tokyo Total Life Clinic",
+      "address": "Atlas Mio Asakusa Kaminarimon, 2 Chome-6-3 Kaminarimon, Taito City, Tokyo 111-0034, Japan",
+      "place_id": "ChIJ8cToDMeOGGARCMMKi-eL-Bw",
+      "from_query": "English speaking doctor Tokyo",
+      "basic_rating": 3.6,
+      "english_score": 35,
+      "reviews_count": 39
+    }
+  ]
+}
