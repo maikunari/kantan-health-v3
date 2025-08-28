@@ -117,6 +117,17 @@ class GooglePlacesCollector:
         # Load city translations
         self._load_city_translations()
         
+        # ENHANCEMENT: Initialize master data validators
+        try:
+            from ..data import LocationValidator, SpecialtyNormalizer
+            self.location_validator = LocationValidator()
+            self.specialty_normalizer = SpecialtyNormalizer()
+            logger.info("✅ Master data validators initialized")
+        except ImportError:
+            logger.warning("⚠️ Master data validators not available")
+            self.location_validator = None
+            self.specialty_normalizer = None
+        
         logger.info(f"✅ Google Places Collector initialized (daily limit: {daily_limit or 'None'})")
     
     def _apply_rate_limit(self):
@@ -326,6 +337,143 @@ class GooglePlacesCollector:
                     if len(queries) >= limit:
                         return queries
         
+        return queries[:limit]
+    
+    def generate_english_focused_queries(self, 
+                                        locations: List[str] = None,
+                                        specialties: List[str] = None,
+                                        limit: int = 100,
+                                        validate: bool = True) -> List[Dict]:
+        """
+        ENHANCEMENT: Generate English-focused search queries using master data
+        
+        Args:
+            locations: List of locations (validated against master list)
+            specialties: List of specialties (normalized to canonical forms)
+            limit: Maximum number of queries to generate
+            validate: Whether to validate locations and specialties
+            
+        Returns:
+            List of query dictionaries with metadata
+        """
+        # Import master data if not already loaded
+        if not self.location_validator or not self.specialty_normalizer:
+            try:
+                from ..data import LocationValidator, SpecialtyNormalizer, get_english_priority_locations
+                self.location_validator = LocationValidator()
+                self.specialty_normalizer = SpecialtyNormalizer()
+            except ImportError:
+                logger.error("Cannot generate English-focused queries without master data")
+                return []
+        
+        # Use priority locations if none specified
+        if not locations:
+            from ..data import get_english_priority_locations
+            locations = get_english_priority_locations(20)
+            logger.info(f"Using {len(locations)} priority English-speaking locations")
+        
+        # Use priority specialties if none specified
+        if not specialties:
+            specialties = self.specialty_normalizer.get_priority_specialties()
+            logger.info(f"Using {len(specialties)} priority medical specialties")
+        
+        # Validate and normalize locations
+        if validate:
+            valid_locations = []
+            for loc in locations:
+                if self.location_validator.validate_location(loc):
+                    normalized = self.location_validator.normalize_location(loc)
+                    valid_locations.append(normalized)
+                else:
+                    logger.warning(f"Invalid location rejected: {loc}")
+            locations = valid_locations
+            
+            if not locations:
+                logger.error("No valid locations after validation")
+                return []
+        
+        # Normalize specialties
+        normalized_specialties = []
+        for spec in specialties:
+            result = self.specialty_normalizer.normalize_specialty(spec)
+            normalized_specialties.append(result['specialty'])
+            if result.get('needs_review'):
+                logger.warning(f"Specialty needs review: {spec} -> {result['specialty']}")
+        
+        # Generate English-focused queries
+        queries = []
+        query_id = 0
+        
+        # Pattern 1: Direct English-speaking queries (highest priority)
+        english_patterns = [
+            "English speaking {specialty} {location}",
+            "English {specialty} {location}",
+            "International {specialty} {location}",
+            "Foreign friendly {specialty} {location}",
+            "Expat {specialty} {location}"
+        ]
+        
+        # Pattern 2: Location-specific patterns for international areas
+        international_patterns = [
+            "{specialty} in {location}",  # Simple but effective in international areas
+            "International medical center {location}",
+            "English clinic {location}"
+        ]
+        
+        # Pattern 3: General healthcare with English focus
+        general_patterns = [
+            "English speaking doctor {location}",
+            "International hospital {location}",
+            "Foreign friendly clinic {location}"
+        ]
+        
+        # Generate queries with metadata
+        for location in locations:
+            location_type = self.location_validator.get_location_type(location)
+            
+            # High-priority English-specific queries for each specialty
+            for specialty in normalized_specialties[:5]:  # Top 5 specialties per location
+                for pattern in english_patterns[:3]:  # Top 3 patterns
+                    query_text = pattern.format(specialty=specialty.lower(), location=location)
+                    
+                    queries.append({
+                        'id': query_id,
+                        'query': query_text,
+                        'location': location,
+                        'location_type': location_type,
+                        'specialty': specialty,
+                        'pattern_type': 'english_specific',
+                        'priority': 1,
+                        'expected_english_rate': 'high'
+                    })
+                    query_id += 1
+                    
+                    if len(queries) >= limit:
+                        return queries
+            
+            # Add some general English queries for the location
+            for pattern in general_patterns[:2]:
+                query_text = pattern.format(location=location)
+                
+                queries.append({
+                    'id': query_id,
+                    'query': query_text,
+                    'location': location,
+                    'location_type': location_type,
+                    'specialty': 'General Medicine',
+                    'pattern_type': 'general_english',
+                    'priority': 2,
+                    'expected_english_rate': 'medium-high'
+                })
+                query_id += 1
+                
+                if len(queries) >= limit:
+                    return queries
+        
+        # Sort by priority (already mostly sorted, but ensure consistency)
+        queries.sort(key=lambda x: (x['priority'], x['id']))
+        
+        logger.info(f"Generated {len(queries)} English-focused queries")
         return queries[:limit]
     
     def search_providers(self, query: str, limit: int = None, max_results: int = 60) -> List[Dict]:
@@ -606,6 +754,15 @@ class GooglePlacesCollector:
         if city:
             record['city'] = city
         
+        # ENHANCEMENT: Validate location against master list
+        if self.location_validator and record.get('city'):
+            if not self.location_validator.validate_location(record['city']):
+                logger.warning(f"Invalid location for {record['provider_name']}: {record['city']}")
+                record['location_needs_review'] = True
+            else:
+                # Normalize the location name
+                record['city'] = self.location_validator.normalize_location(record['city'])
+        
         # Extract business hours
         if 'opening_hours' in place_data:
             record['business_hours'] = place_data['opening_hours'].get('weekday_text', [])
@@ -613,7 +770,24 @@ class GooglePlacesCollector:
         # Extract medical specialties from types
         types = place_data.get('types', [])
         specialties = self._extract_specialties(types)
-        record['specialties'] = specialties
+        
+        # ENHANCEMENT: Validate and normalize specialties
+        if self.specialty_normalizer and specialties:
+            normalized_specialties = []
+            review_needed = False
+            
+            for specialty in specialties:
+                result = self.specialty_normalizer.normalize_specialty(specialty)
+                normalized_specialties.append(result['specialty'])
+                
+                if result.get('needs_review'):
+                    review_needed = True
+                    logger.debug(f"Specialty needs review for {record['provider_name']}: {specialty} -> {result['specialty']}")
+            
+            record['specialties'] = normalized_specialties
+            record['specialties_need_review'] = review_needed
+        else:
+            record['specialties'] = specialties
         
         # Process reviews for English proficiency
         reviews = place_data.get('reviews', [])
