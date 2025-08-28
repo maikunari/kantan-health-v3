@@ -11,7 +11,6 @@ from datetime import datetime
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, Text, Float, JSON, TIMESTAMP, or_, and_, ARRAY
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import NullPool
 
 logger = logging.getLogger(__name__)
 
@@ -130,11 +129,19 @@ class DatabaseManager:
         }
     
     def _create_engine(self):
-        """Create SQLAlchemy engine with connection pooling"""
+        """Create SQLAlchemy engine with proper connection pooling"""
         db_url = f"postgresql://{self.config['user']}:{self.config['password']}@{self.config['host']}:5432/{self.config['database']}"
         
-        # Use NullPool to prevent connection issues
-        return create_engine(db_url, poolclass=NullPool, echo=False)
+        # FIXED: Using proper connection pooling instead of NullPool
+        # NullPool creates/destroys connections on every request - terrible for production
+        return create_engine(
+            db_url,
+            pool_size=10,           # Maintain 10 persistent connections
+            max_overflow=20,        # Allow 20 additional connections when needed
+            pool_recycle=3600,     # Recycle connections after 1 hour
+            pool_pre_ping=True,    # Verify connections before use
+            echo=False
+        )
     
     def get_session(self):
         """Get a new database session"""

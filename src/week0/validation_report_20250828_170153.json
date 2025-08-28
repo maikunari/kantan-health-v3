@@ -1,0 +1,162 @@
+{
+  "timestamp": "2025-08-28T17:01:49.590486",
+  "components": {
+    "environment_config": {
+      "status": "pass",
+      "issues": [],
+      "details": {
+        "POSTGRES_USER": "configured",
+        "POSTGRES_PASSWORD": "***",
+        "POSTGRES_HOST": "configured",
+        "POSTGRES_DB": "configured",
+        "GOOGLE_PLACES_API_KEY": "configured",
+        "ANTHROPIC_API_KEY": "configured",
+        "WORDPRESS_URL": "configured",
+        "WORDPRESS_USERNAME": "configured",
+        "WORDPRESS_APPLICATION_PASSWORD": "***"
+      }
+    },
+    "database_connectivity": {
+      "status": "fail",
+      "issues": [
+        "Using NullPool - creates new connection for every request",
+        "Connection 1 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 2 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 3 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 4 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 5 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 6 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 7 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 8 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 9 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection 10 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+        "Connection instability: 100.0% failure rate",
+        "Database query failed: name 'Provider' is not defined"
+      ],
+      "details": {
+        "connection": "established",
+        "connection_success_rate": "0.0%"
+      },
+      "root_cause": "NullPool causes connection instability and performance issues",
+      "needs_repair": true
+    },
+    "google_places_api": {
+      "status": "fail",
+      "issues": [
+        "Search test failed: search_providers() got an unexpected keyword argument 'limit'",
+        "No rate limiting configured",
+        "Romaji converter not integrated"
+      ],
+      "details": {
+        "collector_initialized": true
+      },
+      "root_cause": "API integration may be broken or quota exceeded"
+    },
+    "wordpress_api": {
+      "status": "error",
+      "issues": [],
+      "details": {
+        "publisher_initialized": true
+      },
+      "root_cause": null,
+      "error": "'WordPressPublisher' object has no attribute 'wordpress_url'",
+      "needs_repair": true
+    },
+    "romaji_converter": {
+      "status": "warning",
+      "issues": [
+        "Romaji converter not found: cannot import name 'BusinessNameRomajiConverter' from 'src.utils.romaji_converter' (/Users/michaelsewell/Projects/kantan-health-v3/src/utils/romaji_converter.py)"
+      ],
+      "details": {}
+    },
+    "duplicate_detection": {
+      "status": "warning",
+      "issues": [
+        "Cannot import DuplicateDetector: cannot import name 'DuplicateDetector' from 'src.collectors.deduplication' (/Users/michaelsewell/Projects/kantan-health-v3/src/collectors/deduplication.py)"
+      ],
+      "details": {},
+      "root_cause": null
+    },
+    "ai_content_processor": {
+      "status": "pass",
+      "issues": [
+        "Mega batch processing not implemented",
+        "Content validation not implemented"
+      ],
+      "details": {
+        "processor_initialized": true
+      }
+    },
+    "pipeline_orchestration": {
+      "status": "pass",
+      "issues": [
+        "No checkpoint recovery found"
+      ],
+      "details": {
+        "pipeline_script": "exists",
+        "pipeline_phases": "collect \u2192 process \u2192 publish"
+      }
+    }
+  },
+  "summary": {
+    "total_tested": 8,
+    "passed": 3,
+    "failed": 2,
+    "errors": 0,
+    "warnings": 2
+  },
+  "critical_issues": [
+    "Using NullPool - creates new connection for every request",
+    "Connection 1 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 2 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 3 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 4 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 5 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 6 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 7 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 8 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 9 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection 10 failed: Textual SQL expression 'SELECT COUNT(*) FROM prov...' should be explicitly declared as text('SELECT COUNT(*) FROM prov...')",
+    "Connection instability: 100.0% failure rate",
+    "Database query failed: name 'Provider' is not defined",
+    "Search test failed: search_providers() got an unexpected keyword argument 'limit'",
+    "No rate limiting configured",
+    "Romaji converter not integrated"
+  ],
+  "warnings": [
+    "Romaji converter not found: cannot import name 'BusinessNameRomajiConverter' from 'src.utils.romaji_converter' (/Users/michaelsewell/Projects/kantan-health-v3/src/utils/romaji_converter.py)",
+    "Cannot import DuplicateDetector: cannot import name 'DuplicateDetector' from 'src.collectors.deduplication' (/Users/michaelsewell/Projects/kantan-health-v3/src/collectors/deduplication.py)"
+  ],
+  "repair_priorities": [
+    {
+      "priority": 1,
+      "component": "database_connectivity",
+      "issue": "NullPool causes connection instability and performance issues",
+      "repair_action": "Replace NullPool with proper connection pooling (pool_size=10, max_overflow=20)"
+    },
+    {
+      "priority": 1,
+      "component": "google_places_api",
+      "issue": "API integration may be broken or quota exceeded",
+      "repair_action": "Fix API integration and implement rate limiting"
+    },
+    {
+      "priority": 1,
+      "component": "wordpress_api",
+      "issue": "Component failure",
+      "repair_action": "Verify credentials and fix authentication"
+    },
+    {
+      "priority": 2,
+      "component": "romaji_converter",
+      "issue": "Romaji converter not found: cannot import name 'BusinessNameRomajiConverter' from 'src.utils.romaji_converter' (/Users/michaelsewell/Projects/kantan-health-v3/src/utils/romaji_converter.py)",
+      "repair_action": "Implement or fix romaji conversion module"
+    },
+    {
+      "priority": 2,
+      "component": "duplicate_detection",
+      "issue": "Cannot import DuplicateDetector: cannot import name 'DuplicateDetector' from 'src.collectors.deduplication' (/Users/michaelsewell/Projects/kantan-health-v3/src/collectors/deduplication.py)",
+      "repair_action": "Remove geographic exclusion and implement identity-based detection"
+    }
+  ]
+}

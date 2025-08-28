@@ -6,6 +6,12 @@ Converts Japanese text (hiragana, katakana, kanji) to readable romaji
 import re
 import logging
 
+# For compatibility - import the wrapper class
+try:
+    from .romaji_wrapper import BusinessNameRomajiConverter
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 # Try to import cutlet, fall back gracefully if not available

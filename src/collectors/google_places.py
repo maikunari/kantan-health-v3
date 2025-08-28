@@ -92,6 +92,19 @@ class GooglePlacesCollector:
         self.db = DatabaseManager()
         self.deduplicator = ProviderDeduplicator()
         
+        # FIXED: Add romaji converter integration
+        try:
+            from ..utils.romaji_wrapper import BusinessNameRomajiConverter
+            self.romaji_converter = BusinessNameRomajiConverter()
+            logger.info("✅ Romaji converter integrated")
+        except ImportError:
+            logger.warning("⚠️ Romaji converter not available")
+            self.romaji_converter = None
+        
+        # FIXED: Add rate limiting (2 seconds between API calls)
+        self.rate_limit_delay = 2.0  # seconds between API calls
+        self.last_api_call = 0
+        
         # Configuration
         self.daily_limit = daily_limit
         self.processed_place_ids: Set[str] = set()
@@ -105,6 +118,18 @@ class GooglePlacesCollector:
         self._load_city_translations()
         
         logger.info(f"✅ Google Places Collector initialized (daily limit: {daily_limit or 'None'})")
+    
+    def _apply_rate_limit(self):
+        """Apply rate limiting between API calls"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_api_call
+        
+        if time_since_last < self.rate_limit_delay:
+            sleep_time = self.rate_limit_delay - time_since_last
+            logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
+            time.sleep(sleep_time)
+        
+        self.last_api_call = time.time()
     
     def _load_exclusion_list(self):
         """Load place IDs to exclude from searches (existing providers and rejected)"""
@@ -303,7 +328,7 @@ class GooglePlacesCollector:
         
         return queries[:limit]
     
-    def search_providers(self, query: str, max_results: int = 60) -> List[Dict]:
+    def search_providers(self, query: str, limit: int = None, max_results: int = 60) -> List[Dict]:
         """Search for healthcare providers with pagination support
         
         This method now supports pagination to get up to 60 results (3 pages of 20).
@@ -312,11 +337,16 @@ class GooglePlacesCollector:
         
         Args:
             query: Search query
+            limit: Maximum results to return (backwards compatibility)
             max_results: Maximum results to return (default 60, max 60)
             
         Returns:
             List of provider results (up to 60)
         """
+        # Handle backwards compatibility - use limit if provided
+        if limit is not None:
+            max_results = limit
+            
         # Limit max_results to 60 (Google's maximum with pagination)
         max_results = min(max_results, 60)
         
@@ -357,6 +387,9 @@ class GooglePlacesCollector:
                 params['pagetoken'] = next_page_token
             
             try:
+                # FIXED: Apply rate limiting
+                self._apply_rate_limit()
+                
                 response = requests.get(self.search_url, params=params, timeout=10)
                 response.raise_for_status()
                 
@@ -500,6 +533,9 @@ class GooglePlacesCollector:
         }
         
         try:
+            # FIXED: Apply rate limiting
+            self._apply_rate_limit()
+            
             response = requests.get(self.details_url, params=params, timeout=10)
             response.raise_for_status()
             

@@ -10,6 +10,12 @@ import unicodedata
 from typing import Dict, Optional
 import logging
 
+# For compatibility - import the wrapper class
+try:
+    from .duplicate_detector import DuplicateDetector
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 

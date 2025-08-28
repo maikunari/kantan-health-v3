@@ -1,0 +1,26 @@
+# Minimal requirements for healthcare provider campaign
+# Database
+sqlalchemy==2.0.31
+psycopg2-binary==2.9.9
+
+# API integrations
+requests==2.31.0
+googlemaps==4.10.0
+anthropic==0.34.1
+
+# Configuration
+python-dotenv==1.0.1
+
+# Data processing
+pandas==2.2.2
+
+# Japanese text processing
+cutlet>=0.3.0
+
+# Utilities
+pytz==2023.3
+python-dateutil==2.8.2
+
+# Google Cloud monitoring (for cost tracking)
+google-cloud-monitoring>=2.0.0
+google-cloud-billing>=1.11.0
