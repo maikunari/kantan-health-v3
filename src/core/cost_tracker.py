@@ -221,13 +221,19 @@ class CostTracker:
         self.cloud_monitor = None
         self.billing_tracker = None
         
-        # First try Google Billing API for most accurate costs
-        try:
-            from .google_billing_tracker import GoogleBillingTracker
-            self.billing_tracker = GoogleBillingTracker(project_id)
-            logger.info(f"✅ Google Billing API enabled for accurate cost tracking")
-        except Exception as e:
-            logger.debug(f"Google Billing API not available: {e}")
+        # Check if billing API is disabled via environment variable
+        disable_billing = os.getenv('DISABLE_GOOGLE_BILLING', '').lower() in ('true', '1', 'yes')
+        
+        # First try Google Billing API for most accurate costs (unless disabled)
+        if not disable_billing:
+            try:
+                from .google_billing_tracker import GoogleBillingTracker
+                self.billing_tracker = GoogleBillingTracker(project_id)
+                logger.info(f"✅ Google Billing API enabled for accurate cost tracking")
+            except Exception as e:
+                logger.debug(f"Google Billing API not available: {e}")
+        else:
+            logger.info("Google Billing API disabled via environment variable")
         
         # Fall back to Cloud Monitoring if available
         if not self.billing_tracker and use_cloud_monitoring and CLOUD_MONITORING_AVAILABLE:
