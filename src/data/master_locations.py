@@ -204,6 +204,12 @@ class LocationValidator:
             self.valid_districts
         )
         
+        # Add backward compatibility attributes
+        self.all_locations = self.all_valid_locations
+        self.tokyo_special_wards = TOKYO_SPECIAL_WARDS
+        self.major_cities = MAJOR_CITIES
+        self.international_districts = INTERNATIONAL_DISTRICTS
+        
         # Create normalization mappings
         self._create_normalization_map()
     

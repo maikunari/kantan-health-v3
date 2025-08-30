@@ -260,6 +260,9 @@ class SpecialtyNormalizer:
         self.duplicate_mappings = DUPLICATE_MAPPINGS.copy()
         self.japanese_mappings = JAPANESE_MAPPINGS.copy()
         
+        # Add backward compatibility alias
+        self.canonical_specialties = self.primary_specialties
+        
         # Default for unknown specialties
         self.default_specialty = 'General Medicine'
     
