@@ -61,6 +61,13 @@ class Provider(Base):
     wheelchair_accessible = Column(String(50))
     parking_available = Column(String(50))
     
+    # Data validation fields
+    primary_specialty = Column(String(100))  # Normalized primary specialty
+    location_needs_review = Column(Boolean, default=False)
+    specialties_need_review = Column(Boolean, default=False)
+    needs_manual_review = Column(Boolean, default=False)
+    validation_notes = Column(Text)
+    
     # Status and tracking
     status = Column(String(50), default="pending", index=True)
     created_at = Column(String)

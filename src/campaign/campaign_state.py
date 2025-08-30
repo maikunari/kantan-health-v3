@@ -33,6 +33,14 @@ class CampaignMetrics:
     providers_with_english: int = 0
     providers_with_content: int = 0
     
+    # Validation metrics
+    locations_validated: int = 0
+    locations_normalized: int = 0
+    locations_needing_review: int = 0
+    specialties_normalized: int = 0
+    specialties_needing_review: int = 0
+    providers_needing_review: int = 0
+    
     # Daily metrics
     providers_today: int = 0
     cost_today: float = 0.0

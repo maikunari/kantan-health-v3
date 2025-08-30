@@ -178,6 +178,39 @@ class EnhancedCampaignPipeline:
                         qualified_count += 1
                         english_scores.append(proficiency)
                         
+                        # Track validation metrics
+                        if provider_record.get('location_needs_review'):
+                            self.state_manager.state.metrics.locations_needing_review += 1
+                            logger.info(f"   ⚠️  Location needs review: {provider_record.get('city', 'Unknown')}")
+                        else:
+                            self.state_manager.state.metrics.locations_validated += 1
+                        
+                        if provider_record.get('specialties_need_review'):
+                            self.state_manager.state.metrics.specialties_needing_review += 1
+                            logger.info(f"   ⚠️  Specialties need review: {provider_record.get('specialties', [])}")
+                        else:
+                            self.state_manager.state.metrics.specialties_normalized += len(provider_record.get('specialties', []))
+                        
+                        # Set primary specialty (first normalized specialty)
+                        specialties = provider_record.get('specialties', [])
+                        if specialties:
+                            provider_record['primary_specialty'] = specialties[0]
+                        
+                        # Flag provider for review if needed
+                        needs_review = (provider_record.get('location_needs_review') or 
+                                      provider_record.get('specialties_need_review'))
+                        if needs_review:
+                            self.state_manager.state.metrics.providers_needing_review += 1
+                            provider_record['needs_manual_review'] = True
+                            
+                            # Add validation notes
+                            notes = []
+                            if provider_record.get('location_needs_review'):
+                                notes.append(f"Location needs review: {provider_record.get('city', 'Unknown')}")
+                            if provider_record.get('specialties_need_review'):
+                                notes.append(f"Specialties need review: {', '.join(specialties)}")
+                            provider_record['validation_notes'] = '; '.join(notes)
+                        
                         # Save to database
                         saved_provider = self.pipeline.db.create_or_update_provider(provider_record)
                         
@@ -185,6 +218,8 @@ class EnhancedCampaignPipeline:
                             providers_collected += 1
                             logger.info(f"   ✅ Added: {provider_record.get('provider_name', 'Unknown')}")
                             logger.info(f"      English Score: {proficiency}/5")
+                            logger.info(f"      Location: {provider_record.get('city', 'Unknown')} {'[REVIEW]' if provider_record.get('location_needs_review') else '[VALID]'}")
+                            logger.info(f"      Specialties: {', '.join(provider_record.get('specialties', ['None']))} {'[REVIEW]' if provider_record.get('specialties_need_review') else '[VALID]'}")
                             
                             # Update metrics
                             self.state_manager.update_provider_metrics(
@@ -301,6 +336,16 @@ class EnhancedCampaignPipeline:
         print(f"\n✨ Quality:")
         print(f"   Avg English Score: {summary['quality']['avg_english_proficiency']:.1f}/5")
         print(f"   Providers with English: {summary['quality']['providers_with_english']}")
+        
+        # Validation metrics
+        print(f"\n🔍 Data Validation:")
+        metrics = self.state_manager.state.metrics
+        print(f"   Locations validated: {metrics.locations_validated}")
+        print(f"   Locations needing review: {metrics.locations_needing_review}")
+        print(f"   Specialties normalized: {metrics.specialties_normalized}")
+        print(f"   Specialties needing review: {metrics.specialties_needing_review}")
+        if metrics.providers_needing_review > 0:
+            print(f"   ⚠️  Providers flagged for review: {metrics.providers_needing_review}")
         
         # Daily metrics
         print(f"\n📈 Today's Performance:")
