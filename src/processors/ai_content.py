@@ -13,6 +13,11 @@ from collections import namedtuple
 
 from anthropic import Anthropic
 from ..core.database import DatabaseManager, Provider
+from ..utils.romaji_converter import (
+    contains_japanese, 
+    convert_to_romaji, 
+    get_display_name
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +50,40 @@ class AIContentProcessor:
         self.model = model
         self.db = DatabaseManager()
         
+        # Cache for romaji conversions to avoid redundant processing
+        self._romaji_cache = {}
+        
         logger.info(f"✅ AI Content Processor initialized with {model}")
+    
+    def _get_english_name(self, provider: Provider) -> str:
+        """Get consistent English name for provider
+        
+        Args:
+            provider: Provider object
+            
+        Returns:
+            English name (romaji if Japanese, original if already English)
+        """
+        original_name = provider.provider_name
+        
+        # Check cache first
+        if original_name in self._romaji_cache:
+            return self._romaji_cache[original_name]
+        
+        # Check if name contains Japanese
+        if contains_japanese(original_name):
+            # Convert to romaji
+            romaji_name = convert_to_romaji(original_name)
+            
+            # Cache and return the romaji version
+            self._romaji_cache[original_name] = romaji_name
+            
+            logger.debug(f"🔤 Converted '{original_name}' to '{romaji_name}'")
+            return romaji_name
+        else:
+            # Already in English, cache and return as-is
+            self._romaji_cache[original_name] = original_name
+            return original_name
     
     def process_providers(self, providers: List[Provider], 
                          batch_size: int = 2,
@@ -141,8 +179,9 @@ class AIContentProcessor:
         provider_details = []
         
         for idx, provider in enumerate(providers, 1):
-            # Extract provider information
-            name = provider.provider_name
+            # Extract provider information with romaji conversion
+            original_name = provider.provider_name
+            name = self._get_english_name(provider)  # Use English/romaji name
             city = provider.city or "Unknown City"
             district = provider.district or ""
             prefecture = provider.prefecture or ""
@@ -161,8 +200,13 @@ class AIContentProcessor:
             review_insights = self._analyze_reviews(provider.review_content)
             
             # Format provider details
+            name_info = name
+            if original_name != name and contains_japanese(original_name):
+                name_info = f"{name} (originally: {original_name})"
+            
             details = f"""
 Provider {idx}: {name}
+- Original Name: {original_name if original_name != name else 'Same as above'}
 - Location: {location}
 - Specialties: {', '.join(specialties) if isinstance(specialties, list) else specialties}
 - English Support: {proficiency}
@@ -231,6 +275,12 @@ SEO_TITLE:
 
 SEO_META_DESCRIPTION:
 [150-160 character meta description with call to action, focusing on location + specialty for local SEO]
+
+IMPORTANT NAME USAGE:
+- ALWAYS use the English/romaji provider name provided (NOT the original Japanese name)
+- The English name has already been converted from Japanese where necessary
+- Use this consistent English name in ALL content fields
+- Do NOT include Japanese characters in any content
 
 FORMATTING REQUIREMENTS:
 1. DESCRIPTION: Exactly 2 paragraphs, 150-175 words total
@@ -395,7 +445,8 @@ Generate content for all {len(provider_details)} providers with ALL SIX content 
         results = []
         
         for provider in providers:
-            name = provider.provider_name
+            # Use English/romaji name consistently
+            name = self._get_english_name(provider)
             city = provider.city or "Japan"
             district = provider.district or ""
             specialty = provider.specialties[0] if provider.specialties else "Healthcare"
@@ -480,6 +531,9 @@ Generate content for all {len(provider_details)} providers with ALL SIX content 
         
         for provider, content in zip(providers, content_results):
             try:
+                # Get the English name used for content
+                english_name = self._get_english_name(provider)
+                
                 # Prepare content data
                 content_data = {
                     'description': content.description,
@@ -488,15 +542,17 @@ Generate content for all {len(provider_details)} providers with ALL SIX content 
                     'english_experience_summary': content.english_experience_summary,
                     'seo_title': content.seo_title,
                     'seo_meta_description': content.seo_meta_description,
-                    'selected_featured_image': content.selected_featured_image
+                    'selected_featured_image': content.selected_featured_image,
+                    # Store the English/romaji name used
+                    'provider_name_romaji': english_name if english_name != provider.provider_name else None
                 }
                 
                 # Update in database
                 if self.db.update_provider_content(provider.id, content_data):
                     updated_count += 1
-                    logger.info(f"✅ Updated content for {provider.provider_name}")
+                    logger.info(f"✅ Updated content for {english_name}")
                 else:
-                    logger.error(f"❌ Failed to update {provider.provider_name}")
+                    logger.error(f"❌ Failed to update {english_name}")
                     
             except Exception as e:
                 logger.error(f"❌ Database update error for {provider.provider_name}: {str(e)}")
