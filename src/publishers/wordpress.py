@@ -14,7 +14,14 @@ import hashlib
 
 from ..core.database import DatabaseManager, Provider
 from .content_hash import ContentHashService
-from ..utils.romaji_converter import get_display_name, generate_romaji_for_provider
+from ..utils.romaji_converter import (
+    get_display_name, 
+    generate_romaji_for_provider,
+    contains_japanese,
+    convert_to_romaji
+)
+from ..data.master_specialties import SpecialtyNormalizer
+from ..data.master_locations import LocationValidator
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +46,13 @@ class WordPressPublisher:
         self.db = DatabaseManager()
         self.hash_service = ContentHashService()
         
+        # Initialize master data validators
+        self.specialty_normalizer = SpecialtyNormalizer()
+        self.location_validator = LocationValidator()
+        
+        # Cache for romaji conversions
+        self._romaji_cache = {}
+        
         # ACF field mappings
         self.acf_field_mappings = {
             'provider_name': 'field_669d64327e1be',
@@ -61,6 +75,55 @@ class WordPressPublisher:
         }
         
         logger.info("✅ WordPress Publisher initialized")
+    
+    def _ensure_romaji_consistency(self, provider: Provider) -> str:
+        """Ensure provider has consistent romaji name for WordPress
+        
+        Args:
+            provider: Provider object
+            
+        Returns:
+            English/romaji name for WordPress use
+        """
+        # Check cache first
+        if provider.provider_name in self._romaji_cache:
+            return self._romaji_cache[provider.provider_name]
+        
+        # Check if provider already has romaji name
+        if hasattr(provider, 'provider_name_romaji') and provider.provider_name_romaji:
+            english_name = provider.provider_name_romaji
+        elif contains_japanese(provider.provider_name):
+            # Generate romaji for Japanese name
+            english_name = convert_to_romaji(provider.provider_name)
+            # Store in database for future use
+            self.db.update_provider_field(provider.id, 'provider_name_romaji', english_name)
+            provider.provider_name_romaji = english_name
+            logger.info(f"🔤 Generated romaji: {provider.provider_name} → {english_name}")
+        else:
+            # Already in English
+            english_name = provider.provider_name
+        
+        # Cache the result
+        self._romaji_cache[provider.provider_name] = english_name
+        return english_name
+    
+    def _validate_no_japanese_in_content(self, content_dict: Dict[str, Any]) -> Dict[str, bool]:
+        """Validate that no Japanese characters exist in content fields
+        
+        Args:
+            content_dict: Dictionary of content fields
+            
+        Returns:
+            Dictionary of field names with Japanese character detection
+        """
+        fields_with_japanese = {}
+        
+        for field_name, value in content_dict.items():
+            if isinstance(value, str) and contains_japanese(value):
+                fields_with_japanese[field_name] = True
+                logger.warning(f"⚠️ Japanese characters found in field '{field_name}'")
+        
+        return fields_with_japanese
     
     def sync_providers(self, providers: List[Provider]) -> Dict[str, Any]:
         """Sync multiple providers to WordPress
@@ -109,7 +172,7 @@ class WordPressPublisher:
         return summary
     
     def create_provider(self, provider: Provider) -> Dict[str, Any]:
-        """Create a new WordPress post for a provider
+        """Create a new WordPress post for a provider with romaji consistency
         
         Args:
             provider: Provider to create
@@ -117,18 +180,13 @@ class WordPressPublisher:
         Returns:
             Result dictionary with success status
         """
-        logger.info(f"📝 Creating WordPress post for {provider.provider_name}")
+        # Get consistent English name
+        english_name = self._ensure_romaji_consistency(provider)
+        logger.info(f"📝 Creating WordPress post for {english_name} (original: {provider.provider_name})")
         
         try:
-            # Generate romaji if needed
-            if not provider.provider_name_romaji:
-                provider.provider_name_romaji = generate_romaji_for_provider(provider)
-                if provider.provider_name_romaji:
-                    # Save romaji to database for future use
-                    self.db.update_provider_field(provider.id, 'provider_name_romaji', provider.provider_name_romaji)
-            
-            # Use romaji-only title if available, otherwise original name
-            title = provider.provider_name_romaji if provider.provider_name_romaji else provider.provider_name
+            # Use English/romaji name for WordPress title
+            title = english_name
             
             # Prepare post data
             post_data = {
@@ -139,6 +197,19 @@ class WordPressPublisher:
                 'categories': self._get_categories(provider),
                 'acf': self._prepare_acf_fields(provider)
             }
+            
+            # Validate no Japanese characters in critical fields
+            critical_fields = {
+                'title': post_data['title'],
+                'seo_title': post_data['acf'].get('seo_title', ''),
+                'description': post_data['acf'].get(self.acf_field_mappings['description'], ''),
+                'excerpt': post_data['acf'].get('ai_excerpt', '')
+            }
+            
+            japanese_check = self._validate_no_japanese_in_content(critical_fields)
+            if japanese_check:
+                logger.warning(f"⚠️ Japanese characters found in {len(japanese_check)} fields: {list(japanese_check.keys())}")
+                # Continue but log the warning
             
             # Add custom taxonomies
             taxonomies = self._get_taxonomies(provider)
@@ -176,7 +247,7 @@ class WordPressPublisher:
             return {'success': False, 'error': str(e)}
     
     def update_provider(self, provider: Provider) -> Dict[str, Any]:
-        """Update an existing WordPress post
+        """Update an existing WordPress post with romaji consistency
         
         Args:
             provider: Provider to update
@@ -184,27 +255,22 @@ class WordPressPublisher:
         Returns:
             Result dictionary with success status
         """
-        logger.info(f"🔄 Updating WordPress post {provider.wordpress_post_id} for {provider.provider_name}")
+        # Get consistent English name
+        english_name = self._ensure_romaji_consistency(provider)
+        logger.info(f"🔄 Updating WordPress post {provider.wordpress_post_id} for {english_name}")
         
         try:
             # Check if update is needed
             if not self.hash_service.needs_update(provider):
-                logger.info(f"✅ No update needed for {provider.provider_name}")
+                logger.info(f"✅ No update needed for {english_name}")
                 return {'success': True, 'updated': False}
             
             # Get changed fields
             changed_fields = self.hash_service.get_changed_fields(provider)
             logger.info(f"📝 Updating fields: {', '.join(changed_fields)}")
             
-            # Generate romaji if needed
-            if not provider.provider_name_romaji:
-                provider.provider_name_romaji = generate_romaji_for_provider(provider)
-                if provider.provider_name_romaji:
-                    # Save romaji to database for future use
-                    self.db.update_provider_field(provider.id, 'provider_name_romaji', provider.provider_name_romaji)
-            
-            # Use romaji-only title if available, otherwise original name
-            title = provider.provider_name_romaji if provider.provider_name_romaji else provider.provider_name
+            # Use English/romaji name for WordPress title
+            title = english_name
             
             # Prepare update data
             post_data = {
@@ -213,6 +279,19 @@ class WordPressPublisher:
                 'categories': self._get_categories(provider),
                 'acf': self._prepare_acf_fields(provider)
             }
+            
+            # Validate no Japanese characters in critical fields
+            critical_fields = {
+                'title': post_data['title'],
+                'seo_title': post_data['acf'].get('seo_title', ''),
+                'description': post_data['acf'].get(self.acf_field_mappings['description'], ''),
+                'excerpt': post_data['acf'].get('ai_excerpt', '')
+            }
+            
+            japanese_check = self._validate_no_japanese_in_content(critical_fields)
+            if japanese_check:
+                logger.warning(f"⚠️ Japanese characters found in {len(japanese_check)} fields: {list(japanese_check.keys())}")
+                # Continue but log the warning
             
             # Add custom taxonomies
             taxonomies = self._get_taxonomies(provider)
@@ -259,14 +338,23 @@ class WordPressPublisher:
         return f"<!-- Provider: {provider.provider_name} -->"
     
     def _prepare_acf_fields(self, provider: Provider) -> Dict[str, Any]:
-        """Prepare ACF fields for WordPress
+        """Prepare ACF fields for WordPress with romaji consistency and master data validation
         
         Args:
             provider: Provider data
             
         Returns:
-            Dictionary of ACF field values
+            Dictionary of ACF field values with English names and validated data
         """
+        # Get consistent English name
+        english_name = self._ensure_romaji_consistency(provider)
+        
+        # Validate and normalize location
+        location_validation = self._validate_location(provider)
+        
+        # Validate and normalize specialties
+        specialty_validation = self._validate_specialties(provider)
+        
         # Format business hours
         hours_text = ""
         if provider.business_hours:
@@ -306,8 +394,8 @@ class WordPressPublisher:
         
         # Prepare ACF data with ALL fields from the old system
         acf_data = {
-            # Basic provider info
-            self.acf_field_mappings['provider_name']: provider.provider_name,
+            # Basic provider info with English/romaji name
+            self.acf_field_mappings['provider_name']: english_name,  # Use English name in WordPress
             self.acf_field_mappings['english_speaker']: provider.english_proficiency or 'Unknown',
             self.acf_field_mappings['location']: location,
             self.acf_field_mappings['station']: provider.nearest_station or '',
@@ -351,9 +439,24 @@ class WordPressPublisher:
             "photo_count": 0,
             "image_selection_status": "none",
             
-            # SEO Fields
-            "seo_title": provider.seo_title or provider.provider_name,
+            # SEO Fields (use English name if SEO title not available)
+            "seo_title": provider.seo_title or english_name,
             "seo_meta_description": provider.seo_meta_description or provider.ai_excerpt or '',
+            
+            # Master Data Validation Fields
+            "location_validation_status": location_validation['status'],
+            "location_needs_review": location_validation['needs_review'],
+            "location_validation_notes": location_validation['notes'],
+            "specialty_validation_status": specialty_validation['status'],
+            "specialty_needs_review": specialty_validation['needs_review'],
+            "specialty_validation_notes": specialty_validation['notes'],
+            "validated_specialties": specialty_validation['validated_specialties'],
+            "validated_location": location_validation['validated_location'],
+            
+            # Romaji fields
+            "provider_name_original": provider.provider_name,  # Keep original for reference
+            "provider_name_romaji": english_name,  # Store romaji version
+            "has_japanese_name": contains_japanese(provider.provider_name),
             
             # Business Hours (individual days)
             "business_hours": self._format_business_hours_for_acf(provider.business_hours) if hasattr(provider, 'business_hours') else '',
@@ -386,6 +489,87 @@ class WordPressPublisher:
         }
         
         return acf_data
+    
+    def _validate_location(self, provider: Provider) -> Dict[str, Any]:
+        """Validate provider location against master data
+        
+        Args:
+            provider: Provider data
+            
+        Returns:
+            Validation results dictionary
+        """
+        validation_result = {
+            'status': 'valid',
+            'needs_review': False,
+            'notes': '',
+            'validated_location': ''
+        }
+        
+        # Check city
+        if provider.city:
+            if self.location_validator.validate_location(provider.city):
+                validation_result['validated_location'] = provider.city
+            else:
+                normalized = self.location_validator.normalize_location(provider.city)
+                if self.location_validator.validate_location(normalized):
+                    validation_result['validated_location'] = normalized
+                    validation_result['notes'] = f"City normalized: {provider.city} → {normalized}"
+                else:
+                    validation_result['status'] = 'needs_review'
+                    validation_result['needs_review'] = True
+                    validation_result['notes'] = f"City '{provider.city}' not in master list"
+        
+        # Check district
+        if provider.district:
+            if not self.location_validator.validate_location(provider.district):
+                normalized = self.location_validator.normalize_location(provider.district)
+                if not self.location_validator.validate_location(normalized):
+                    validation_result['needs_review'] = True
+                    if validation_result['notes']:
+                        validation_result['notes'] += f"; District '{provider.district}' not validated"
+                    else:
+                        validation_result['notes'] = f"District '{provider.district}' not validated"
+        
+        return validation_result
+    
+    def _validate_specialties(self, provider: Provider) -> Dict[str, Any]:
+        """Validate provider specialties against master data
+        
+        Args:
+            provider: Provider data
+            
+        Returns:
+            Validation results dictionary
+        """
+        validation_result = {
+            'status': 'valid',
+            'needs_review': False,
+            'notes': '',
+            'validated_specialties': ''
+        }
+        
+        validated_specialties = []
+        notes = []
+        
+        if provider.specialties:
+            for specialty in provider.specialties[:3]:  # Limit to 3 specialties
+                normalized_result = self.specialty_normalizer.normalize_specialty(specialty)
+                validated_specialties.append(normalized_result['specialty'])
+                
+                if normalized_result.get('needs_review'):
+                    validation_result['needs_review'] = True
+                    reason = normalized_result.get('reason', 'unknown')
+                    original = normalized_result.get('original_value', specialty)
+                    notes.append(f"{original} → {normalized_result['specialty']} ({reason})")
+        
+        validation_result['validated_specialties'] = ', '.join(validated_specialties)
+        
+        if notes:
+            validation_result['notes'] = '; '.join(notes)
+            validation_result['status'] = 'needs_review'
+        
+        return validation_result
     
     def _format_reviews(self, review_content: Any) -> str:
         """Format reviews for ACF field
