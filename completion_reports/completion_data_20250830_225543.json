@@ -1,0 +1,141 @@
+{
+  "overall_completion_percentage": 65.68862953460402,
+  "weighted_completion_score": 50.43962394046774,
+  "campaign_status": "on_track",
+  "transition_decision": "continue",
+  "provider_count_criterion": {
+    "name": "Provider Count",
+    "description": "Total healthcare providers collected",
+    "current_value": 6,
+    "target_value": 5000,
+    "weight": 0.3,
+    "completion_percentage": 0.12,
+    "meets_threshold": false,
+    "threshold_percentage": 0.8,
+    "status": "critical",
+    "issues": [
+      "Only 6 providers collected (0.1% of target)",
+      "Critical shortage - far below minimum viable dataset"
+    ],
+    "recommendations": [
+      "Intensify collection efforts with optimized search strategies",
+      "Consider extending campaign timeline or reducing scope",
+      "Focus on high-yield locations identified by search optimizer"
+    ]
+  },
+  "geographic_coverage_criterion": {
+    "name": "Geographic Coverage",
+    "description": "Coverage across key locations and international areas",
+    "current_value": 25.6,
+    "target_value": 100.0,
+    "weight": 0.2,
+    "completion_percentage": 25.6,
+    "meets_threshold": false,
+    "threshold_percentage": 0.6,
+    "status": "behind",
+    "issues": [
+      "Limited geographic coverage: 14 locations covered",
+      "Insufficient international area coverage"
+    ],
+    "recommendations": [
+      "Expand to more prefectures and key international areas",
+      "Focus on Roppongi, Azabu, Shibuya, and other international districts"
+    ]
+  },
+  "quality_standards_criterion": {
+    "name": "Quality Standards",
+    "description": "Overall data and content quality score",
+    "current_value": 78.99657510851009,
+    "target_value": 85.0,
+    "weight": 0.2,
+    "completion_percentage": 92.93714718648245,
+    "meets_threshold": true,
+    "threshold_percentage": 0.88,
+    "status": "near_complete",
+    "issues": [
+      "232 providers need manual review"
+    ],
+    "recommendations": [
+      "Complete manual review queue before transition"
+    ]
+  },
+  "data_integrity_criterion": {
+    "name": "Data Integrity",
+    "description": "Romaji consistency, master data compliance, WordPress sync accuracy",
+    "current_value": 82.97463002114165,
+    "target_value": 100.0,
+    "weight": 0.15,
+    "completion_percentage": 82.97463002114165,
+    "meets_threshold": false,
+    "threshold_percentage": 0.85,
+    "status": "advanced",
+    "issues": [
+      "WordPress sync accuracy at 51.1% (target: 85%+)"
+    ],
+    "recommendations": [
+      "Fix WordPress publishing pipeline issues"
+    ]
+  },
+  "system_health_criterion": {
+    "name": "System Health",
+    "description": "Database, APIs, campaign state, and monitoring system health",
+    "current_value": 92.5,
+    "target_value": 100.0,
+    "weight": 0.1,
+    "completion_percentage": 92.5,
+    "meets_threshold": true,
+    "threshold_percentage": 0.8,
+    "status": "near_complete",
+    "issues": [],
+    "recommendations": []
+  },
+  "cost_efficiency_criterion": {
+    "name": "Cost Efficiency",
+    "description": "Budget utilization and cost per provider efficiency",
+    "current_value": 100.0,
+    "target_value": 100.0,
+    "weight": 0.05,
+    "completion_percentage": 100.0,
+    "meets_threshold": true,
+    "threshold_percentage": 0.7,
+    "status": "complete",
+    "issues": [],
+    "recommendations": []
+  },
+  "total_providers": 6,
+  "target_providers": 5000,
+  "geographic_coverage_percentage": 25.6,
+  "quality_score": 78.99657510851009,
+  "data_integrity_score": 82.97463002114165,
+  "system_health_score": 92.5,
+  "budget_utilization": 0.12266666666666673,
+  "estimated_completion_date": "2032-07-01",
+  "days_remaining": 2497,
+  "current_daily_rate": 2.0,
+  "required_daily_rate": 200.0,
+  "readiness_score": 50.43962394046774,
+  "critical_blockers": [
+    "Only 6 providers collected (0.1% of target)",
+    "Critical shortage - far below minimum viable dataset",
+    "Limited geographic coverage: 14 locations covered",
+    "Insufficient international area coverage"
+  ],
+  "minor_issues": [],
+  "transition_recommendations": [
+    "\ud83d\ude80 CONTINUE CAMPAIGN: Core objectives not yet met",
+    "\ud83d\udcca Focus on highest-priority completion criteria",
+    "\ud83d\udcb0 Optimize remaining budget for maximum provider yield",
+    "\u23f0 Set target completion date based on current progress rate",
+    "Intensify collection efforts with optimized search strategies",
+    "Consider extending campaign timeline or reducing scope",
+    "Expand to more prefectures and key international areas",
+    "Focus on Roppongi, Azabu, Shibuya, and other international districts"
+  ],
+  "risk_level": "low",
+  "risk_factors": [
+    "Insufficient provider dataset for reliable service"
+  ],
+  "mitigation_strategies": [
+    "Focus collection on highest-density areas for maximum yield"
+  ]
+}
