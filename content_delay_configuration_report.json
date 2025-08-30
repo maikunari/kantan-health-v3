@@ -1,0 +1,57 @@
+{
+  "test_date": "2025-08-30T23:53:18.393142",
+  "total_providers_tested": 473,
+  "aggressive_approach": {
+    "update_plans": 40,
+    "estimated_cost": 100.0,
+    "delay_enabled": false
+  },
+  "conservative_approach": {
+    "update_plans": 50,
+    "estimated_cost": 100.0,
+    "delay_months": 6,
+    "delay_enabled": true
+  },
+  "cost_analysis": {
+    "cost_savings": 0.0,
+    "cost_reduction_percent": 0.0
+  },
+  "provider_status_distribution": {
+    "recently_added": 37,
+    "fresh": 30,
+    "delay_period_active": 216,
+    "aging": 190
+  },
+  "quality_distribution": {
+    "critical_quality": 0,
+    "quality_issues": 0,
+    "good_quality": 0,
+    "excellent_quality": 473
+  },
+  "override_statistics": {
+    "override_eligible": 63,
+    "delay_period_active": 216
+  },
+  "configuration_flexibility": {
+    "No Delay": {
+      "delay_months": 0,
+      "update_plans": 50,
+      "estimated_cost": 100.0
+    },
+    "Short Delay": {
+      "delay_months": 3,
+      "update_plans": 50,
+      "estimated_cost": 100.0
+    },
+    "Standard Delay": {
+      "delay_months": 6,
+      "update_plans": 50,
+      "estimated_cost": 100.0
+    },
+    "Long Delay": {
+      "delay_months": 12,
+      "update_plans": 50,
+      "estimated_cost": 100.0
+    }
+  }
+}

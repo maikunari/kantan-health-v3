@@ -1,0 +1,41 @@
+{
+  "report_id": "content_analytics_20250830_234535",
+  "generated_at": "2025-08-30T23:45:35.916392",
+  "analysis_period_days": 30,
+  "total_providers_analyzed": 473,
+  "average_performance_score": 85.0,
+  "top_performing_providers": [
+    "provider_5",
+    "provider_9",
+    "provider_48",
+    "provider_7",
+    "provider_4"
+  ],
+  "underperforming_providers": [
+    "provider_44",
+    "provider_11",
+    "provider_24",
+    "provider_23",
+    "provider_6"
+  ],
+  "total_page_views": 16498,
+  "average_session_duration": 201.56,
+  "average_bounce_rate": 0.49596,
+  "traffic_trend": "high",
+  "quality_score_distribution": {
+    "80-89": 473
+  },
+  "quality_improvement_rate": 0.0,
+  "quality_issues_identified": [],
+  "updates_performed": 46,
+  "update_success_rate": 97.03448275862068,
+  "average_quality_improvement": 3.2,
+  "cost_per_quality_point": 0.78,
+  "priority_actions": [],
+  "optimization_opportunities": [],
+  "budget_recommendations": {
+    "next_month_budget": 0.0,
+    "priority_updates": 0,
+    "maintenance_budget": 200.0
+  }
+}

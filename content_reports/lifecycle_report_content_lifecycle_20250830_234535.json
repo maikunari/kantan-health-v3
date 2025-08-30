@@ -1,0 +1,29 @@
+{
+  "report_id": "content_lifecycle_20250830_234535",
+  "generated_at": "2025-08-30T23:45:35.919903",
+  "total_providers": 473,
+  "content_status_distribution": {
+    "fresh": 3,
+    "aging": 6,
+    "stale": 9,
+    "outdated": 455
+  },
+  "priority_distribution": {},
+  "updates_completed_30d": 0,
+  "updates_failed_30d": 0,
+  "average_quality_improvement": 0.0,
+  "cost_per_update": 2.0,
+  "content_freshness_score": 7.7111081721021435,
+  "romaji_consistency_score": 100.0,
+  "wordpress_sync_success_rate": 100.0,
+  "recommended_actions": [
+    "High priority: 455 providers have outdated content requiring immediate updates"
+  ],
+  "budget_utilization": 0.0,
+  "projected_next_month": {
+    "providers_aging_soon": 3,
+    "high_priority_updates": 0,
+    "estimated_cost": 6.0,
+    "budget_required": 6.0
+  }
+}

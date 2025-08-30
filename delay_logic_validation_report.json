@@ -1,0 +1,39 @@
+{
+  "validation_date": "2025-08-31T00:01:10.542416",
+  "total_providers": 473,
+  "provider_age_range": {
+    "min_days": 0,
+    "max_days": 59,
+    "avg_days": 44.03171247357294
+  },
+  "status_distribution": {
+    "recently_added": 121,
+    "needs_update": 9,
+    "delay_period_active": 343
+  },
+  "validation_results": {
+    "aging_status_fixed": true,
+    "no_premature_ready_providers": true,
+    "expected_status_percentage": 100.0,
+    "immediate_update_percentage": 1.0570824524312896
+  },
+  "delay_period_comparison": {
+    "0": {
+      "update_plans": 100,
+      "percentage": 21.141649048625794
+    },
+    "3": {
+      "update_plans": 5,
+      "percentage": 1.0570824524312896
+    },
+    "6": {
+      "update_plans": 5,
+      "percentage": 1.0570824524312896
+    },
+    "12": {
+      "update_plans": 5,
+      "percentage": 1.0570824524312896
+    }
+  },
+  "quality_overrides": 0
+}

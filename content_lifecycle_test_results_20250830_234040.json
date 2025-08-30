@@ -1,0 +1,88 @@
+{
+  "test_suite": "Content Lifecycle Comprehensive Test Suite",
+  "execution_time": "2025-08-30T23:40:40.571332",
+  "total_tests": 9,
+  "passed_tests": 6,
+  "failed_tests": 3,
+  "success_rate": 66.66666666666666,
+  "individual_results": [
+    {
+      "test_name": "content_aging_analysis",
+      "status": "PASSED",
+      "details": {
+        "status_classification_correct": true,
+        "freshness_scoring_accurate": true,
+        "change_detection_working": true,
+        "all_age_ranges_handled": true
+      }
+    },
+    {
+      "test_name": "content_prioritization_system",
+      "status": "FAILED",
+      "error": ""
+    },
+    {
+      "test_name": "content_metrics_creation",
+      "status": "PASSED",
+      "details": {
+        "metrics_structure_valid": true,
+        "data_type_validation": true,
+        "edge_cases_handled": true,
+        "all_fields_accessible": true
+      }
+    },
+    {
+      "test_name": "update_plan_generation",
+      "status": "FAILED",
+      "error": ""
+    },
+    {
+      "test_name": "content_update_execution",
+      "status": "PASSED",
+      "details": {
+        "update_execution_completed": true,
+        "timing_tracked": true,
+        "success_status_recorded": true,
+        "error_handling_working": true
+      }
+    },
+    {
+      "test_name": "lifecycle_report_generation",
+      "status": "PASSED",
+      "details": {
+        "report_structure_valid": true,
+        "metrics_calculation_correct": true,
+        "recommendations_generated": true,
+        "projections_included": true,
+        "budget_tracking_accurate": true
+      }
+    },
+    {
+      "test_name": "provider_analysis_system",
+      "status": "PASSED",
+      "details": {
+        "analysis_completed": true,
+        "metrics_structure_correct": true,
+        "quality_scores_valid": true,
+        "age_calculations_accurate": true,
+        "status_flags_correct": true
+      }
+    },
+    {
+      "test_name": "maintenance_integration",
+      "status": "FAILED",
+      "error": "'MaintenanceModeManager' object has no attribute 'scheduler'"
+    },
+    {
+      "test_name": "content_lifecycle_workflow",
+      "status": "PASSED",
+      "details": {
+        "content_analysis_completed": true,
+        "update_plans_generated": true,
+        "update_execution_working": true,
+        "lifecycle_reporting_functional": true,
+        "workflow_integration_successful": true
+      }
+    }
+  ]
+}
